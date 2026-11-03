@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Realms, Kings and Other Stuff</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="hud">
+      <div class="hud-title">Realms, Kings and Other Stuff <span class="hud-build">Phase 0 skeleton</span></div>
+      <div class="hud-row">
+        <label>Seed <input id="seed" type="text" value="realms" size="12" /></label>
+        <label>Size
+          <select id="size">
+            <option value="160x100" selected>160 × 100 (test map)</option>
+            <option value="80x50">80 × 50 (small)</option>
+            <option value="400x250">400 × 250 (engine max)</option>
+          </select>
+        </label>
+        <button id="generate">Generate draft</button>
+      </div>
+      <div class="hud-row hud-info">
+        <span id="info-map"></span>
+      </div>
+      <div class="hud-row hud-info">
+        <span id="info-hex">Hover a hex</span>
+      </div>
+      <div class="hud-row hud-info hud-dim">
+        <span id="info-perf"></span>
+      </div>
+      <div class="hud-row hud-help hud-dim">Drag to pan · wheel to zoom · arrow keys to scroll · G toggles grid</div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

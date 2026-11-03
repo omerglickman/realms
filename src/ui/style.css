@@ -1,0 +1,93 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1b2430;
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #e8e0cc;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+#map canvas {
+  display: block;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(20, 26, 34, 0.86);
+  border: 1px solid #5a4a2e;
+  border-radius: 4px;
+  padding: 10px 14px;
+  min-width: 300px;
+  font-size: 13px;
+  line-height: 1.5;
+  user-select: none;
+}
+
+.hud-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #f0d78c;
+  margin-bottom: 6px;
+}
+
+.hud-build {
+  font-size: 11px;
+  font-weight: normal;
+  color: #9a8c6a;
+  margin-left: 8px;
+}
+
+.hud-row {
+  margin: 4px 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hud-info {
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.hud-dim {
+  color: #9a9484;
+}
+
+.hud-help {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+#hud label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+#hud input, #hud select, #hud button {
+  font: inherit;
+  font-size: 12px;
+  background: #2a3240;
+  color: #e8e0cc;
+  border: 1px solid #5a4a2e;
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+#hud button {
+  cursor: pointer;
+  background: #4a3a1e;
+}
+
+#hud button:hover {
+  background: #6a5428;
+}
