@@ -138,7 +138,7 @@ Goal: see the world, edit the world.
 - [ ] Resource spawning from `data/resources.json` terrain weights.
 - [x] Save/load of the map (download/upload JSON). *(Session 3)*
 - [x] First test map draft (~160×100) generated, saved to `maps/testmap.json`, and handed to Omer for editing. *(Session 2)*
-- [ ] Omer's edited map committed back as `maps/testmap.json`.
+- [x] Omer's edited map committed back as `maps/testmap.json` (revision 1, Session 3b). Repeat as he edits.
 
 **Acceptance**: Omer can generate a draft, paint it, save it, reload it; 400×250 renders smoothly on his machine.
 
