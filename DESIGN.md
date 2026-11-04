@@ -115,7 +115,7 @@ Hexes are *unknown*, *explored* or *visible*. Settlements and units see 2 hexes 
 | Wine | River 4.5% · Hills 3.5% · Plains 1.2% | luxury |
 | Silver | Mountains 2.8% · Hills 0.5% (min 4 hexes apart) | money |
 
-Horses come from pasture (terrain), not a resource. The test map's resources are placed in the editor (seeded spawn, then hand-edits) and live in the map file. OPEN: Furs and Game overlap (both forest/woodland/tundra) — keep both, or fold furs into game?
+Horses are not a resource (DECIDED 2026-11-04): to recruit mounted units — and possibly to sustain them — a settlement needs **access to a pasture-bearing hex**, either by direct control (in its zone) or via a road connection to a settlement that has one. Fish may also be placed **offshore**, away from the coast (DECIDED 2026-11-04): such hexes are only workable by a town or city with an improved port — a later building; the spawner still only auto-places fish on coastal sea, offshore fish are hand-placed. The test map's resources are placed in the editor (seeded spawn, then hand-edits) and live in the map file. OPEN: Furs and Game overlap (both forest/woodland/tundra) — keep both, or fold furs into game?
 
 ### 3.2 Units (DECIDED concept, PROPOSED roster)
 
@@ -308,6 +308,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.2d (2026-11-04): horses via pasture access; offshore fish for ports.
 - 0.2c (2026-11-04): §3.1 rewritten — fertility/pasture/timber are terrain yields (Omer's decision); Game added; resource table with current spawn chances.
 - 0.2b (2026-11-04): §3.1 note on the implemented resource table.
 - 0.2a (2026-11-04): starting canvas chosen (seed vinral) and frozen as `maps/testmap.json`.
