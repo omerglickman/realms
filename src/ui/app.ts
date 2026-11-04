@@ -4,7 +4,7 @@
 import { Application, Graphics } from 'pixi.js';
 import { MapRenderer, HEX_SIZE } from './render/mapRenderer';
 import { Camera } from './camera';
-import { generateDraftMap } from '../sim/mapgen';
+import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
 import { pixelToAxial, axialToOffset, offsetToPixel, hexCorners } from '../sim/hex';
 import { inBounds, getTerrain, countTerrain } from '../sim/map';
@@ -29,8 +29,40 @@ export async function startApp(): Promise<void> {
   });
   host.appendChild(app.canvas);
 
+  // ---- generator settings (also readable from the URL hash, e.g.
+  //      realms.html#seed=orkney&w=160&h=100&continents=2&islands=6&land=45) ----
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const seedInput = el<HTMLInputElement>('seed');
+  const sizeSel = el<HTMLSelectElement>('size');
+  const contSel = el<HTMLSelectElement>('continents');
+  const islandsInput = el<HTMLInputElement>('islands');
+  const landInput = el<HTMLInputElement>('land');
+  if (hash.get('seed')) seedInput.value = hash.get('seed')!;
+  if (hash.get('w') && hash.get('h')) {
+    const v = `${hash.get('w')}x${hash.get('h')}`;
+    if ([...sizeSel.options].some((o) => o.value === v)) sizeSel.value = v;
+  }
+  if (hash.get('continents')) contSel.value = hash.get('continents')!;
+  if (hash.get('islands')) islandsInput.value = hash.get('islands')!;
+  if (hash.get('land')) landInput.value = hash.get('land')!;
+  const syncLandLabel = () => { el('land-val').textContent = `${landInput.value}%`; };
+  landInput.addEventListener('input', syncLandLabel);
+  syncLandLabel();
+
+  function readParams(): MapGenParams {
+    const [w, h] = sizeSel.value.split('x').map(Number);
+    return {
+      seed: seedInput.value.trim() || 'realms',
+      width: w,
+      height: h,
+      continents: Number(contSel.value) || MAPGEN_DEFAULTS.continents,
+      islands: Number(islandsInput.value) || 0,
+      landFraction: (Number(landInput.value) || 45) / 100,
+    };
+  }
+
   // ---- state ----
-  let state: GameState = newGame('realms', 160, 100);
+  let state: GameState = newGameFrom(readParams());
   const renderer = new MapRenderer(state.map);
   const camera = new Camera(renderer.root, app.screen.width, app.screen.height);
   const hover = new Graphics();
@@ -38,9 +70,11 @@ export async function startApp(): Promise<void> {
   app.stage.addChild(renderer.root);
   applyMap();
 
-  function newGame(seed: string, w: number, h: number): GameState {
-    const map = generateDraftMap({ width: w, height: h, seed });
-    return createGameState(seed, map);
+  function newGameFrom(p: MapGenParams): GameState {
+    const map = generateDraftMap(p);
+    const st = createGameState(String(p.seed), map);
+    location.hash = `seed=${encodeURIComponent(String(p.seed))}&w=${p.width}&h=${p.height}&continents=${p.continents}&islands=${p.islands}&land=${Math.round((p.landFraction ?? 0.45) * 100)}`;
+    return st;
   }
 
   function applyMap(): void {
@@ -57,13 +91,23 @@ export async function startApp(): Promise<void> {
   }
 
   // ---- HUD controls ----
-  el<HTMLButtonElement>('generate').addEventListener('click', () => {
-    const seed = el<HTMLInputElement>('seed').value.trim() || 'realms';
-    const [w, h] = el<HTMLSelectElement>('size').value.split('x').map(Number);
+  function regenerate(): void {
     const t0 = performance.now();
-    state = newGame(seed, w, h);
+    state = newGameFrom(readParams());
     applyMap();
     el('info-perf').textContent = `generated in ${(performance.now() - t0).toFixed(0)} ms`;
+  }
+  el<HTMLButtonElement>('generate').addEventListener('click', regenerate);
+  el<HTMLButtonElement>('random').addEventListener('click', () => {
+    const syll = ['ar', 'bel', 'cor', 'dun', 'el', 'fen', 'gal', 'hol', 'is', 'kar', 'lin', 'mor', 'nor', 'os', 'ral', 'sil', 'tor', 'ul', 'vin', 'wen'];
+    const n = 2 + Math.floor(Math.random() * 2);
+    let w = '';
+    for (let i = 0; i < n; i++) w += syll[Math.floor(Math.random() * syll.length)];
+    seedInput.value = w;
+    regenerate();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.target as HTMLElement)?.id === 'seed') regenerate();
   });
 
   // ---- input: pan / zoom / hover ----

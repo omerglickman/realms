@@ -9,13 +9,14 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 - **Phase:** 0 — Skeleton and map. Skeleton done; map editor not started.
 - **Repository:** GitHub `omerglickman/realms` (private). Claude has push access. Default branch `main`.
 - **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (19 passing). Headless: `npm run sim -- --seed realms --width 160 --height 100 --turns 24`.
-- **Last playable build:** `realms.html` from Session 1 (2026-11-03) — pan/zoom hex map with draft terrain, seed + size controls, hover readout, fps readout.
-- **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude noise draft generator (elevation + moisture + latitude, lakes, downhill rivers); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, F = fit, G = grid toggle; HUD.
-- **Known broken / limitations:** no editor yet, so the map cannot be changed by hand; no resources; no save/load UI (only in code); generator parameters other than seed and size not exposed; tundra appears only on the southern edge of most seeds (the northern band is usually sea from the edge falloff) — cosmetic for a draft; real fps not yet measured on Omer's machine.
+- **Last playable build:** `realms.html` from Session 2 (2026-11-04) — pan/zoom hex map; draft generator with seed, size, continents (1–3), islands, land % controls and a Random button; settings also in the URL hash (`realms.html#seed=…&continents=…`).
+- **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude draft generator (1–3 continents in horizontal slots with sea channels between them + islands, domain-warped coastlines, fractal noise, sea level from land fraction, ridged-noise mountain ranges, moisture bands, northern tundra, lakes, meandering downhill rivers); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, F = fit, G = grid toggle; HUD.
+- **Known broken / limitations:** no editor yet, so the map cannot be changed by hand; no resources; no save/load UI (only in code); generator produces fewer islands than requested when they fall near a continent (they merge) — acceptable for a draft; at land ≥55% continents tend to touch.
+- **Performance (measured by Omer 2026-11-04):** 60–61 fps at every map size including 400×250 fully zoomed out. Budget met.
 - **Next steps (in order):**
-  1. Omer opens `realms.html`, confirms it runs, reports the fps shown in the HUD at full zoom-out on the 400×250 size, and says whether the draft look is a reasonable starting point.
-  2. Session 2: **map editor** — terrain palette, brush (sizes 1/2/3/5), fill-region, undo/redo via a command layer (`src/sim/commands.ts`), generator parameter controls (land fraction, scale, rivers), export/import of `maps/*.json` through download/upload, and `maps/testmap.json` committed as the starting draft.
-  3. Session 3: resources (`data/resources.json`, spawn weights by terrain, render as small icons/dots), resource painting in the editor, map save/load polish, Phase 0 acceptance review with Omer.
+  1. Omer picks a starting canvas (seed + continents/islands/land settings) from the candidate sheet or by playing with the Random button; the chosen settings go into `maps/testmap.json` once the editor can save.
+  2. Session 3: **map editor** — terrain palette, brush (sizes 1/2/3/5), fill-region, undo/redo via a command layer (`src/sim/commands.ts`), generator parameter controls (land fraction, scale, rivers), export/import of `maps/*.json` through download/upload, and `maps/testmap.json` committed as the starting draft.
+  3. Session 4: resources (`data/resources.json`, spawn weights by terrain, render as small icons/dots), resource painting in the editor, map save/load polish, Phase 0 acceptance review with Omer.
 - **Scheduled design sessions:** "Government & Institutions" (DESIGN §4.3) before Phase 2.
 - **Open questions for Omer:** DESIGN.md §5 (desert; number of factions).
 
@@ -116,3 +117,30 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 **Next session should:**
 1. Read Omer's feedback on the first build (fps at 400×250 full zoom-out; draft look).
 2. Build the map editor with a command layer, brushes, fill, undo/redo, generator parameters, export/import JSON; commit `maps/testmap.json`.
+
+## 2026-11-04 — Session 2 — Continents & islands generator
+
+**Phase:** 0 — **Goal of session:** Omer reported 60 fps at all sizes and asked for several candidate maps with 1–3 continents plus big islands to choose from.
+
+**Done:**
+- `src/sim/mapgen.ts` rewritten: land-mass field (continents placed in horizontal slots with Gaussian sea channels between slots; islands with a height boost so they clear the sea level), domain warping of the mass field for non-elliptical coastlines, fractal noise, sea level from land fraction, ridged noise for mountain ranges (mountains > 0.78, hills > 0.66 — tuned so mountains ≈ 3–4 % and hills ≈ 8 % of the map at 45 % land), northern tundra band with noise, lakes, meandering rivers that stop when they join another river.
+- HUD: continents (1–3), islands (0–20), land % slider, Random seed button, Enter in the seed box regenerates; all settings read from / written to the URL hash so a map can be shared or scripted (`realms.html#seed=karlin&w=160&h=100&continents=3&islands=5&land=45`).
+- Contact sheet of 8 candidates rendered via Playwright (`file://` load, HUD hidden, fit-to-screen) and composed with PIL → delivered to Omer.
+
+**How it was done / decisions of note:**
+- Playwright gotcha: `page.goto` to the same file with only a different `#hash` does not reload the page — go to `about:blank` first.
+- The generator is still deliberately crude (DESIGN §2.2). Omer will repaint whatever he picks.
+
+**Design decisions made by Omer this session:** none new. Performance budget (ROADMAP B.3.9) confirmed met on his machine.
+
+**Broken / unfinished:** as in Current state.
+
+**Tests & build:** pass (19/19; build clean; headless browser load clean).
+
+**Commit(s):** `phase0: continents/islands draft generator, HUD controls, URL-hash params`.
+
+**Build delivered:** `realms.html` (Session 2) + `map_candidates.png`.
+
+**Next session should:**
+1. Note Omer's chosen canvas (seed/settings) in DESIGN §2.2 or DEVLOG.
+2. Build the map editor (command layer, brushes, fill, undo/redo, export/import JSON) and save the chosen draft as `maps/testmap.json`.
