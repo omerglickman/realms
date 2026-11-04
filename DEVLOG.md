@@ -6,16 +6,16 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 ## CURRENT STATE (always kept up to date — overwrite this block, don't append to it)
 
-- **Phase:** 0 — Skeleton and map. Skeleton done; starting canvas chosen and frozen; map editor not started.
+- **Phase:** 0 — Skeleton and map. Skeleton, canvas and terrain editor done; resources remain, then Phase 0 acceptance.
 - **Repository:** GitHub `omerglickman/realms` (private). Claude has push access. Default branch `main`.
-- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (23 passing). Headless: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json` to write a map file).
-- **Last playable build:** `realms.html` from Session 2 (2026-11-04) — opens on the frozen test map (`maps/testmap.json`, embedded in the build); draft generator with seed, size, continents (1–3), islands, land % controls, Random button, and a "Test map" button to return to the shipped map; generator settings also work from the URL hash (`realms.html#seed=…&continents=…`).
+- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (28 passing). Headless: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json` to write a map file).
+- **Last playable build:** `realms.html` from Session 3 (2026-11-04) — opens on the frozen test map; **map editor** (E or "Edit map"): terrain palette with number keys, Brush (B) sizes 1/2/3/5 (`[` `]`), Fill (F), Pick (I), undo/redo (Ctrl+Z / Ctrl+Y, 200 steps), Export .json / Import…, autosave to browser storage with a Restore/Discard prompt on next open, unsaved-edits warning on close; left-drag paints, right/middle-drag pans. Generator is folded into a "New draft…" disclosure.
 - **The map:** `maps/testmap.json` = seed `vinral`, 160×100, 2 continents, 6 islands, 45 % land (DESIGN §2.2). The file is canonical; the editor (next session) edits it; the generator only makes new drafts.
 - **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude draft generator (1–3 continents in horizontal slots with sea channels between them + islands, domain-warped coastlines, fractal noise, sea level from land fraction, ridged-noise mountain ranges, moisture bands, northern tundra, lakes, meandering downhill rivers); map file format `src/sim/mapfile.ts` (versioned, terrain ids stored for safe re-mapping); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, F = fit, G = grid toggle; HUD.
-- **Known broken / limitations:** no editor yet, so the map cannot be changed by hand; no resources; no save/load UI (only in code); generator produces fewer islands than requested when they fall near a continent (they merge) — acceptable for a draft; at land ≥55% continents tend to touch.
+- **Known broken / limitations:** no resources yet; no map resize in the editor; editing works on the embedded copy of the test map — Omer's edited file must be sent back (attach the exported .json to a chat) for the session to commit it as `maps/testmap.json`; generator produces fewer islands than requested when they fall near a continent (they merge) — acceptable for a draft; at land ≥55% continents tend to touch.
 - **Performance (measured by Omer 2026-11-04):** 60–61 fps at every map size including 400×250 fully zoomed out. Budget met.
 - **Next steps (in order):**
-  1. Session 3: **map editor** — editor mode toggle, terrain palette, brush (sizes 1/2/3/5), fill-region, undo/redo via a command layer (`src/sim/commands.ts`), export of the edited map as a `.json` download and import by file upload; Omer's edited file replaces `maps/testmap.json` in the repo (Omer attaches it to a chat, or the session asks for it).
+  1. Omer tries the editor; reports what is awkward. When he has an edited map he likes, he attaches the exported `.json` to a chat and the session commits it as `maps/testmap.json` (then the build opens on it).
   2. Session 4: resources (`data/resources.json`, spawn weights by terrain, render as small icons/dots), resource painting in the editor, map save/load polish, Phase 0 acceptance review with Omer.
 - **Scheduled design sessions:** "Government & Institutions" (DESIGN §4.3) before Phase 2.
 - **Open questions for Omer:** DESIGN.md §5 (desert; number of factions).
@@ -147,3 +147,31 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 **Next session should:**
 1. Build the map editor (command layer, brushes, fill, undo/redo, export/import JSON) working on `maps/testmap.json`.
+
+## 2026-11-04 — Session 3 — Map editor
+
+**Phase:** 0 — **Goal of session:** the map editor, working on `maps/testmap.json`.
+
+**Done:**
+- `src/sim/commands.ts` — command layer: `setTerrain` (list of cell edits) and `replaceMap`; `applyCommand` returns the inverse; helpers `brushCells` (hex range clipped to the map), `paintCommand`, `floodFillCommand` (connected same-terrain region, capped at 200k cells). 5 tests (28 total).
+- `src/ui/editor/editor.ts` — `Editor` class owning the `#editor` panel: palette built from `TERRAIN` (keys 1–9, 0, S), tools Brush/Fill/Pick (B/F/I), brush radii 0/1/2/4 = sizes 1/2/3/5 (`[`/`]`), stroke = one undo step (original terrain per cell recorded on first touch; redo rebuilt from final values), undo/redo stacks (200), Export (Blob download named after the map), Import (file input → `loadMapFile` → `replaceMap` command, history reset), autosave to `localStorage` 0.8 s after the last change with a Restore/Discard notice on next load, `beforeunload` warning when dirty.
+- `src/ui/app.ts` rewired: edit mode toggle (E / button), left button paints in edit mode, right/middle button pans, hover shows the brush footprint, `Home` fits (F is now Fill), chunk invalidation per edited cell, "New draft…" generator controls collapsed into a `<details>`.
+- `index.html` / `style.css` — editor panel on the right.
+
+**How it was done / decisions of note:**
+- Verified in headless Chromium: paint stroke → hover shows Mountains; Ctrl+Z → Sea; Ctrl+Y; right-drag pans while editing; Export downloads a valid `realms-map` file (16,000 cells); Fill replaces a connected sea region; Import reloads the exported file; autosave status updates; zero console errors.
+- Editing works on the embedded copy of `maps/testmap.json`. Round trip to the repo is manual: Omer exports, attaches the file to a chat, the session commits it. A later convenience could be a GitHub upload, but not needed now.
+
+**Design decisions made by Omer this session:** none new.
+
+**Broken / unfinished:** no map resize; no resources (next session).
+
+**Tests & build:** pass (28/28; build clean; headless browser run clean).
+
+**Commit(s):** `phase0: map editor — command layer, brush/fill/pick, undo/redo, export/import, autosave`.
+
+**Build delivered:** `realms.html` (Session 3).
+
+**Next session should:**
+1. Read Omer's feedback on the editor.
+2. Resources: `data/resources.json` with spawn weights per terrain (DESIGN §3.1 list), a resource layer in `MapData` (and the map file, version 2 with migration), spawning in the generator and a "Spawn resources" action in the editor, resource painting/erasing, small icon rendering, HUD readout.

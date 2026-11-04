@@ -8,43 +8,79 @@
   </head>
   <body>
     <div id="map"></div>
+
     <div id="hud">
-      <div class="hud-title">Realms, Kings and Other Stuff <span class="hud-build">Phase 0 skeleton</span></div>
+      <div class="hud-title">Realms, Kings and Other Stuff <span class="hud-build">Phase 0 · editor</span></div>
       <div class="hud-row">
-        <label>Seed <input id="seed" type="text" value="vinral" size="10" /></label>
-        <button id="random" title="Pick a random seed and generate">Random</button>
-        <label>Size
-          <select id="size">
-            <option value="160x100" selected>160 × 100 (test map)</option>
-            <option value="80x50">80 × 50 (small)</option>
-            <option value="400x250">400 × 250 (engine max)</option>
-          </select>
-        </label>
-      </div>
-      <div class="hud-row">
-        <label>Continents
-          <select id="continents">
-            <option value="1">1</option>
-            <option value="2" selected>2</option>
-            <option value="3">3</option>
-          </select>
-        </label>
-        <label>Islands <input id="islands" type="number" min="0" max="20" value="6" style="width:3em" /></label>
-        <label>Land <input id="land" type="range" min="25" max="70" value="45" style="width:6em" /> <span id="land-val">45%</span></label>
-        <button id="generate">Generate draft</button>
+        <button id="edit-toggle">Edit map</button>
         <button id="testmap" title="Reload the shipped test map">Test map</button>
+        <details id="gen">
+          <summary>New draft…</summary>
+          <div class="hud-row">
+            <label>Seed <input id="seed" type="text" value="vinral" size="10" /></label>
+            <button id="random" title="Pick a random seed and generate">Random</button>
+            <label>Size
+              <select id="size">
+                <option value="160x100" selected>160 × 100</option>
+                <option value="80x50">80 × 50</option>
+                <option value="400x250">400 × 250</option>
+              </select>
+            </label>
+          </div>
+          <div class="hud-row">
+            <label>Continents
+              <select id="continents">
+                <option value="1">1</option>
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+            <label>Islands <input id="islands" type="number" min="0" max="20" value="6" style="width:3em" /></label>
+            <label>Land <input id="land" type="range" min="25" max="70" value="45" style="width:6em" /> <span id="land-val">45%</span></label>
+            <button id="generate">Generate draft</button>
+          </div>
+        </details>
       </div>
-      <div class="hud-row hud-info">
-        <span id="info-map"></span>
-      </div>
-      <div class="hud-row hud-info">
-        <span id="info-hex">Hover a hex</span>
-      </div>
-      <div class="hud-row hud-info hud-dim">
-        <span id="info-perf"></span>
-      </div>
-      <div class="hud-row hud-help hud-dim">Drag to pan · wheel to zoom · arrow keys to scroll · G toggles grid</div>
+      <div class="hud-row hud-info"><span id="info-map"></span></div>
+      <div class="hud-row hud-info"><span id="info-hex">Hover a hex</span></div>
+      <div class="hud-row hud-info hud-dim"><span id="info-perf"></span></div>
+      <div class="hud-row hud-help hud-dim" id="help-view">Drag to pan · wheel to zoom · arrows scroll · Home fits · G grid · E editor</div>
     </div>
+
+    <div id="editor" class="hidden">
+      <div class="panel-title">Map editor</div>
+      <div id="editor-restore" class="hidden notice">
+        <span id="editor-restore-label"></span>
+        <button id="editor-restore-yes">Restore</button>
+        <button id="editor-restore-no">Discard</button>
+      </div>
+      <div class="row">
+        <label>Name <input id="map-name" type="text" size="16" /></label>
+        <span id="editor-dirty" class="dirty"></span>
+      </div>
+      <div class="row">
+        <button id="editor-export" title="Download the map as a .json file">Export .json</button>
+        <button id="editor-import" title="Load a map .json file">Import…</button>
+        <input id="editor-import-file" type="file" accept="application/json,.json" class="hidden" />
+        <button id="editor-undo" title="Ctrl+Z">Undo</button>
+        <button id="editor-redo" title="Ctrl+Y">Redo</button>
+      </div>
+      <div class="row small"><span id="editor-msg"></span> <span id="editor-autosave-status" class="dim"></span></div>
+      <div class="section">Tool</div>
+      <div class="row">
+        <button id="tool-brush" title="B">Brush</button>
+        <button id="tool-fill" title="F — fill a connected region">Fill</button>
+        <button id="tool-pick" title="I — pick the terrain under the cursor">Pick</button>
+      </div>
+      <div class="section">Brush size <span class="dim">[ ]</span></div>
+      <div class="row" id="brush-sizes">
+        <button>1</button><button>2</button><button>3</button><button>5</button>
+      </div>
+      <div class="section">Terrain</div>
+      <div id="palette"></div>
+      <div class="help dim">Left-drag paints · right-drag or middle-drag pans · wheel zooms · Ctrl+Z / Ctrl+Y undo/redo · number keys pick terrain</div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

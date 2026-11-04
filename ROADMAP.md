@@ -132,11 +132,13 @@ Goal: see the world, edit the world.
 - [x] Hex grid math with tests; rectangular map store sized up to 400×250. *(Session 1)*
 - [x] Map rendering with chunking, culling, pan/zoom, terrain colours (placeholder art), hex coordinates on hover. *(Session 1)*
 - [x] Noise-based draft generator with seed and size. *(Session 1 — crude; parameters not yet exposed in the UI)*
-- [ ] **Map editor**: paint terrain (brush sizes), fill, undo; place/remove resources; generator parameters; import/export `maps/testmap.json`.
-- [ ] Command layer (`commands.ts`) — editor edits go through it.
+- [x] **Map editor** (terrain): palette, brush sizes 1/2/3/5, flood fill, pick, undo/redo, export/import `.json`, autosave. *(Session 3)* — resource placement comes with resources.
+- [x] Command layer (`commands.ts`) — editor edits go through it. *(Session 3)*
+- [x] Generator parameters (continents, islands, land %) and the chosen canvas frozen as `maps/testmap.json`. *(Session 2)*
 - [ ] Resource spawning from `data/resources.json` terrain weights.
-- [ ] Save/load of the map (download/upload JSON).
-- [ ] First test map draft (~160×100) generated, saved to `maps/testmap.json`, and handed to Omer for editing.
+- [x] Save/load of the map (download/upload JSON). *(Session 3)*
+- [x] First test map draft (~160×100) generated, saved to `maps/testmap.json`, and handed to Omer for editing. *(Session 2)*
+- [ ] Omer's edited map committed back as `maps/testmap.json`.
 
 **Acceptance**: Omer can generate a draft, paint it, save it, reload it; 400×250 renders smoothly on his machine.
 

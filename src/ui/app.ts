@@ -1,9 +1,10 @@
-// The browser application: PixiJS stage, camera, input, HUD.
+// The browser application: PixiJS stage, camera, input, HUD, editor wiring.
 // All game rules live in src/sim; this file only displays and forwards input.
 
 import { Application, Graphics } from 'pixi.js';
 import { MapRenderer, HEX_SIZE } from './render/mapRenderer';
 import { Camera } from './camera';
+import { Editor } from './editor/editor';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
 import { pixelToAxial, axialToOffset, offsetToPixel, hexCorners } from '../sim/hex';
@@ -73,12 +74,29 @@ export async function startApp(): Promise<void> {
     state = createGameState('testmap', loaded.map);
     mapName = loaded.name;
   }
+
   const renderer = new MapRenderer(state.map);
   const camera = new Camera(renderer.root, app.screen.width, app.screen.height);
   const hover = new Graphics();
   renderer.root.addChild(hover);
   app.stage.addChild(renderer.root);
-  applyMap();
+
+  const editor = new Editor({
+    getState: () => state,
+    onChanged: (cells) => {
+      if (cells === 'all') {
+        applyMap(false);
+      } else {
+        const w = state.map.width;
+        for (const i of cells) renderer.invalidateHex(i % w, Math.floor(i / w));
+      }
+      updateMapInfo();
+    },
+    getMapName: () => mapName,
+    setMapName: (n) => { mapName = n; updateMapInfo(); },
+  });
+
+  applyMap(true);
 
   function newGameFrom(p: MapGenParams): GameState {
     const map = generateDraftMap(p);
@@ -87,12 +105,16 @@ export async function startApp(): Promise<void> {
     return st;
   }
 
-  function applyMap(): void {
+  function applyMap(fit: boolean): void {
     renderer.setMap(state.map);
     renderer.root.addChild(hover);
     const ws = renderer.worldSize();
     camera.setWorldSize(ws.width, ws.height);
-    camera.fit();
+    if (fit) camera.fit();
+    updateMapInfo();
+  }
+
+  function updateMapInfo(): void {
     const counts = countTerrain(state.map);
     const land = state.map.terrain.length - (counts[TERRAIN.findIndex((t) => t.id === 'sea')] ?? 0);
     const cal = calendar(state.turn);
@@ -104,19 +126,13 @@ export async function startApp(): Promise<void> {
   // ---- HUD controls ----
   function regenerate(): void {
     const t0 = performance.now();
-    mapName = '';
+    mapName = `draft ${seedInput.value.trim() || 'realms'}`;
     state = newGameFrom(readParams());
-    applyMap();
+    editor.resetHistory();
+    applyMap(true);
     el('info-perf').textContent = `generated in ${(performance.now() - t0).toFixed(0)} ms`;
   }
   el<HTMLButtonElement>('generate').addEventListener('click', regenerate);
-  el<HTMLButtonElement>('testmap').addEventListener('click', () => {
-    const loaded = loadMapFile(testmapJson);
-    state = createGameState('testmap', loaded.map);
-    mapName = loaded.name;
-    history.replaceState(null, '', location.pathname);
-    applyMap();
-  });
   el<HTMLButtonElement>('random').addEventListener('click', () => {
     const syll = ['ar', 'bel', 'cor', 'dun', 'el', 'fen', 'gal', 'hol', 'is', 'kar', 'lin', 'mor', 'nor', 'os', 'ral', 'sil', 'tor', 'ul', 'vin', 'wen'];
     const n = 2 + Math.floor(Math.random() * 2);
@@ -125,34 +141,59 @@ export async function startApp(): Promise<void> {
     seedInput.value = w;
     regenerate();
   });
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.target as HTMLElement)?.id === 'seed') regenerate();
+  el<HTMLButtonElement>('testmap').addEventListener('click', () => {
+    const loaded = loadMapFile(testmapJson);
+    state = createGameState('testmap', loaded.map);
+    mapName = loaded.name;
+    history.replaceState(null, '', location.pathname);
+    editor.resetHistory();
+    applyMap(true);
   });
 
-  // ---- input: pan / zoom / hover ----
+  // ---- input: pan / zoom / hover / paint ----
   const canvas = app.canvas;
-  let dragging = false;
-  let lastX = 0, lastY = 0, moved = 0;
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  let panning = false;
+  let painting = false;
+  let lastX = 0, lastY = 0;
   let mouseX = -1, mouseY = -1;
 
+  function hexAt(sx: number, sy: number): { col: number; row: number } {
+    const w = camera.screenToWorld(sx, sy);
+    const a = pixelToAxial(w.x, w.y, HEX_SIZE);
+    return axialToOffset(a.q, a.r);
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    moved = 0;
+    canvas.setPointerCapture(e.pointerId);
     lastX = e.clientX;
     lastY = e.clientY;
-    canvas.setPointerCapture(e.pointerId);
+    const paintButton = editor.active && e.button === 0;
+    if (paintButton) {
+      painting = true;
+      const h = hexAt(e.clientX, e.clientY);
+      editor.pointerDown(h.col, h.row);
+      updateHover(e.clientX, e.clientY);
+    } else {
+      panning = true;
+    }
   });
   canvas.addEventListener('pointerup', (e) => {
-    dragging = false;
+    panning = false;
+    if (painting) {
+      painting = false;
+      editor.pointerUp();
+    }
     canvas.releasePointerCapture(e.pointerId);
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (dragging) {
-      const dx = e.clientX - lastX, dy = e.clientY - lastY;
-      moved += Math.abs(dx) + Math.abs(dy);
-      camera.panBy(dx, dy);
+    if (panning) {
+      camera.panBy(e.clientX - lastX, e.clientY - lastY);
       lastX = e.clientX;
       lastY = e.clientY;
+    } else if (painting) {
+      const h = hexAt(e.clientX, e.clientY);
+      editor.pointerMove(h.col, h.row);
     }
     mouseX = e.clientX;
     mouseY = e.clientY;
@@ -166,33 +207,50 @@ export async function startApp(): Promise<void> {
   }, { passive: false });
 
   window.addEventListener('keydown', (e) => {
-    if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+      if (e.key === 'Enter' && (e.target as HTMLElement).id === 'seed') regenerate();
+      return;
+    }
+    if (editor.key(e)) { e.preventDefault(); if (mouseX >= 0) updateHover(mouseX, mouseY); return; }
     const step = 60;
     if (e.key === 'ArrowLeft') camera.panBy(step, 0);
     else if (e.key === 'ArrowRight') camera.panBy(-step, 0);
     else if (e.key === 'ArrowUp') camera.panBy(0, step);
     else if (e.key === 'ArrowDown') camera.panBy(0, -step);
     else if (e.key === 'g' || e.key === 'G') renderer.setGridVisible(!renderer.gridVisible);
-    else if (e.key === 'f' || e.key === 'F') camera.fit();
+    else if (e.key === 'Home') camera.fit();
+    else if (e.key === 'e' || e.key === 'E') editor.setActive(!editor.active);
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   });
 
   window.addEventListener('resize', () => camera.resize(app.screen.width, app.screen.height));
+  window.addEventListener('beforeunload', (e) => {
+    if (editor.dirty) { e.preventDefault(); }
+  });
 
   function updateHover(sx: number, sy: number): void {
-    const w = camera.screenToWorld(sx, sy);
-    const a = pixelToAxial(w.x, w.y, HEX_SIZE);
-    const o = axialToOffset(a.q, a.r);
+    const h = hexAt(sx, sy);
     hover.clear();
-    if (!inBounds(state.map, o.col, o.row)) {
+    if (!inBounds(state.map, h.col, h.row)) {
       el('info-hex').textContent = 'Outside the map';
       return;
     }
-    const t = TERRAIN[getTerrain(state.map, o.col, o.row)];
+    const t = TERRAIN[getTerrain(state.map, h.col, h.row)];
     el('info-hex').textContent =
-      `hex (${o.col}, ${o.row})  axial (${a.q}, ${a.r})  ${t.name}  move ${t.passable ? t.moveCost : '—'}  food ${t.food}`;
-    const p = offsetToPixel(o.col, o.row, HEX_SIZE);
-    hover.poly(hexCorners(p.x, p.y, HEX_SIZE)).stroke({ width: 2 / camera.zoom, color: 0xffffff, alpha: 0.9 });
+      `hex (${h.col}, ${h.row})  ${t.name}  move ${t.passable ? t.moveCost : '—'}  food ${t.food}`;
+    const lw = 2 / camera.zoom;
+    if (editor.active) {
+      const w = state.map.width;
+      for (const i of editor.previewCells(h.col, h.row)) {
+        const p = offsetToPixel(i % w, Math.floor(i / w), HEX_SIZE);
+        hover.poly(hexCorners(p.x, p.y, HEX_SIZE));
+      }
+      hover.stroke({ width: lw, color: 0xffffff, alpha: 0.85 });
+    } else {
+      const p = offsetToPixel(h.col, h.row, HEX_SIZE);
+      hover.poly(hexCorners(p.x, p.y, HEX_SIZE)).stroke({ width: lw, color: 0xffffff, alpha: 0.9 });
+    }
   }
 
   // ---- frame loop: culling + perf readout ----
