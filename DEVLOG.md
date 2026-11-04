@@ -298,3 +298,21 @@ Omer: 6 factions on the test map; game = food resource, furs = trade good, both 
 **Crowding birth penalty (PROPOSED, off by default = 0):** births × (1 − penalty × idle share of hands), villages only (`crowdingAppliesTo`), because a city's idle hands are its workshop/recruit pool, not crowding (a first version that also hit cities made full granaries coexist with shrinking cities). With penalty 1.0 villages settle where births = deaths at ≈28 % idle hands — land fully worked plus a standing pool of spare hands — and their exports hold instead of vanishing; 60-year runs: without it every orbit degenerates to famine (town + 6 villages 4,146 → 3,438 with hunger; city orbit → 3,816), with it the town reaches 6,190 (its tier cap) and the city orbit holds 8,000 → 9,300.
 
 **Tests & build:** 57/57; tsc clean. **Commit:** `phase1: forecast migration trigger, crowding birth penalty (off), ring/crowding A/B scenario`. **Awaiting Omer:** adopt 5 rings / metropolis 12k @ 6 rings? adopt crowding 1.0 for villages?
+
+## 2026-11-04 — Session 5c — Decisions adopted; first run on the real map
+
+**Omer's decisions (DESIGN v0.3a):** city influence **5 rings**, metropolis from **12,000 with 6 rings**; **crowding birth penalty 1.0 for villages**. `data/settlements.json`, `data/demography.json`, DESIGN §3.3/§4.1/§5/glossary updated. Commit `fb274ec`.
+
+**Real-map scenario** `npm run sim -- --scenario testmap [--sites 5] [--years 20] [--csv …]` (`src/headless/testmap.ts`): scores every settle-able hex of `maps/testmap.json` by the food its 19-hex work zone yields (all jobs incl. resources), picks the best / top-10 % / median / bottom-20 % / best-coastal sites, founds a city of 8,000 on each, and places villages (600/400/250 by their 7-hex capacity, ≥3 apart) on rings 3–5; 20 years headless, each site in its own state. Results (city at year 20; 60-year ceiling for the top two):
+
+| Site | City fields | Villages | City yr 20 | Hunger | Ceiling |
+|---|---|---|---|---|---|
+| A best (45,64) plains + river, fish | 4,615/yr | 10 | 11,055, never hungry | 0 | ≈10,650 |
+| B top-10 % (147,73) grassland | 3,960 | 11 | 11,055 | 0 | ≈10,400 |
+| C median (110,60) hills + grassland | 3,065 | 9 | 6,020 | ~80/yr | — |
+| D bottom-20 % (19,88) woodland/forest/lakes | 2,005 | 10 | 6,075 | ~80/yr | — |
+| E coastal (148,32) grassland + sea, fish | 3,750 | 7 | 7,022 | ~80/yr | — |
+
+Villages never starve on any site; migration is negligible. The spread between best and median land is the whole game: a river/plains site holds ~10,500 without roads, a hills site ~6,000. Both ceilings sit under the 12,000 metropolis line, so the metropolis still needs roads. Note the village placement rule (centres ≥3 apart) yields 7–11 villages per orbit on real terrain vs 24 on the ideal canvas — a realistic density. Picture `testmap_sites.png` delivered.
+
+**Tests & build:** 57/57; tsc clean. **Commit:** `phase1: real-map scenario (testmap) + DEVLOG 5c`.
