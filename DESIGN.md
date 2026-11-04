@@ -1,6 +1,8 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3a — 2026-11-04 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3b — 2026-11-04 — Status: DRAFT, core decisions made; see §5 for what is still open**
+
+> **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
 Working title: **Realms, Kings and Other Stuff** (DECIDED 2026-11-03; may change later).
 
@@ -115,7 +117,7 @@ Hexes are *unknown*, *explored* or *visible*. Settlements and units see 2 hexes 
 | Wine | River 4.5% · Hills 3.5% · Plains 1.2% | luxury |
 | Silver | Mountains 2.8% · Hills 0.5% (min 4 hexes apart) | money |
 
-**Water hexes are workable (DECIDED 2026-11-04).** Lake, River and **shore** hexes (a sea hex with at least one land neighbour) in a settlement's work zone yield food from fishing: **75 food/year for 10 hands** *(draft)*; with a Fish resource **150 for 30 hands**. Sea hexes that touch no land are *offshore* and need a port (below). River hexes keep their farming yield as well (fertility 4), so a river hex is the richest in the game — intended, to pull settlement toward rivers and coasts. Water hexes carry no pasture.
+**Water hexes are workable (DECIDED 2026-11-04).** Lake, River and **shore** hexes (a sea hex with at least one land neighbour) in a settlement's work zone yield food from fishing: **225 people fed per year for 30 hands** *(draft)*; with a Fish resource **450 for 90 hands**. Sea hexes that touch no land are *offshore* and need a port (below). River hexes keep their farming yield as well (fertility 4), so a river hex is the richest in the game — intended, to pull settlement toward rivers and coasts. Water hexes carry no pasture.
 
 **Game vs Furs (DECIDED 2026-11-04):** both stay. Game is a food-producing resource (hunting); Furs are a trade good; furs are more common than game in tundra (game does not spawn there). Horses are not a resource (DECIDED 2026-11-04): to recruit mounted units — and possibly to sustain them — a settlement needs **access to a pasture-bearing hex**, either by direct control (in its zone) or via a road connection to a settlement that has one. Fish may also be placed **offshore**, away from the coast (DECIDED 2026-11-04): such hexes are only workable by a town or city with an improved port — a later building; the spawner still only auto-places fish on coastal sea, offshore fish are hand-placed. The test map's resources are placed in the editor (seeded spawn, then hand-edits) and live in the map file.
 
@@ -125,8 +127,8 @@ Units are mobile entities belonging to a faction. **Every unit carries populatio
 
 Unit families:
 
-- **Settlers** — found a new village. Carry ~200–400 people *(draft)*.
-- **Work-bands** — build infrastructure outside settlements (roads, forts, mills, extraction sites). Carry ~50–100 people.
+- **Settlers** — found a new village. Carry ~600–1,200 people *(draft, ×3 scale)*.
+- **Work-bands** — build infrastructure outside settlements (roads, forts, mills, extraction sites). Carry ~150–300 people *(draft, ×3 scale)*.
 - **Military units** — see §4.6. Each has a size (people), demographic requirement (e.g. men 15–44), source (village levy vs. city militia vs. professional), upkeep, and facility requirements.
 - *(later)* **Caravans / envoys / ships.**
 
@@ -141,25 +143,26 @@ Four tiers: **Village**, **Town**, **City**, **Metropolis**. Every settlement ha
 
 | | Village | Town | City | Metropolis |
 |---|---|---|---|---|
-| Population *(draft)* | 200–1,500 | 1,500–6,000 | 6,000–12,000 | 12,000+ (upgrade) |
+| **Gate** (population needed to upgrade *to* this tier; DECIDED §5.8) | — (founded by settlers) | **1,500** | **6,000** | **36,000** |
+| Typical size *(draft, ×3 scale)* | 900–2,100 (plateaus ~2,100 when its land is full) | ~10,000 alone, ~18,000 with villages | 18,000–33,000 depending on the orbit's land | 36,000+ (needs food by road) |
 | **Work zone** | 1 ring (7 hexes) | 2 rings (19) | 2 rings (19) | 2 rings (19) |
 | **Influence zone** | 1 ring (7) | 3 rings (37) | **5 rings (91)** | **6 rings (127)** |
-| Food | Surplus | Balanced alone; ~6,000 with ~6 villages | Own land feeds ~2,850; an orbit of up to ~24 villages holds ~8,000–9,000 (headless, average land); beyond that needs roads | Orbit feeds more; exact ceiling TBD |
+| Food | Surplus | Balanced alone; ~18,000 with ~6 villages | Own land feeds ~8,500; an orbit of up to ~24 villages holds ~25,000–28,000 (headless, average land); beyond that needs roads | Orbit feeds more; exact ceiling TBD |
 | Economy / culture | Little | Moderate | Large | Largest; unique features (TBD) |
 
-*(Why these numbers: a 7-hex village zone cannot sit inside a 2-ring influence zone without most of its fields being the town's. With town influence 3, six villages fit at distance 3 and the town's ceiling lands on its tier range. City influence was 4 rings until an A/B test on 2026-11-04 showed that 5 rings plus the crowding rule in §4.1 holds a city of 8,000–9,000 stably, where 4 rings held ~6,200; Omer chose 5 and moved the metropolis threshold to 12,000 with 6 rings.)*
+*(Why these numbers: a 7-hex village zone cannot sit inside a 2-ring influence zone without most of its fields being the town's. With town influence 3, six villages fit at distance 3 and the town's ceiling lands on its tier range. City influence was 4 rings until an A/B test on 2026-11-04 showed that 5 rings plus the crowding rule in §4.1 holds a city of 8,000–9,000 stably, where 4 rings held ~6,200 (pre-×3 numbers); Omer chose 5 and moved the metropolis threshold to 12,000 — 36,000 after the ×3 scale — with 6 rings.)*
 
 **Contested hexes (DECIDED 2026-11-04):** each hex is worked by exactly one settlement. Where work zones overlap, the **higher tier wins**; ties go to the nearer centre; the player may reassign any hex by hand.
 
 **Subordination (DECIDED 2026-11-04):** a lower-tier settlement is subordinate to ("parent") the settlement whose influence zone covers its centre. If several qualify, default to the highest tier, then the nearest; the player can choose the parent explicitly. Surplus and migration go to the parent.
 
-**Metropolis (DECIDED 2026-11-04 as a tier; prerequisites PROPOSED):** a city of 12,000+ may be upgraded to a metropolis — 6 rings of influence and features to be defined. It must be rare and require roads and good land. PROPOSED prerequisites: population ≥ 12,000 for 3 consecutive years; a paved road to at least two towns; an institutional prerequisite from §4.3 (e.g. Chancery). *(A city's own 5-ring orbit holds ~8,000–9,000, so 12,000 is reachable only with food arriving by road — the rarity is built into the geometry.)*
+**Metropolis (DECIDED 2026-11-04 as a tier; prerequisites PROPOSED):** a city of 36,000+ may be upgraded to a metropolis — 6 rings of influence and features to be defined. It must be rare and require roads and good land. PROPOSED prerequisites: population ≥ 36,000 for 3 consecutive years; a paved road to at least two towns; an institutional prerequisite from §4.3 (e.g. Chancery). *(A city's own 5-ring orbit holds ~25,000–33,000 even on the best land of the test map, so 36,000 is reachable only with food arriving by road — the rarity is built into the geometry.)*
 
 Other details:
 
 - Overlapping influence zones between factions are **contested** territory — a source of diplomatic friction and a trigger for border events. *(PROPOSED)*
 - **Growth between tiers is a player decision**, not automatic: upgrading requires a population threshold, money, materials, and enough **administrative capacity** (§4.3). This is how "few cities, many villages" is enforced softly. *(DECIDED concept)*
-- **Buildings need hands (DECIDED 2026-11-04).** Buildings inside a settlement are staffed from its working hands before any hand goes to the fields. Staffing is linear: a building at half staff gives half its effect. Every settlement has from its founding a **hall** (village: *Moot Hall* — PLACEHOLDER name; town: Town Hall; city: City Hall; metropolis: TBD) that cannot be demolished and a **Granary**. Hands *(draft)*: hall 10 / 50 / 100 / 200; granary 30 / 60 / 120 / 240 by tier. The hall is where government happens — taxes, order, and (Phase 2) administrative capacity; an understaffed hall penalizes tax and order. Hands not needed by buildings or fields are **idle hands** — the pool later used for workshops, recruitment and unrest, and the source of migration (§4.1). Other buildings (PROPOSED starter list: Mill, Palisade, Chapel; Market, Workshop, Walls, Barracks, Stables, Inn; Cathedral, School, Guildhall, Citadel, Mint, Ironworks, Great Market) each carry a hands requirement in `data/buildings.json`.
+- **Buildings need hands (DECIDED 2026-11-04).** Buildings inside a settlement are staffed from its working hands before any hand goes to the fields. Staffing is linear: a building at half staff gives half its effect. Every settlement has from its founding a **hall** (village: *Moot Hall* — PLACEHOLDER name; town: Town Hall; city: City Hall; metropolis: TBD) that cannot be demolished and a **Granary**. Hands *(draft, ×3 scale)*: hall 30 / 150 / 300 / 600; granary 90 / 180 / 360 / 720 by tier. The hall is where government happens — taxes, order, and (Phase 2) administrative capacity; an understaffed hall penalizes tax and order. Hands not needed by buildings or fields are **idle hands** — the pool later used for workshops, recruitment and unrest, and the source of migration (§4.1). Other buildings (PROPOSED starter list: Mill, Palisade, Chapel; Market, Workshop, Walls, Barracks, Stables, Inn; Cathedral, School, Guildhall, Citadel, Mint, Ironworks, Great Market) each carry a hands requirement in `data/buildings.json`.
 
 ### 3.4 Infrastructure and buildings outside settlements (DECIDED concept)
 
@@ -190,7 +193,7 @@ The world contains a fixed, countable population: the sum of everyone in every s
 | Recruitable | men 15–44 (by unit type, §4.6); taking them lowers working hands |
 | Hunger (granary empty) | extra deaths that month = shortfall fraction × 5 % of population, children and 60+ hit twice as hard; order drops |
 | Crowding (DECIDED 2026-11-04) | **villages only**: births × (1 − 1.0 × share of hands that are idle). A village whose land is full stops growing instead of starving, and settles with ≈ 28 % spare hands — its standing levy pool. Towns and cities are exempt: their idle hands are the workshop/recruit pool. |
-| Net result | ≈ +1.1 %/year well fed → a village doubles in ~65 years |
+| Net result | ≈ +1.1–1.6 %/year well fed → a village doubles in ~50–65 years; a village founded by 900 settlers crosses the 1,500 town gate ~30 years later and plateaus ~2,100 |
 
 - **Raids and sieges** kill or carry off people, skewed toward the vulnerable or the able-bodied depending on the attacker's intent; the demographic shape of the loss shapes the recovery.
 - **Migration (DECIDED 2026-11-04, Phase 1; trigger revised by Omer the same day):** when a settlement **forecasts that it will run out of food before the next harvest** (granary + expected monthly income − consumption until the harvest month < 0) and it has **idle hands** (hands not needed by buildings or fields), **10 % of the idle hands per month leave with their dependants** — a proportional slice of all cohorts — for the **parent settlement** (§3.3). A settlement with no parent sends nobody. Migration outpaces hunger deaths on purpose: people flee famine faster than it kills them. The two famines are thus distinguished automatically: overpopulation (idle hands exist → people leave) vs. a shortage of hands after a levy or raid (no idle hands → nobody leaves; they recover or die).
@@ -203,7 +206,7 @@ Economic output is computed from in-world activity — resources gathered, goods
 **Food model (DECIDED structure 2026-11-04; numbers are draft, in `data/economy.json`):**
 
 - **1 food feeds one person for one month.** Everyone eats 1 regardless of age *(v1 simplification)*.
-- **Farming** on a worked hex: people fed per year at full labour by fertility level 0–4 = **0 / 50 / 100 / 150 / 200**; **30 hands** work a hex fully; yield scales linearly with hands. **Herding** by pasture level = **0 / 15 / 30 / 45 / 60** per year, 5 hands. **Fishing** on water hexes (§3.1): 75 / 10 hands, or 150 / 30 hands with Fish. **Game**: +60 / 10 hands.
+- **Farming** on a worked hex: people fed per year at full labour by fertility level 0–4 = **0 / 150 / 300 / 450 / 600**; **90 hands** work a hex fully; yield scales linearly with hands. **Herding** by pasture level = **0 / 45 / 90 / 135 / 180** per year, 15 hands. **Fishing** on water hexes (§3.1): 225 / 30 hands, or 450 / 90 hands with Fish. **Game**: +180 / 30 hands. *(All at the ×3 model scale, §5.8; `data/economy.json` carries `modelScale: 3`.)*
 - **Harvest timing:** farming output lands **60 % in September, 40 % in October**; herding, fishing and hunting arrive monthly in twelfths.
 - **Staffing order:** halls and granary first, then fields (best hexes first), then extraction sites; what is left over are idle hands.
 - **Granary:** every settlement has one (§3.3). Fully staffed: capacity 24 months of consumption, spoilage 0.5 % of stock per month. Unstaffed: 15 months, 1.5 %. Linear in between.
@@ -318,7 +321,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 5. Name of the village hall (placeholder *Moot Hall*; alternatives *Reeve's House*, *Manor*) and of the metropolis hall.
 6. Whether River keeps both farming (200) and fishing (75) — currently yes (§3.1).
 7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
-8. **Tier upgrade thresholds — RESOLVED 2026-11-04 (Omer, late evening), to be implemented at the start of the next chat.** The model is linear in population, so **everything scales ×3**: hex yields (people fed per year) and the hands to work them, building hands, settler/scenario populations — curves stay identical with labels ×3. The **town gate stays 1,500 and the city gate stays 6,000**; at ×3 a village plateaus ~2,100 (crosses 1,500 by growth, ~30 years after founding), a town alone levels at ~10,000 and with villages ~18,000 (crosses 6,000 in 25–40 years). The **metropolis gate scales to 36,000** (it was calibrated to the orbit's ceiling: a good site reaches ~31,000 without roads). Tier population ranges in §3.3 become typical sizes, not gates. All later unit/settler sizes are written at the ×3 scale; `data/economy.json` will carry a note of the scale.
+8. **Tier upgrade thresholds — RESOLVED 2026-11-04 (Omer, late evening); IMPLEMENTED in Session 6 (2026-11-04), proven scale-invariant by `tests/scale.test.ts` and by a row-by-row comparison of the 20-year scenario tables before and after.** The model is linear in population, so **everything scales ×3**: hex yields (people fed per year) and the hands to work them, building hands, settler/scenario populations — curves stay identical with labels ×3. The **town gate stays 1,500 and the city gate stays 6,000**; at ×3 a village plateaus ~2,100 (crosses 1,500 by growth, ~30 years after founding), a town alone levels at ~10,000 and with villages ~18,000 (crosses 6,000 in 25–40 years). The **metropolis gate scales to 36,000** (it was calibrated to the orbit's ceiling: a good site reaches ~31,000 without roads). Tier population ranges in §3.3 become typical sizes, not gates. All later unit/settler sizes are written at the ×3 scale; `data/economy.json` carries `modelScale: 3`.
 
 Resolved 2026-11-04 (Phase 1 design, evening): city influence 5 rings, metropolis from 12,000 with 6 rings (A/B tested); crowding birth penalty 1.0 for villages; migration trigger = forecast of running out before the next harvest.
 Resolved 2026-11-04 (Phase 1 design): work vs influence zones per tier (1/1, 2/3, 2/4 → 2/5 in the evening, metropolis 2/5 → 2/6); contested hexes → higher tier wins; subordination to the parent by influence; metropolis tier; water hexes workable (shore = sea touching land); buildings need hands, every settlement has a hall and a granary; cohort demographic model with the §4.1 starting numbers; food model with the §4.2 starting numbers; migration of 10 % of idle hands/month with dependants to the parent when the settlement forecasts running out before the next harvest; settlers are a player action, never automatic.
@@ -334,7 +337,8 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 - **Parent settlement** — the higher-tier settlement a village or town is subordinate to; receives its surplus and its migrants.
 - **Shore** — a sea hex with at least one land neighbour; workable for fish. Sea touching no land is *offshore* (needs a port).
 - **Hands** — working adults 15–59. *Staffed* hands run buildings, *field* hands work hexes, *idle hands* do neither.
-- **Metropolis** — the fourth settlement tier: a city of 12,000+ upgraded to 6 rings of influence and unique features.
+- **Metropolis** — the fourth settlement tier: a city of 36,000+ upgraded to 6 rings of influence and unique features.
+- **Model scale** — all people-counts (yields, hands, sizes) are ×3 the original draft (§5.8); the tier gates 1,500 / 6,000 are not.
 - **Group** — several units on one hex acting as one; an *army* is a group of military units.
 - **Administrative capacity** — how much a faction can govern before corruption and disorder rise.
 - **Government form** — the faction's type of state; sets what institutions and policies are available.
@@ -347,6 +351,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3b (2026-11-04, Session 6): model scale ×3 implemented — §3.1 fishing, §3.2 unit sizes, §3.3 gates vs typical sizes and building hands, §4.2 yields, §5.8, glossary.
 - 0.3a (2026-11-04, evening): city 5 rings / metropolis 12,000 @ 6 rings after A/B test; crowding birth penalty for villages; migration trigger by forecast.
 - 0.3 (2026-11-04, Phase 1 design): §3.3 rewritten — work vs influence zones, four tiers incl. metropolis, contested hexes, subordination, staffed buildings (hall + granary); §3.1 water hexes workable; §4.1 cohort model and starting rates, migration; §4.2 food model starting numbers; §5 and glossary updated.
 - 0.2e (2026-11-04): 6 factions; game/furs roles; Phase 0 signed off.

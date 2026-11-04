@@ -6,23 +6,23 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 ## CURRENT STATE (always kept up to date — overwrite this block, don't append to it)
 
-- **Phase:** **1 (settlements, people and food) — session 1 done: the model exists and runs headless; no map UI for it yet.** Phase 0 signed off 2026-11-04.
+- **Phase:** **1 (settlements, people and food) — sessions 1–2 done: the model exists at the ×3 scale and runs headless; no map UI for it yet.** Phase 0 signed off 2026-11-04.
 - **Repository:** GitHub `omerglickman/realms` (private). Claude has push access. Default branch `main`.
-- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (57 passing). Map diff: `npm run mapdiff -- <file>`. Headless draft map: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json`). **Phase 1 scenarios: `npm run sim -- --scenario phase1 [--years 20] [--csv …] [--cityRings N --crowding X]`** (eight cases on ideal land) and **`npm run sim -- --scenario testmap [--sites 5] [--years 20]`** (cities on the real vinral map).
-- **Last playable build:** `realms.html` from Session 5 (2026-11-04) — identical UI to Session 4c (map + editor on test map rev 3); the Phase 1 simulation is in the bundle but not yet reachable from the UI.
+- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (60 passing). Map diff: `npm run mapdiff -- <file>`. Headless draft map: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json`). **Phase 1 scenarios: `npm run sim -- --scenario phase1 [--years 20] [--csv …] [--cityRings N --crowding X]`** (eight cases on ideal land) and **`npm run sim -- --scenario testmap [--sites 5] [--years 20]`** (cities on the real vinral map).
+- **Last playable build:** `realms.html` from Session 6 (2026-11-04) — identical UI to Session 4c (map + editor on test map rev 3); the Phase 1 simulation is in the bundle but not yet reachable from the UI.
 - **The map:** `maps/testmap.json` = "vinral", 160×100, revision 3 (file v2, with 881 resources). Canonical; the generator only makes new drafts. `data/resources.json` and `data/settlements.json` are index-stable.
+- **Model scale (DESIGN §5.8, implemented Session 6):** every yield and hands figure in `data/economy.json` / `data/buildings.json`, and every scenario population, is **×3** the Session-5 draft (`modelScale: 3` in economy.json). Gates: town 1,500, city 6,000 (unscaled), metropolis 36,000. `tests/scale.test.ts` proves the curves are invariant. When quoting or writing any people-count from now on, use the ×3 numbers (a village of 900, a town of 9,000, a city of 24,000; farm hex 600 fed / 90 hands…).
 - **What works (Phase 1):** `data/demography.json`, `data/economy.json`, `data/settlements.json` (4 tiers incl. metropolis), `data/buildings.json` (halls + granaries with hands); `src/sim/demography.ts` (cohort model sex × 5 bands, yearly update in December, hunger deaths, slices for migration); `src/sim/settlements.ts` (Settlement entity, work/influence zones per tier, contested hexes → higher tier wins, parent resolution by influence/tier/faction with override); `src/sim/economy.ts` (labour plan: buildings first then jobs best-per-hand; farm/herd/fish/hunt jobs incl. shore detection; harvest 60/40 Sept/Oct; consume + hunger; granary spoilage/cap by staffing; surplus to parent keeping food-until-harvest + 3 months; migration of 10 % idle hands/month with dependants); `endTurn` runs the economy monthly and demography yearly; `GameState` v2 (settlements, nextId; v1 saves migrate); commands `foundSettlement` / `removeSettlement` / `restoreSettlement`; headless scenario `src/headless/phase1.ts`.
 - **What works (Phase 0):** unchanged — hex math, map store, terrain/resources tables, generator, map file v2, command layer, renderer, camera, HUD, map editor.
-- **Known broken / limitations:** no settlement on the map or in the UI yet; no factions entity (settlements carry a faction string); no roads (surplus only moves inside influence zones); fishing on offshore sea (ports) not implemented; metropolis upgrade prerequisites not implemented (tier exists); growth is birth-limited, so coast and inland villages grow identically when both are fed; with the crowding rule villages plateau ~700 and cannot reach the 1,500 town gate by growth (DESIGN §5.8, open).
+- **Known broken / limitations:** no settlement on the map or in the UI yet; no factions entity (settlements carry a faction string); no roads (surplus only moves inside influence zones); fishing on offshore sea (ports) not implemented; metropolis upgrade prerequisites not implemented (tier exists); growth is birth-limited, so coast and inland villages grow identically when both are fed; metropolis gate 36,000 is above every roadless orbit ceiling by design (best test-map site ~33,000 at year 20).
 - **Decided 2026-11-04 evening (Sessions 5b–5c):** city influence 5 rings, metropolis from 12,000 with 6 rings; village crowding birth penalty 1.0; migration trigger = forecast of running out before the next harvest.
-- **Phase 1 scenario results (2026-11-04, starting numbers):** lone village 300 → 415 in 20 y (+1.6 %/y, never hungry); lone town 3,000 → peaks 3,571 then settles ≈3,360 = its land; city 8,000 alone → 3,344 in ~6 y (≈4,500 hunger deaths); city 8,000 + 10 villages of 600 → ≈5,200 (fed ≈2,700 extra by village surplus that shrinks from 32k to 19k food/yr as villages grow 6,000 → 6,770); town 3,000 + 6 villages → 4,146, villages 3,642 → 4,836, nobody hungry.
+- **Phase 1 scenario results (×3 scale, 2026-11-04):** lone village 900 → 1,244 in 20 y (+1.6 %/y, never hungry); lone town 9,000 → ≈10,070 = its land; city 24,000 alone → ≈10,000 (hunger); city 24,000 + 10 villages of 1,800 → 16,462 (villages 18,000 → 19,007); town 9,000 + 6 villages → 12,437; city 24,000 + 24 villages (G) → 24,945 stable; real map: best site 33,164 at year 20, median site 18,059. (Exactly 3× the Session 5–5c figures.)
 - **Next steps (in order):**
   1. Whenever Omer attaches a newly exported map `.json`: `npm run mapdiff -- <file>`, set `name` "vinral", bump `meta.revision`, commit, rebuild, deliver.
-  2. **Implement DESIGN §5.8 (decided):** scale ×3 — multiply `fedPerYear*`/`hands` in `data/economy.json`, building `hands` in `data/buildings.json`, scenario populations in `src/headless/*.ts`; keep town gate 1,500 / city gate 6,000; metropolis gate → 36,000 (`popMin`, `metropolisUpgrade.popAtLeast`); tier `popMin/popMax` become typical sizes (village ~900–2,100, town 1,500–18,000, city 6,000–36,000); add a scale-invariance test (×1 vs ×3 curves equal ×3); rerun both scenarios.
-  3. **Phase 1, session 2:** `data/factions.json` (6 factions — ask Omer: hand-designed names/positions or generated), faction entity in `GameState`, editor tool to place settlements and assign factions on the test map, influence and work zones drawn, settlement hover/panel showing hands (staffed/field/idle), granary months, parent.
-  4. Session 3: end-turn button + yearly reports in the UI; starter buildings with effects; tuning against the headless curves.
+  2. **Phase 1, session 3 (factions):** `data/factions.json` (6 factions — ask Omer: hand-designed names/positions or generated), faction entity in `GameState`, editor tool to place settlements and assign factions on the test map, influence and work zones drawn, settlement hover/panel showing hands (staffed/field/idle), granary months, parent.
+  3. Session 4: end-turn button + yearly reports in the UI; starter buildings with effects; tuning against the headless curves.
 - **Scheduled design sessions:** "Government & Institutions" (DESIGN §4.3) before Phase 2.
-- **Open questions for Omer:** DESIGN.md §5 (desert; draft yield rows; factions hand-designed or generated; village/metropolis hall names; river 200+75; metropolis prerequisites; tier upgrade gates §5.8).
+- **Open questions for Omer:** DESIGN.md §5 (desert; draft yield rows; factions hand-designed or generated — being discussed; village/metropolis hall names; river 600+225; metropolis prerequisites).
 
 ---
 
@@ -318,3 +318,33 @@ Villages never starve on any site; migration is negligible. The spread between b
 
 **Tests & build:** 57/57; tsc clean. **Commit:** `phase1: real-map scenario (testmap) + DEVLOG 5c`.
 - **DESIGN §5.8 raised and resolved:** with crowding, villages plateau ~700 and cannot reach the 1,500 town gate by growth. Omer's answer: **scale the whole model ×3** (yields, hands, building hands, populations) and keep the gates at 1,500 / 6,000 — a village then plateaus ~2,100 and a town reaches 6,000 in 25–40 years; the metropolis gate scales to 36,000. To be implemented first thing in the next chat.
+
+## 2026-11-04 — Session 6 — Model scale ×3
+
+**Phase:** 1 — **Goal of session:** implement DESIGN §5.8 (scale the model ×3, keep the town/city gates) and prove the curves are unchanged; then discuss the six factions.
+
+**Done:**
+- `data/economy.json`: every `fedPerYear*` and `hands` ×3 (farm 0/150/300/450/600 per 90 hands; herd 0/45/90/135/180 per 15; fishing 225/30, 450/90 with Fish; game 180/30); new field `modelScale: 3` with a comment explaining the convention.
+- `data/buildings.json`: hall 30/150/300/600, granary 90/180/360/720.
+- `data/settlements.json`: `popMin` is now explicitly the **gate** for upgrading *to* the tier — village 600 (settler minimum), town **1,500**, city **6,000** (both deliberately unscaled), metropolis **36,000**; `popMax` = next gate (informational); new `typicalPop` per tier for the UI; `metropolisUpgrade.popAtLeast` 36,000.
+- `src/headless/phase1.ts` and `testmap.ts`: all scenario populations ×3 (village 900, town 9,000, city 24,000, orbit villages 1,800; real-map village sizes 1,800/1,200/750 by capacity 2,100/1,350/900). `tests/economy.test.ts` expectations ×3.
+- **`tests/scale.test.ts`** (3 tests, 60 total): (1) data declares `modelScale 3` with the ×3 numbers; (2) divides the model back to ×1 in place, runs five 20-year cases (lone village, lone town, city + 10 villages, starving city, town + overfull villages so hunger, migration and sharing are all exercised), restores ×3, runs again, and asserts every yearly people-count is exactly 3× (tolerance 1e-6 relative) and every ratio (granary months, idle share) identical; (3) gates 1,500 / 6,000 / 36,000.
+- Independent check: the `--scenario phase1` CSV from the untouched Session-5c code (260 rows) vs the new one — zero deviation beyond CSV rounding. Real-map scenario: best site 33,164 at year 20 (= 3 × 11,055), median 18,059 (= 3 × 6,020).
+
+**How it was done / decisions of note:**
+- Nothing in `src/sim` changed — the model was already linear (all rules are ratios: idle share, shortfall fraction, months of stock, proportional migration slices), so the scale is purely a data convention. The `modelScale` field is a label for humans and tests; the sim never reads it.
+- Tier gates are not yet enforced anywhere in the sim (upgrading is a Phase 2 player action); `popMin` just records them.
+
+**Design decisions made by Omer this session (DESIGN v0.3b):** §5.8 marked implemented; the ×3 convention written at the top of DESIGN.md.
+
+**Broken / unfinished:** nothing broken; UI unchanged since Session 4c.
+
+**Tests & build:** pass (60/60; `tsc` clean; build clean; headless Chromium load of `dist/realms.html` with zero console errors).
+
+**Commit(s):** `phase1: model scale ×3 — …; scale-invariance test` (3501a83) + docs commit.
+
+**Build delivered:** `realms.html` (Session 6; UI unchanged).
+
+**Next session should:**
+1. Record Omer's faction decisions (names, personas, start regions, hand-designed vs generated) in DESIGN §4.8 and `data/factions.json`.
+2. Faction entity in `GameState`; editor tool to place settlements and assign factions; zones drawn; settlement hover/panel.

@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.4 — 2026-11-04 — Status: ACTIVE (Phase 1 in progress — session 1 done)**
+**Version 0.4a — 2026-11-04 — Status: ACTIVE (Phase 1 in progress — sessions 1–2 done)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -152,7 +152,7 @@ A chat devoted to DESIGN §4.3: government forms, the institution list and prere
 
 Goal: a living economy with no enemies.
 
-Progress: **Session 5 (2026-11-04)** — design decisions (zones, tiers incl. metropolis, contested hexes, water hexes, staffed buildings, migration) recorded in DESIGN v0.3; `demography.ts`, `economy.ts`, `settlements.ts`, four data files, `foundSettlement` command, headless scenario `npm run sim -- --scenario phase1`, 20 new tests. Remaining: factions data, settlements on the map + editor placement + zones drawn, panels, end-turn in the UI, buildings with effects, tuning.
+Progress: **Session 5 (2026-11-04)** — design decisions (zones, tiers incl. metropolis, contested hexes, water hexes, staffed buildings, migration) recorded in DESIGN v0.3; `demography.ts`, `economy.ts`, `settlements.ts`, four data files, `foundSettlement` command, headless scenario `npm run sim -- --scenario phase1`, 20 new tests. Remaining: factions data, settlements on the map + editor placement + zones drawn, panels, end-turn in the UI, buildings with effects, tuning. **Session 6 (2026-11-04)** — model scale ×3 applied (DESIGN §5.8) with a scale-invariance test; factions discussion next.
 
 Suggested order (each session ends with a build): (1) numbers first — propose the demographic and food model constants to Omer, build `demography.ts` + `economy.ts` in `src/sim` with a headless 20-year village/town/city scenario and a results table, *before any map UI*; (2) settlements and factions as data + on the map, editor placement, influence/work zones drawn; (3) buildings, build queue, panels, end-turn; (4) tuning with Omer against the headless curves.
 
@@ -228,6 +228,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.4a (2026-11-04): Session 6 (×3 scale) noted.
 - 0.4 (2026-11-04): Phase 1 marked in progress with a checklist; Session 5 progress noted.
 - 0.3 (2026-11-04): Phase 0 signed off; Phase 1 marked next with a suggested session order.
 - 0.2b (2026-11-04): Phase 0 checklist updated through Session 4 (resources).
