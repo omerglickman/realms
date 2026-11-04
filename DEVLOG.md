@@ -6,17 +6,17 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 ## CURRENT STATE (always kept up to date — overwrite this block, don't append to it)
 
-- **Phase:** 0 — Skeleton and map. Skeleton done; map editor not started.
+- **Phase:** 0 — Skeleton and map. Skeleton done; starting canvas chosen and frozen; map editor not started.
 - **Repository:** GitHub `omerglickman/realms` (private). Claude has push access. Default branch `main`.
-- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (19 passing). Headless: `npm run sim -- --seed realms --width 160 --height 100 --turns 24`.
-- **Last playable build:** `realms.html` from Session 2 (2026-11-04) — pan/zoom hex map; draft generator with seed, size, continents (1–3), islands, land % controls and a Random button; settings also in the URL hash (`realms.html#seed=…&continents=…`).
-- **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude draft generator (1–3 continents in horizontal slots with sea channels between them + islands, domain-warped coastlines, fractal noise, sea level from land fraction, ridged-noise mountain ranges, moisture bands, northern tundra, lakes, meandering downhill rivers); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, F = fit, G = grid toggle; HUD.
+- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (23 passing). Headless: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json` to write a map file).
+- **Last playable build:** `realms.html` from Session 2 (2026-11-04) — opens on the frozen test map (`maps/testmap.json`, embedded in the build); draft generator with seed, size, continents (1–3), islands, land % controls, Random button, and a "Test map" button to return to the shipped map; generator settings also work from the URL hash (`realms.html#seed=…&continents=…`).
+- **The map:** `maps/testmap.json` = seed `vinral`, 160×100, 2 continents, 6 islands, 45 % land (DESIGN §2.2). The file is canonical; the editor (next session) edits it; the generator only makes new drafts.
+- **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude draft generator (1–3 continents in horizontal slots with sea channels between them + islands, domain-warped coastlines, fractal noise, sea level from land fraction, ridged-noise mountain ranges, moisture bands, northern tundra, lakes, meandering downhill rivers); map file format `src/sim/mapfile.ts` (versioned, terrain ids stored for safe re-mapping); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, F = fit, G = grid toggle; HUD.
 - **Known broken / limitations:** no editor yet, so the map cannot be changed by hand; no resources; no save/load UI (only in code); generator produces fewer islands than requested when they fall near a continent (they merge) — acceptable for a draft; at land ≥55% continents tend to touch.
 - **Performance (measured by Omer 2026-11-04):** 60–61 fps at every map size including 400×250 fully zoomed out. Budget met.
 - **Next steps (in order):**
-  1. Omer picks a starting canvas (seed + continents/islands/land settings) from the candidate sheet or by playing with the Random button; the chosen settings go into `maps/testmap.json` once the editor can save.
-  2. Session 3: **map editor** — terrain palette, brush (sizes 1/2/3/5), fill-region, undo/redo via a command layer (`src/sim/commands.ts`), generator parameter controls (land fraction, scale, rivers), export/import of `maps/*.json` through download/upload, and `maps/testmap.json` committed as the starting draft.
-  3. Session 4: resources (`data/resources.json`, spawn weights by terrain, render as small icons/dots), resource painting in the editor, map save/load polish, Phase 0 acceptance review with Omer.
+  1. Session 3: **map editor** — editor mode toggle, terrain palette, brush (sizes 1/2/3/5), fill-region, undo/redo via a command layer (`src/sim/commands.ts`), export of the edited map as a `.json` download and import by file upload; Omer's edited file replaces `maps/testmap.json` in the repo (Omer attaches it to a chat, or the session asks for it).
+  2. Session 4: resources (`data/resources.json`, spawn weights by terrain, render as small icons/dots), resource painting in the editor, map save/load polish, Phase 0 acceptance review with Omer.
 - **Scheduled design sessions:** "Government & Institutions" (DESIGN §4.3) before Phase 2.
 - **Open questions for Omer:** DESIGN.md §5 (desert; number of factions).
 
@@ -141,8 +141,9 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 **Commit(s):** `phase0: continents/islands draft generator, HUD controls, URL-hash params`.
 
-**Build delivered:** `realms.html` (Session 2) + `map_candidates.png` (v1) and `map_candidates_v2.png` (rugged coasts, same eight seeds).
+- **Canvas chosen (Omer, 2026-11-04):** seed `vinral`, 160×100, 2 continents, 6 islands, 45 % land. Frozen as `maps/testmap.json` via `npm run sim -- --out`; the build embeds and opens it by default, with a "Test map" button to return to it after generating drafts. `src/sim/mapfile.ts` added (format `realms-map` v1, stores terrain ids for re-mapping) with 4 tests (23 total). DESIGN §2.2 updated (DECIDED).
+
+**Build delivered:** `realms.html` (Session 2, three iterations: generator controls → rugged coasts → frozen test map) + `map_candidates.png` (v1) and `map_candidates_v2.png` (rugged coasts, same eight seeds).
 
 **Next session should:**
-1. Note Omer's chosen canvas (seed/settings) in DESIGN §2.2 or DEVLOG.
-2. Build the map editor (command layer, brushes, fill, undo/redo, export/import JSON) and save the chosen draft as `maps/testmap.json`.
+1. Build the map editor (command layer, brushes, fill, undo/redo, export/import JSON) working on `maps/testmap.json`.

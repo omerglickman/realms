@@ -8,6 +8,8 @@ import { createGameState, calendar } from '../sim/state';
 import { endTurn } from '../sim/turn';
 import { countTerrain } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
+import { saveMapFile } from '../sim/mapfile';
+import { writeFileSync } from 'node:fs';
 
 function arg(name: string, def: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -21,12 +23,19 @@ const turns = Number(arg('turns', '12'));
 const continents = Number(arg('continents', '2'));
 const islands = Number(arg('islands', '6'));
 const landFraction = Number(arg('land', '45')) / 100;
+const out = arg('out', '');
 
 const t0 = performance.now();
 const map = generateDraftMap({ width, height, seed, continents, islands, landFraction });
 const state = createGameState(seed, map);
 for (let i = 0; i < turns; i++) endTurn(state);
 const ms = performance.now() - t0;
+
+if (out) {
+  const file = { ...saveMapFile(map, `draft ${seed}`, { seed, continents, islands, landFraction }) };
+  writeFileSync(out, JSON.stringify(file));
+  console.log(`wrote ${out}`);
+}
 
 const counts = countTerrain(map);
 const total = map.terrain.length;

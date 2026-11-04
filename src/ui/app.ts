@@ -9,6 +9,8 @@ import { createGameState, calendar, type GameState } from '../sim/state';
 import { pixelToAxial, axialToOffset, offsetToPixel, hexCorners } from '../sim/hex';
 import { inBounds, getTerrain, countTerrain } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
+import { loadMapFile } from '../sim/mapfile';
+import testmapJson from '../../maps/testmap.json';
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -61,8 +63,16 @@ export async function startApp(): Promise<void> {
     };
   }
 
-  // ---- state ----
-  let state: GameState = newGameFrom(readParams());
+  // ---- state: the shipped test map by default; a generated draft if the URL asks for one ----
+  let state: GameState;
+  let mapName = '';
+  if (hash.has('seed')) {
+    state = newGameFrom(readParams());
+  } else {
+    const loaded = loadMapFile(testmapJson);
+    state = createGameState('testmap', loaded.map);
+    mapName = loaded.name;
+  }
   const renderer = new MapRenderer(state.map);
   const camera = new Camera(renderer.root, app.screen.width, app.screen.height);
   const hover = new Graphics();
@@ -86,18 +96,27 @@ export async function startApp(): Promise<void> {
     const counts = countTerrain(state.map);
     const land = state.map.terrain.length - (counts[TERRAIN.findIndex((t) => t.id === 'sea')] ?? 0);
     const cal = calendar(state.turn);
+    const label = mapName ? `map "${mapName}"` : `seed "${state.seed}"`;
     el('info-map').textContent =
-      `${state.map.width}×${state.map.height} hexes · seed "${state.seed}" · land ${((100 * land) / state.map.terrain.length).toFixed(0)}% · ${cal.monthName}, year ${cal.year}`;
+      `${state.map.width}×${state.map.height} hexes · ${label} · land ${((100 * land) / state.map.terrain.length).toFixed(0)}% · ${cal.monthName}, year ${cal.year}`;
   }
 
   // ---- HUD controls ----
   function regenerate(): void {
     const t0 = performance.now();
+    mapName = '';
     state = newGameFrom(readParams());
     applyMap();
     el('info-perf').textContent = `generated in ${(performance.now() - t0).toFixed(0)} ms`;
   }
   el<HTMLButtonElement>('generate').addEventListener('click', regenerate);
+  el<HTMLButtonElement>('testmap').addEventListener('click', () => {
+    const loaded = loadMapFile(testmapJson);
+    state = createGameState('testmap', loaded.map);
+    mapName = loaded.name;
+    history.replaceState(null, '', location.pathname);
+    applyMap();
+  });
   el<HTMLButtonElement>('random').addEventListener('click', () => {
     const syll = ['ar', 'bel', 'cor', 'dun', 'el', 'fen', 'gal', 'hol', 'is', 'kar', 'lin', 'mor', 'nor', 'os', 'ral', 'sil', 'tor', 'ul', 'vin', 'wen'];
     const n = 2 + Math.floor(Math.random() * 2);

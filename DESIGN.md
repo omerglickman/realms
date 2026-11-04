@@ -51,6 +51,7 @@ A faction wins when every other faction has been **conquered**, **subjugated** o
 - The engine is **built to support 400×250** hexes.
 - The first test map is **about 160×100 (≈16,000 hexes)**.
 - The editor includes a **crude noise-based draft generator** from the first phase. It is *not* the real procedural generator — it only produces a plausible starting canvas that Omer then edits by hand.
+- **The starting canvas (DECIDED 2026-11-04):** generator seed `vinral`, 160×100, 2 continents, 6 islands, 45 % land — frozen as `maps/testmap.json`. From now on **the file is the map**: the game opens on it, the editor works on it, and the generator is only for making *new* drafts (so later changes to the generator never alter the test map).
 
 ### 2.3 Terrain types (DECIDED list, PROPOSED properties)
 
@@ -296,5 +297,6 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.2a (2026-11-04): starting canvas chosen (seed vinral) and frozen as `maps/testmap.json`.
 - 0.2 (2026-11-03): Omer's decisions recorded — title, turn/scale, map size, institutions+policies, mortal ruler, HTML delivery, GitHub hosting. §4.3 restructured into government form / institutions / policies.
 - 0.1 (2026-11-03): first draft from Omer's brief plus Claude's proposals.
