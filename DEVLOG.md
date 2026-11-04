@@ -288,3 +288,13 @@ Omer: 6 factions on the test map; game = food resource, furs = trade good, both 
 **Next session should:**
 1. Take Omer's tuning verdict on the curves; adjust `data/*.json`; rerun `--scenario phase1`.
 2. Phase 1 session 2: factions data + settlements on the test map in the editor, zones drawn, settlement panel.
+
+## 2026-11-04 — Session 5b — Migration trigger, ring/crowding A/B test
+
+**Omer's decisions:** 20-year growth pace is fine for now; migration trigger changed to "forecast running out before the next harvest" (implemented: `forecastBeforeHarvest` = stock + monthly income − consumption until the harvest month; `data/demography.json` `triggerSafetyMonths` replaces `triggerReserveMonths`; DESIGN §4.1 updated); the until-harvest reserve rule accepted.
+
+**A/B test requested by Omer:** city influence 5 rings (metropolis at 12,000 with 6 rings) vs today's 4. Scenario runner gained `--cityRings --metroRings --metroPop --crowding` overrides (scenario-only; `data/settlements.json` unchanged pending his decision) and two cases: G = city 8,000 + 24 villages on rings 3–5, H = city 12,000 + the same villages. Results (city population at year 20, case G): 4 rings 4,946 (falling); 5 rings 5,682 (falling); 4 rings + crowding 6,198 (stable); 5 rings + crowding 8,315 (stable, slowly rising). A 12,000 city falls to the same equilibrium as an 8,000 one in every rule set → the orbit's land, not the starting size, decides.
+
+**Crowding birth penalty (PROPOSED, off by default = 0):** births × (1 − penalty × idle share of hands), villages only (`crowdingAppliesTo`), because a city's idle hands are its workshop/recruit pool, not crowding (a first version that also hit cities made full granaries coexist with shrinking cities). With penalty 1.0 villages settle where births = deaths at ≈28 % idle hands — land fully worked plus a standing pool of spare hands — and their exports hold instead of vanishing; 60-year runs: without it every orbit degenerates to famine (town + 6 villages 4,146 → 3,438 with hunger; city orbit → 3,816), with it the town reaches 6,190 (its tier cap) and the city orbit holds 8,000 → 9,300.
+
+**Tests & build:** 57/57; tsc clean. **Commit:** `phase1: forecast migration trigger, crowding birth penalty (off), ring/crowding A/B scenario`. **Awaiting Omer:** adopt 5 rings / metropolis 12k @ 6 rings? adopt crowding 1.0 for villages?

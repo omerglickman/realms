@@ -98,9 +98,10 @@ export interface YearlyResult {
 /**
  * The yearly demographic update (run in December): deaths by band, aging,
  * births. `foodSufficiency` is the year's average share of need that was met
- * (0–1); `plenty` is true when the granary holds more than a year's need.
+ * (0–1); `plenty` is true when the granary holds more than a year's need;
+ * `idleShare` is the share of working hands that had no work (crowding).
  */
-export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boolean): YearlyResult {
+export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boolean, idleShare = 0): YearlyResult {
   // 1. deaths by band
   let deaths = 0;
   for (let b = 0; b < BANDS; b++) {
@@ -114,6 +115,8 @@ export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boo
   const suff = Math.max(0, Math.min(1, foodSufficiency));
   let mult = suff;
   if (plenty && suff >= 1) mult *= DEMOGRAPHY.plentyBirthMultiplier;
+  // PLACEHOLDER (DESIGN §4.1, proposed 2026-11-04): crowding lowers births; off while penalty = 0
+  mult *= Math.max(0, 1 - DEMOGRAPHY.crowdingBirthPenalty * Math.max(0, Math.min(1, idleShare)));
   const births = fertileWomen(p) * DEMOGRAPHY.birthsPerWomanPerYear * mult;
   // 3. aging: 1/width of each band moves up; the last band is terminal
   const share = 1 / DEMOGRAPHY.bandWidthYears;

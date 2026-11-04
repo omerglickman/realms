@@ -9,7 +9,7 @@ import { createGameState, type GameState } from '../sim/state';
 import { endTurn } from '../sim/turn';
 import { applyCommand } from '../sim/commands';
 import { axialRing, axialToOffset, offsetToAxial, type Axial } from '../sim/hex';
-import { totalPopulation } from '../sim/demography';
+import { totalPopulation, DEMOGRAPHY } from '../sim/demography';
 import { TIERS, type Settlement } from '../sim/settlements';
 import { ECONOMY } from '../sim/economy';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -22,6 +22,17 @@ function arg(name: string, def: string): string {
 
 const YEARS = Number(arg('years', '20'));
 const CSV = arg('csv', '');
+
+// Tier overrides for A/B tests of the zone numbers (scenario only; data/settlements.json stays canonical).
+// e.g. --cityRings 5 --metroRings 6 --metroPop 12000
+const cityT = TIERS.find((t) => t.id === 'city')!, metroT = TIERS.find((t) => t.id === 'metropolis')!;
+cityT.influenceRings = Number(arg('cityRings', String(cityT.influenceRings)));
+metroT.influenceRings = Number(arg('metroRings', String(metroT.influenceRings)));
+metroT.popMin = Number(arg('metroPop', String(metroT.popMin)));
+cityT.popMax = metroT.popMin;
+(DEMOGRAPHY as { crowdingBirthPenalty: number }).crowdingBirthPenalty = Number(arg('crowding', String(DEMOGRAPHY.crowdingBirthPenalty)));
+console.log(`crowding birth penalty ${DEMOGRAPHY.crowdingBirthPenalty}`);
+console.log(`tiers: city influence ${cityT.influenceRings} rings · metropolis from ${metroT.popMin} with ${metroT.influenceRings} rings`);
 
 // ---- synthetic land: a repeating mix averaging fertility 3 (DESIGN §4.2 "average land") ----
 const MIX = ['grassland', 'plains', 'grassland', 'hills', 'plains', 'woodland'].map(terrainIndex);
@@ -170,6 +181,26 @@ const t0 = performance.now();
   found(st, 'Town', 'town', 20, 20, 3000);
   ringSpots(20, 20, 3, 6).forEach((o, i) => found(st, `Village ${i + 1}`, 'village', o.col, o.row, 600));
   record('E town 3000 + 6 villages', runCase('E — town of 3,000 with 6 villages of 600', st, tierName));
+}
+
+// G — a city of 8,000 with villages on rings 3, 4 and 5 (6 + 8 + 10 = 24 villages of 600)
+{
+  const st = createGameState('p1g', landMap(61, 61));
+  found(st, 'City', 'city', 30, 30, 8000);
+  ringSpots(30, 30, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 600));
+  ringSpots(30, 30, 4, 8).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 600));
+  ringSpots(30, 30, 5, 10).forEach((o, i) => found(st, `Village d5-${i + 1}`, 'village', o.col, o.row, 600));
+  record('G city 8000 + 24 villages r3-5', runCase('G — city of 8,000 with 24 villages of 600 on rings 3–5', st, tierName));
+}
+
+// H — a city of 12,000 with the same 24 villages
+{
+  const st = createGameState('p1h', landMap(61, 61));
+  found(st, 'City', 'city', 30, 30, 12000);
+  ringSpots(30, 30, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 600));
+  ringSpots(30, 30, 4, 8).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 600));
+  ringSpots(30, 30, 5, 10).forEach((o, i) => found(st, `Village d5-${i + 1}`, 'village', o.col, o.row, 600));
+  record('H city 12000 + 24 villages r3-5', runCase('H — city of 12,000 with 24 villages of 600 on rings 3–5', st, tierName));
 }
 
 // F — coastal vs inland village of 200 (sea to the west; the coastal village has shore hexes in its ring)

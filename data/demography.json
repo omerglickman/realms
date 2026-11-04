@@ -11,6 +11,9 @@
   "fertileBands": ["young", "prime"],
   "recruitBands": ["young", "prime"],
   "birthsPerWomanPerYear": 0.18,
+  "crowdingBirthPenalty": 0,
+  "crowdingAppliesTo": ["village"],
+  "_crowdingComment": "PROPOSED (not yet approved): in the listed tiers, births are multiplied by (1 − penalty × idle share of hands). 0 = off. At 1.0 a village with 30 % of its hands idle has 30 % fewer births — land-starved villages stop growing instead of starving. Towns and cities are excluded: their idle hands are the workshop/recruit pool, not crowding.",
   "plentyBirthMultiplier": 1.15,
   "boySexRatio": 0.51,
   "deathRatePerYear": { "child": 0.03, "young": 0.01, "prime": 0.015, "mature": 0.03, "old": 0.10 },
@@ -22,9 +25,9 @@
     "vulnerableBands": ["child", "old"]
   },
   "migration": {
-    "_comment": "DESIGN §4.1: when stock < reserveMonths of consumption and idle hands exist, this share of idle hands leaves each month, with dependants (proportional slice of all cohorts), for the parent settlement.",
+    "_comment": "DESIGN §4.1: when a settlement forecasts that stock + monthly income − consumption will fall below triggerSafetyMonths of consumption before the next harvest arrives, and it has idle hands, this share of idle hands leaves each month, with dependants (proportional slice of all cohorts), for the parent settlement. Omer 2026-11-04: forecast trigger replaces the flat 3-month trigger.",
     "idleHandsSharePerMonth": 0.10,
-    "triggerReserveMonths": 3
+    "triggerSafetyMonths": 0
   },
   "startingDistribution": {
     "_comment": "Shares used to create a settlement of N people; roughly stationary for the rates above. Men/women split 50/50 within each band.",

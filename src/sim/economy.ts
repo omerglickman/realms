@@ -173,6 +173,19 @@ export function reserveFood(s: Settlement, month: number): number {
   return monthlyNeed(s) * (monthsUntilHarvest(month) + ECONOMY.sharing.reserveMonths);
 }
 
+/**
+ * Food the settlement expects to have left when the next harvest arrives:
+ * stock + the monthly income of the months in between − consumption in those
+ * months (DESIGN §4.1 migration trigger). Negative = it will run out first.
+ */
+export function forecastBeforeHarvest(s: Settlement, plan: LabourPlan, month: number): number {
+  const k = monthsUntilHarvest(month) - 1; // months to get through before the harvest month
+  let food = s.food;
+  const need = monthlyNeed(s);
+  for (let j = 1; j <= k; j++) food += monthlyProduction(plan, (month + j) % 12) - need;
+  return food;
+}
+
 /** One month of the food economy for every settlement in the state. */
 export function economyMonth(state: GameState, month: number): void {
   resolveAllParents(state);
@@ -238,7 +251,8 @@ export function economyMonth(state: GameState, month: number): void {
     p.report.received += give;
   }
 
-  // migration (DESIGN §4.1): hungry + idle hands + a parent → 10 % of idle hands leave with dependants
+  // migration (DESIGN §4.1): a settlement that forecasts running out of food before the
+  // next harvest, has idle hands and a parent → 10 % of idle hands leave with dependants
   const mig = DEMOGRAPHY.migration;
   for (const s of order) {
     if (!s.parent) continue;
@@ -246,7 +260,7 @@ export function economyMonth(state: GameState, month: number): void {
     if (!p) continue;
     const plan = plans.get(s.id)!;
     if (plan.idleHands <= 0 || plan.hands <= 0) continue;
-    if (s.food >= mig.triggerReserveMonths * monthlyNeed(s)) continue;
+    if (forecastBeforeHarvest(s, plan, month) >= mig.triggerSafetyMonths * monthlyNeed(s)) continue;
     const movingHands = plan.idleHands * mig.idleHandsSharePerMonth;
     const slice = takeSlice(s.pop, movingHands / plan.hands);
     const n = totalPopulation(slice);
@@ -261,7 +275,9 @@ export function demographyYear(state: GameState): void {
   for (const s of Object.values(state.settlements)) {
     const suff = s.yearMonths > 0 ? s.yearSufficiency / s.yearMonths : 1;
     const plenty = s.food > 12 * monthlyNeed(s);
-    const res = yearlyUpdate(s.pop, suff, plenty);
+    const crowdable = (DEMOGRAPHY as { crowdingAppliesTo: string[] }).crowdingAppliesTo.includes(TIERS[s.tier].id);
+    const idleShare = crowdable && s.report.hands > 0 ? s.report.idleHands / s.report.hands : 0;
+    const res = yearlyUpdate(s.pop, suff, plenty, idleShare);
     s.report.births = res.births;
     s.report.deaths = res.deaths;
     s.yearMonths = 0;
