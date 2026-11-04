@@ -2,7 +2,7 @@
   "name": "realms-kings-and-other-stuff",
   "version": "0.0.1",
   "private": true,
-  "description": "Realms, Kings and Other Stuff — a medieval-ish hex grand strategy game",
+  "description": "Realms, Kings and Other Stuff \u2014 a medieval-ish hex grand strategy game",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "sim": "tsx src/headless/run.ts"
+    "sim": "tsx src/headless/run.ts",
+    "mapdiff": "tsx src/headless/mapdiff.ts"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"
