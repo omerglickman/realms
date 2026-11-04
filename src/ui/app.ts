@@ -240,8 +240,9 @@ export async function startApp(): Promise<void> {
     }
     const t = TERRAIN[getTerrain(state.map, h.col, h.row)];
     const r = resourceByIndex(getResource(state.map, h.col, h.row));
+    const y = [t.fertility ? `fertility ${t.fertility}` : '', t.pasture ? `pasture ${t.pasture}` : '', t.timber ? `timber ${t.timber}` : ''].filter(Boolean).join(' ');
     el('info-hex').textContent =
-      `hex (${h.col}, ${h.row})  ${t.name}${r ? ` · ${r.name}` : ''}  move ${t.passable ? t.moveCost : '—'}  food ${t.food}`;
+      `hex (${h.col}, ${h.row})  ${t.name}${r ? ` · ${r.name}` : ''}  move ${t.passable ? t.moveCost : '—'}${y ? '  ' + y : ''}`;
     const lw = 2 / camera.zoom;
     if (editor.active) {
       const w = state.map.width;

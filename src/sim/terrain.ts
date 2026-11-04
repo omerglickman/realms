@@ -7,9 +7,14 @@ export interface TerrainDef {
   name: string;
   color: string; // hex colour string, e.g. "#8fbf5a"
   moveCost: number;
-  food: number;
+  /** yields on a 0–4 scale (none/low/medium/high/very high), see data/terrain.json */
+  fertility: number;
+  pasture: number;
+  timber: number;
   passable: boolean;
 }
+
+export const YIELD_WORDS = ['none', 'low', 'medium', 'high', 'very high'] as const;
 
 export const TERRAIN: readonly TerrainDef[] = terrainData.terrain;
 

@@ -86,26 +86,36 @@ Hexes are *unknown*, *explored* or *visible*. Settlements and units see 2 hexes 
 
 ## 3. Entities on the map
 
-### 3.1 Resources (DECIDED concept, PROPOSED list)
+### 3.1 Terrain yields and resources (DECIDED concept; numbers draft)
 
-Resources are features that spawn on hexes with a probability that depends on terrain. A hex has at most one resource. They are drawn from by the settlement whose work zone covers the hex, some only after a work-band builds an extraction site (mine, quarry, lumber camp).
+**Terrain yields (DECIDED 2026-11-04).** Soil fertility, pasture and timber are **properties of the terrain**, not resources on the map. Each terrain has a yield on a 0–4 scale (none / low / medium / high / very high) in `data/terrain.json`:
 
-PROPOSED initial list:
+| Terrain | Fertility | Pasture | Timber | Status |
+|---|---|---|---|---|
+| Grassland | very high (4) | low (1) | — | fertility per Omer; pasture draft |
+| Plains | high (3) | high (3) | — | per Omer |
+| Hills | medium (2) | medium (2) | low (1) | per Omer; timber draft |
+| Woodland | medium (2) | low (1) | medium (2) | per Omer; pasture draft |
+| Forest | low (1) | — | high (3) | timber per Omer; fertility draft |
+| River | very high (4) | low (1) | — | draft (as grassland) |
+| Tundra | — | low (1) | — | draft |
+| Swamp | low (1) | — | low (1) | draft |
+| Mountains, Lake, Sea | — | — | — | — |
 
-| Resource | Spawns mainly on | Gives | Strategic use |
-|---|---|---|---|
-| Fertile soil | Grassland, River, Plains | +food | Feeds cities |
-| Pasture | Plains, Hills | +food, **horses** | Required for cavalry (with Stables) |
-| Timber | Forest, Woodland | **timber** | Buildings, ships later |
-| Stone | Hills, Mountains | **stone** | Walls, paved roads, major buildings |
-| Iron | Hills, Mountains | **iron** | Professional troops, knights (with Ironworks) |
-| Fish | Lake, Sea, River (adjacent) | +food | Coastal cities |
-| Furs | Forest, Tundra, Woodland | trade goods | Money |
-| Salt | Swamp, coast, Hills | trade goods, food preservation | Money, granary bonus |
-| Wine / luxury crop | River, Hills (south) | luxury goods | Public order in cities |
-| Silver | Mountains | money | Rare, high value |
+**Map resources (DECIDED concept, list PROPOSED).** Resources are features that spawn on hexes with a probability that depends on terrain; a hex has at most one. They are drawn from by the settlement whose work zone covers the hex, some only after a work-band builds an extraction site (mine, quarry, lumber camp). Current table (`data/resources.json`; per-hex chance by terrain; spacing rules thin these out):
 
-Spawn weights are a data table (`data/resources.json`) that Omer can edit. *Implemented (Session 4, draft numbers):* each resource lists a per-mille chance per terrain, an optional minimum spacing from the same resource, and for Fish a "coastal only" rule (sea hexes must touch land); `gives` values are placeholders until the economy exists. A hex has at most one resource; the test map's resources are placed by the editor (seeded spawn, then hand-edits) and live in the map file like terrain.
+| Resource | Spawns on | Gives (draft) |
+|---|---|---|
+| Game | Forest 15% · Woodland 8% · Hills 3% | food (hunting) |
+| Stone | Mountains 11% · Hills 9% · Plains 0.8% | stone |
+| Iron | Mountains 8.5% · Hills 4.5% | iron |
+| Fish | Lake 22% · Sea 9% (coastal only) · River 3.5% | food |
+| Furs | Tundra 12% · Forest 6.5% · Woodland 3.5% | trade goods |
+| Salt | Swamp 11% · Hills 1.8% · Tundra 1.5% | trade goods, preservation |
+| Wine | River 4.5% · Hills 3.5% · Plains 1.2% | luxury |
+| Silver | Mountains 2.8% · Hills 0.5% (min 4 hexes apart) | money |
+
+Horses come from pasture (terrain), not a resource. The test map's resources are placed in the editor (seeded spawn, then hand-edits) and live in the map file. OPEN: Furs and Game overlap (both forest/woodland/tundra) — keep both, or fold furs into game?
 
 ### 3.2 Units (DECIDED concept, PROPOSED roster)
 
@@ -274,8 +284,9 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 ## 5. Open decisions (need Omer)
 
 1. **Desert** terrain: yes/no.
-2. **Number of factions** on the test map (proposed 6–10) and whether they are hand-designed or generated.
-3. **Government & Institutions** detailed design — scheduled as a dedicated design session before Phase 2 (§4.3 is a sketch only).
+2. **Furs vs Game** overlap (§3.1); draft yield rows in the terrain table (§3.1).
+3. **Number of factions** on the test map (proposed 6–10) and whether they are hand-designed or generated.
+4. **Government & Institutions** detailed design — scheduled as a dedicated design session before Phase 2 (§4.3 is a sketch only).
 
 Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement tuned for fun); map size (160×100 test map, engine for 400×250); institutions + policies as the advancement system; ruler as a mortal character with succession; builds delivered as a single HTML file Omer opens from disk (plus a private web page as backup); code hosted on GitHub (`omerglickman/realms`).
 
@@ -297,6 +308,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.2c (2026-11-04): §3.1 rewritten — fertility/pasture/timber are terrain yields (Omer's decision); Game added; resource table with current spawn chances.
 - 0.2b (2026-11-04): §3.1 note on the implemented resource table.
 - 0.2a (2026-11-04): starting canvas chosen (seed vinral) and frozen as `maps/testmap.json`.
 - 0.2 (2026-11-03): Omer's decisions recorded — title, turn/scale, map size, institutions+policies, mortal ruler, HTML delivery, GitHub hosting. §4.3 restructured into government form / institutions / policies.

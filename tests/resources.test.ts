@@ -11,13 +11,24 @@ import { axialDistance, offsetToAxial } from '../src/sim/hex';
 import testmap from '../maps/testmap.json';
 
 describe('resource data', () => {
-  it('has the ten DESIGN §3.1 resources in a stable order and only references known terrains', () => {
+  it('has the eight map resources in a stable order and only references known terrains', () => {
     expect(RESOURCES.map((r) => r.id)).toEqual([
-      'fertile_soil', 'pasture', 'timber', 'stone', 'iron', 'fish', 'furs', 'salt', 'wine', 'silver',
+      'game', 'stone', 'iron', 'fish', 'furs', 'salt', 'wine', 'silver',
     ]);
     const ids = new Set(TERRAIN.map((t) => t.id));
     for (const r of RESOURCES) for (const t of Object.keys(r.spawn)) expect(ids.has(t)).toBe(true);
-    expect(resourceIndex('iron')).toBe(4);
+    expect(resourceIndex('iron')).toBe(2);
+  });
+  it('terrain yields follow Omer\'s spec', () => {
+    const by = Object.fromEntries(TERRAIN.map((t) => [t.id, t]));
+    expect(by.grassland.fertility).toBe(4);
+    expect(by.plains.fertility).toBe(3); expect(by.plains.pasture).toBe(3);
+    expect(by.hills.fertility).toBe(2); expect(by.hills.pasture).toBe(2);
+    expect(by.woodland.fertility).toBe(2); expect(by.woodland.timber).toBe(2);
+    expect(by.forest.timber).toBe(3);
+    for (const t of TERRAIN) for (const k of ['fertility', 'pasture', 'timber'] as const) {
+      expect(t[k]).toBeGreaterThanOrEqual(0); expect(t[k]).toBeLessThanOrEqual(4);
+    }
   });
   it('total spawn chance per terrain never exceeds 100%', () => {
     for (const t of TERRAIN) {

@@ -1,16 +1,115 @@
 {
-  "_comment": "Terrain types. ORDER IS INDEX-STABLE: never reorder or remove entries, only append (map files store terrain as the index). Values marked draft in DESIGN.md §2.3 — Omer tunes these.",
+  "_comment": "Terrain types. ORDER IS INDEX-STABLE: never reorder or remove entries, only append (map files store terrain as the index). Yields are on a 0-4 scale: 0 none, 1 low, 2 medium, 3 high, 4 very high. fertility = farming food; pasture = grazing (food + horses); timber = wood. Omer's spec (2026-11-04): grassland very high fertility; plains high fertility + pasture; hills medium fertility + pasture; woodland medium fertility + timber; forest high timber. Rows marked draft are Claude's guesses pending Omer. All numbers are draft.",
   "terrain": [
-    { "id": "plains",    "name": "Plains",    "color": "#c9c27a", "moveCost": 1, "food": 2, "passable": true },
-    { "id": "grassland", "name": "Grassland", "color": "#8fbf5a", "moveCost": 1, "food": 3, "passable": true },
-    { "id": "river",     "name": "River",     "color": "#5fa96b", "moveCost": 1, "food": 4, "passable": true },
-    { "id": "hills",     "name": "Hills",     "color": "#a98d5b", "moveCost": 2, "food": 1, "passable": true },
-    { "id": "mountains", "name": "Mountains", "color": "#7d7468", "moveCost": 4, "food": 0, "passable": false },
-    { "id": "woodland",  "name": "Woodland",  "color": "#6f9a45", "moveCost": 2, "food": 1, "passable": true },
-    { "id": "forest",    "name": "Forest",    "color": "#3f6b2f", "moveCost": 3, "food": 0, "passable": true },
-    { "id": "tundra",    "name": "Tundra",    "color": "#b9c2b5", "moveCost": 2, "food": 0, "passable": true },
-    { "id": "swamp",     "name": "Swamp",     "color": "#5c7a5e", "moveCost": 3, "food": 0, "passable": true },
-    { "id": "lake",      "name": "Lake",      "color": "#4f8fc9", "moveCost": 99, "food": 0, "passable": false },
-    { "id": "sea",       "name": "Sea",       "color": "#2f5f99", "moveCost": 99, "food": 0, "passable": false }
+    {
+      "id": "plains",
+      "name": "Plains",
+      "color": "#c9c27a",
+      "moveCost": 1,
+      "passable": true,
+      "fertility": 3,
+      "pasture": 3,
+      "timber": 0
+    },
+    {
+      "id": "grassland",
+      "name": "Grassland",
+      "color": "#8fbf5a",
+      "moveCost": 1,
+      "passable": true,
+      "fertility": 4,
+      "pasture": 1,
+      "timber": 0
+    },
+    {
+      "id": "river",
+      "name": "River",
+      "color": "#5fa96b",
+      "moveCost": 1,
+      "passable": true,
+      "fertility": 4,
+      "pasture": 1,
+      "timber": 0
+    },
+    {
+      "id": "hills",
+      "name": "Hills",
+      "color": "#a98d5b",
+      "moveCost": 2,
+      "passable": true,
+      "fertility": 2,
+      "pasture": 2,
+      "timber": 1
+    },
+    {
+      "id": "mountains",
+      "name": "Mountains",
+      "color": "#7d7468",
+      "moveCost": 4,
+      "passable": false,
+      "fertility": 0,
+      "pasture": 0,
+      "timber": 0
+    },
+    {
+      "id": "woodland",
+      "name": "Woodland",
+      "color": "#6f9a45",
+      "moveCost": 2,
+      "passable": true,
+      "fertility": 2,
+      "pasture": 1,
+      "timber": 2
+    },
+    {
+      "id": "forest",
+      "name": "Forest",
+      "color": "#3f6b2f",
+      "moveCost": 3,
+      "passable": true,
+      "fertility": 1,
+      "pasture": 0,
+      "timber": 3
+    },
+    {
+      "id": "tundra",
+      "name": "Tundra",
+      "color": "#b9c2b5",
+      "moveCost": 2,
+      "passable": true,
+      "fertility": 0,
+      "pasture": 1,
+      "timber": 0
+    },
+    {
+      "id": "swamp",
+      "name": "Swamp",
+      "color": "#5c7a5e",
+      "moveCost": 3,
+      "passable": true,
+      "fertility": 1,
+      "pasture": 0,
+      "timber": 1
+    },
+    {
+      "id": "lake",
+      "name": "Lake",
+      "color": "#4f8fc9",
+      "moveCost": 99,
+      "passable": false,
+      "fertility": 0,
+      "pasture": 0,
+      "timber": 0
+    },
+    {
+      "id": "sea",
+      "name": "Sea",
+      "color": "#2f5f99",
+      "moveCost": 99,
+      "passable": false,
+      "fertility": 0,
+      "pasture": 0,
+      "timber": 0
+    }
   ]
 }

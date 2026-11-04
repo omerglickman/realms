@@ -1,66 +1,132 @@
 {
-  "_comment": "Resources on hexes (DESIGN §3.1). ORDER IS INDEX-STABLE: never reorder or remove, only append. Maps store the resource as its index here, -1 = none. spawn = chance per hex in per-mille (‰) for each terrain id; terrains not listed never get it. 'coastalOnly' restricts spawning to sea hexes that touch land. 'minSpacing' = no identical resource within this many hexes. All numbers are DRAFT — Omer tunes.",
+  "_comment": "Resources on hexes (DESIGN \u00a73.1). ORDER IS INDEX-STABLE from the first committed map with resources onward (none yet as of 2026-11-04): never reorder or remove, only append. Maps store the resource as its index here, -1 = none. spawn = chance per hex in per-mille (\u2030) for each terrain id; terrains not listed never get it. 'coastalOnly' restricts spawning to sea hexes that touch land. 'minSpacing' = no identical resource within this many hexes. All numbers are DRAFT \u2014 Omer tunes.",
   "resources": [
     {
-      "id": "fertile_soil", "name": "Fertile soil", "color": "#f0c940", "glyph": "circle",
-      "spawn": { "grassland": 110, "river": 170, "plains": 60 },
+      "id": "game",
+      "name": "Game",
+      "color": "#c47a3a",
+      "glyph": "triangle",
+      "spawn": {
+        "forest": 150,
+        "woodland": 80,
+        "hills": 30
+      },
       "minSpacing": 1,
-      "gives": { "food": 2 }, "notes": "Feeds cities"
+      "gives": {
+        "food": 1
+      },
+      "notes": "Hunting; forest high, woodland medium, hills low"
     },
     {
-      "id": "pasture", "name": "Pasture", "color": "#e0a060", "glyph": "ring",
-      "spawn": { "plains": 90, "hills": 45, "grassland": 25 },
+      "id": "stone",
+      "name": "Stone",
+      "color": "#d8d8d8",
+      "glyph": "square",
+      "spawn": {
+        "hills": 90,
+        "mountains": 110,
+        "plains": 8
+      },
       "minSpacing": 1,
-      "gives": { "food": 1, "horses": 1 }, "notes": "Required for cavalry (with Stables)"
+      "gives": {
+        "stone": 2
+      },
+      "notes": "Walls, paved roads, major buildings"
     },
     {
-      "id": "timber", "name": "Timber", "color": "#6b4423", "glyph": "triangle",
-      "spawn": { "forest": 140, "woodland": 100 },
-      "minSpacing": 1,
-      "gives": { "timber": 2 }, "notes": "Buildings, ships later"
-    },
-    {
-      "id": "stone", "name": "Stone", "color": "#d8d8d8", "glyph": "square",
-      "spawn": { "hills": 90, "mountains": 110, "plains": 8 },
-      "minSpacing": 1,
-      "gives": { "stone": 2 }, "notes": "Walls, paved roads, major buildings"
-    },
-    {
-      "id": "iron", "name": "Iron", "color": "#50505e", "glyph": "diamond",
-      "spawn": { "hills": 45, "mountains": 85 },
+      "id": "iron",
+      "name": "Iron",
+      "color": "#50505e",
+      "glyph": "diamond",
+      "spawn": {
+        "hills": 45,
+        "mountains": 85
+      },
       "minSpacing": 2,
-      "gives": { "iron": 2 }, "notes": "Professional troops, knights (with Ironworks)"
+      "gives": {
+        "iron": 2
+      },
+      "notes": "Professional troops, knights (with Ironworks)"
     },
     {
-      "id": "fish", "name": "Fish", "color": "#8fd8ff", "glyph": "diamond",
-      "spawn": { "sea": 90, "lake": 220, "river": 35 },
+      "id": "fish",
+      "name": "Fish",
+      "color": "#8fd8ff",
+      "glyph": "diamond",
+      "spawn": {
+        "sea": 90,
+        "lake": 220,
+        "river": 35
+      },
       "coastalOnly": true,
       "minSpacing": 1,
-      "gives": { "food": 2 }, "notes": "Coastal cities; sea hexes must touch land"
+      "gives": {
+        "food": 2
+      },
+      "notes": "Coastal cities; sea hexes must touch land"
     },
     {
-      "id": "furs", "name": "Furs", "color": "#a0522d", "glyph": "hex",
-      "spawn": { "forest": 65, "tundra": 120, "woodland": 35 },
+      "id": "furs",
+      "name": "Furs",
+      "color": "#a0522d",
+      "glyph": "hex",
+      "spawn": {
+        "forest": 65,
+        "tundra": 120,
+        "woodland": 35
+      },
       "minSpacing": 2,
-      "gives": { "goods": 1 }, "notes": "Trade goods"
+      "gives": {
+        "goods": 1
+      },
+      "notes": "Trade goods"
     },
     {
-      "id": "salt", "name": "Salt", "color": "#ffffff", "glyph": "cross",
-      "spawn": { "swamp": 110, "hills": 18, "tundra": 15 },
+      "id": "salt",
+      "name": "Salt",
+      "color": "#ffffff",
+      "glyph": "cross",
+      "spawn": {
+        "swamp": 110,
+        "hills": 18,
+        "tundra": 15
+      },
       "minSpacing": 3,
-      "gives": { "goods": 1 }, "notes": "Trade goods, food preservation"
+      "gives": {
+        "goods": 1
+      },
+      "notes": "Trade goods, food preservation"
     },
     {
-      "id": "wine", "name": "Wine", "color": "#8e3b8e", "glyph": "circle",
-      "spawn": { "river": 45, "hills": 35, "plains": 12 },
+      "id": "wine",
+      "name": "Wine",
+      "color": "#8e3b8e",
+      "glyph": "circle",
+      "spawn": {
+        "river": 45,
+        "hills": 35,
+        "plains": 12
+      },
       "minSpacing": 2,
-      "gives": { "luxury": 1 }, "notes": "Luxury goods; public order in cities"
+      "gives": {
+        "luxury": 1
+      },
+      "notes": "Luxury goods; public order in cities"
     },
     {
-      "id": "silver", "name": "Silver", "color": "#eef0ff", "glyph": "star",
-      "spawn": { "mountains": 28, "hills": 5 },
+      "id": "silver",
+      "name": "Silver",
+      "color": "#eef0ff",
+      "glyph": "star",
+      "spawn": {
+        "mountains": 28,
+        "hills": 5
+      },
       "minSpacing": 4,
-      "gives": { "money": 2 }, "notes": "Rare, high value"
+      "gives": {
+        "money": 2
+      },
+      "notes": "Rare, high value"
     }
   ]
 }
