@@ -316,3 +316,4 @@ Omer: 6 factions on the test map; game = food resource, furs = trade good, both 
 Villages never starve on any site; migration is negligible. The spread between best and median land is the whole game: a river/plains site holds ~10,500 without roads, a hills site ~6,000. Both ceilings sit under the 12,000 metropolis line, so the metropolis still needs roads. Note the village placement rule (centres ≥3 apart) yields 7–11 villages per orbit on real terrain vs 24 on the ideal canvas — a realistic density. Picture `testmap_sites.png` delivered.
 
 **Tests & build:** 57/57; tsc clean. **Commit:** `phase1: real-map scenario (testmap) + DEVLOG 5c`.
+- **Open question added (DESIGN §5.8):** with crowding, villages plateau ~700 and cannot reach the 1,500 town gate by growth; towns need villages and ~60 years to reach 6,000. Proposed gates: village→town ~700, town→city ~4,500. Awaiting Omer; next chat.
