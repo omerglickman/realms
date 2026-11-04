@@ -1,10 +1,11 @@
 {
-  "_comment": "Food model (DESIGN §4.2, §3.1). 1 food = one person fed for one month. Yields are people fed PER YEAR by a fully worked hex; 'hands' = working hands needed to work it fully; output scales linearly with hands. Omer-approved STARTING VALUES for tuning (2026-11-04).",
+  "_comment": "Food model (DESIGN §4.2, §3.1). 1 food = one person fed for one month. Yields are people fed PER YEAR by a fully worked hex; 'hands' = working hands needed to work it fully; output scales linearly with hands. Omer-approved STARTING VALUES for tuning (2026-11-04). MODEL SCALE ×3 (DESIGN §5.8, Omer 2026-11-04): every yield and every hands figure here, every building's hands in data/buildings.json, and all unit/settler sizes are 3× the original draft, so that a village crosses the 1,500 town gate and a town the 6,000 city gate by growth. The model is linear in population, so the curves are unchanged — only the labels (tests/scale.test.ts proves it).",
+  "modelScale": 3,
   "foodPerPersonPerMonth": 1,
   "farming": {
     "_comment": "indexed by terrain fertility level 0–4",
-    "fedPerYearByFertility": [0, 50, 100, 150, 200],
-    "hands": 30,
+    "fedPerYearByFertility": [0, 150, 300, 450, 600],
+    "hands": 90,
     "harvest": {
       "_comment": "share of the yearly farming output arriving in each month (0 = January). Sums to 1.",
       "shares": [0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0.4, 0, 0]
@@ -12,21 +13,21 @@
   },
   "herding": {
     "_comment": "indexed by terrain pasture level 0–4; arrives monthly in twelfths",
-    "fedPerYearByPasture": [0, 15, 30, 45, 60],
-    "hands": 5
+    "fedPerYearByPasture": [0, 45, 90, 135, 180],
+    "hands": 15
   },
   "fishing": {
     "_comment": "Lake, River and shore (sea touching land) hexes. Offshore sea needs a port (later). With a Fish resource the richer row applies instead. Arrives monthly in twelfths.",
-    "fedPerYear": 75,
-    "hands": 10,
-    "withFish": { "fedPerYear": 150, "hands": 30 },
+    "fedPerYear": 225,
+    "hands": 30,
+    "withFish": { "fedPerYear": 450, "hands": 90 },
     "waterTerrains": ["lake", "river", "sea"],
     "seaNeedsLandNeighbour": true
   },
   "hunting": {
     "_comment": "Game resource on a worked hex. Arrives monthly in twelfths.",
-    "fedPerYear": 60,
-    "hands": 10
+    "fedPerYear": 180,
+    "hands": 30
   },
   "granary": {
     "_comment": "Every settlement has one (DESIGN §3.3). capacity in months of the settlement's monthly consumption; spoilage = share of stock lost per month. Linear between unstaffed and fully staffed.",

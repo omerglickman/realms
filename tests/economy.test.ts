@@ -36,7 +36,7 @@ describe('hex jobs', () => {
     m.terrain[idx(m, 6, 5)] = P;
     m.terrain[idx(m, 2, 2)] = RIVER;
     expect(hexJobs(m, idx(m, 5, 5)).map((j) => j.kind)).toEqual(['farm', 'herd']); // grassland pasture 1
-    expect(hexJobs(m, idx(m, 5, 5))[0].fedPerYear).toBe(200);
+    expect(hexJobs(m, idx(m, 5, 5))[0].fedPerYear).toBe(600); // fertility 4 at model scale ×3
     expect(hexJobs(m, idx(m, 6, 5)).map((j) => j.kind)).toEqual(['farm', 'herd']);
     expect(isShore(m, 4, 5)).toBe(true); // touches the grassland
     expect(isShore(m, 8, 8)).toBe(false);
@@ -53,8 +53,8 @@ describe('hex jobs', () => {
     m.resource[idx(m, 4, 5)] = resourceIndex('fish');
     m.resource[idx(m, 5, 5)] = resourceIndex('game');
     const fish = hexJobs(m, idx(m, 4, 5)).find((j) => j.kind === 'fish')!;
-    expect(fish.fedPerYear).toBe(150);
-    expect(fish.hands).toBe(30);
+    expect(fish.fedPerYear).toBe(450);
+    expect(fish.hands).toBe(90);
     expect(hexJobs(m, idx(m, 5, 5)).map((j) => j.kind)).toContain('hunt');
   });
 });
@@ -62,31 +62,31 @@ describe('hex jobs', () => {
 describe('labour and granary', () => {
   it('staffs buildings first, then the best jobs per hand, and reports idle hands', () => {
     const state = createGameState('t', createMap(20, 20, G));
-    const s = found(state, 'v', 'village', 10, 10, 1000); // ~580 hands
+    const s = found(state, 'v', 'village', 10, 10, 3000); // ~1,740 hands
     const cells = workedCellsBySettlement(state).get(s.id)!;
     expect(cells).toHaveLength(7);
     const plan = planLabour(state.map, s, cells);
-    expect(plan.staffedHands).toBe(40); // moot hall 10 + granary 30
+    expect(plan.staffedHands).toBe(120); // moot hall 30 + granary 90
     expect(plan.granaryStaffing).toBe(1);
-    expect(plan.fieldHands).toBe(7 * 35); // 7 × (farm 30 + herd 5)
-    expect(plan.idleHands).toBeCloseTo(plan.hands - 40 - 245, 6);
-    expect(plan.landCapacity).toBe(7 * (200 + 15));
+    expect(plan.fieldHands).toBe(7 * 105); // 7 × (farm 90 + herd 15)
+    expect(plan.idleHands).toBeCloseTo(plan.hands - 120 - 735, 6);
+    expect(plan.landCapacity).toBe(7 * (600 + 45));
   });
 
   it('a tiny village is hands-limited: fields are only partly worked', () => {
     const state = createGameState('t', createMap(20, 20, G));
-    const s = found(state, 'v', 'village', 10, 10, 200);
+    const s = found(state, 'v', 'village', 10, 10, 600);
     const plan = planLabour(state.map, s, workedCellsBySettlement(state).get(s.id)!);
     expect(plan.idleHands).toBe(0);
     expect(plan.plannedPerYear).toBeLessThan(plan.landCapacity);
-    expect(plan.plannedPerYear).toBeGreaterThan(200); // but still feeds itself
+    expect(plan.plannedPerYear).toBeGreaterThan(600); // but still feeds itself
   });
 
   it('harvest lands 60/40 in September/October; herding arrives monthly', () => {
     const state = createGameState('t', createMap(20, 20, G));
-    const s = found(state, 'v', 'village', 10, 10, 1000);
+    const s = found(state, 'v', 'village', 10, 10, 3000);
     const plan = planLabour(state.map, s, workedCellsBySettlement(state).get(s.id)!);
-    const farmYear = 7 * 200 * 12, herdMonth = (7 * 15 * 12) / 12;
+    const farmYear = 7 * 600 * 12, herdMonth = (7 * 45 * 12) / 12;
     expect(monthlyProduction(plan, 8)).toBeCloseTo(farmYear * 0.6 + herdMonth, 6);
     expect(monthlyProduction(plan, 9)).toBeCloseTo(farmYear * 0.4 + herdMonth, 6);
     expect(monthlyProduction(plan, 3)).toBeCloseTo(herdMonth, 6);
@@ -107,29 +107,29 @@ describe('labour and granary', () => {
 describe('zones, contested hexes and parents', () => {
   it('higher tier wins contested hexes; a village at distance 3 from a city loses hexes to it', () => {
     const state = createGameState('t', createMap(30, 30, G));
-    const city = found(state, 'c', 'city', 15, 15, 8000);
+    const city = found(state, 'c', 'city', 15, 15, 24000);
     const spot = ringSpots(15, 15, 3, 1)[0];
-    const v = found(state, 'v', 'village', spot.col, spot.row, 600);
+    const v = found(state, 'v', 'village', spot.col, spot.row, 1800);
     const worked = workedCellsBySettlement(state);
     expect(worked.get(city.id)).toHaveLength(19);
     expect(worked.get(v.id)!.length).toBeLessThan(7);
     expect(worked.get(v.id)!.length).toBeGreaterThanOrEqual(5);
     const spot4 = ringSpots(15, 15, 4, 2)[1]; // opposite side of the city from v
-    const v4 = found(state, 'v4', 'village', spot4.col, spot4.row, 600);
+    const v4 = found(state, 'v4', 'village', spot4.col, spot4.row, 1800);
     expect(workedCellsBySettlement(state).get(v4.id)).toHaveLength(7);
     expect(computeWorkAssignment(state).size).toBe(19 + worked.get(v.id)!.length + 7);
   });
 
   it('resolves the parent by influence zone, tier and faction; override wins when valid', () => {
     const state = createGameState('t', createMap(40, 40, G));
-    const city = found(state, 'c', 'city', 20, 20, 8000);
-    const town = found(state, 't', 'town', 27, 20, 3000); // distance 7: outside the city's 5 rings
-    const v = found(state, 'v', 'village', 24, 20, 600); // distance 4 from the city, 3 from the town
+    const city = found(state, 'c', 'city', 20, 20, 24000);
+    const town = found(state, 't', 'town', 27, 20, 9000); // distance 7: outside the city's 5 rings
+    const v = found(state, 'v', 'village', 24, 20, 1800); // distance 4 from the city, 3 from the town
     expect(resolveParent(state, v)).toBe(city.id); // higher tier wins
     v.parentOverride = town.id;
     expect(resolveParent(state, v)).toBe(town.id);
     v.parentOverride = null;
-    const foreign = found(state, 'f', 'village', 18, 20, 600, 'B');
+    const foreign = found(state, 'f', 'village', 18, 20, 1800, 'B');
     expect(resolveParent(state, foreign)).toBeNull();
     expect(resolveParent(state, city)).toBeNull();
     expect(resolveParent(state, town)).toBeNull();
@@ -148,28 +148,28 @@ describe('20-year scenarios (ROADMAP Phase 1 acceptance)', () => {
 
   it('a lone village survives and grows over 20 years without hunger', () => {
     const state = createGameState('a', mixMap());
-    const v = found(state, 'v', 'village', 20, 20, 300);
+    const v = found(state, 'v', 'village', 20, 20, 900);
     let hunger = 0;
     for (let i = 0; i < 240; i++) { endTurn(state); hunger += v.report.hungerDeaths; }
     expect(hunger).toBe(0);
-    expect(totalPopulation(v.pop)).toBeGreaterThan(380);
+    expect(totalPopulation(v.pop)).toBeGreaterThan(1140);
   });
 
   it('a city with no villages starves down toward what its own land feeds', () => {
     const state = createGameState('d', mixMap());
-    const c = found(state, 'c', 'city', 20, 20, 8000);
+    const c = found(state, 'c', 'city', 20, 20, 24000);
     years(state, 20);
     const pop = totalPopulation(c.pop);
-    expect(pop).toBeLessThan(4000);
-    expect(pop).toBeGreaterThan(2500);
+    expect(pop).toBeLessThan(12000);
+    expect(pop).toBeGreaterThan(7500);
   });
 
   it('a city with ten villages is fed by them and keeps far more people; villages never starve', () => {
     const state = createGameState('c', mixMap());
-    const c = found(state, 'c', 'city', 20, 20, 8000);
+    const c = found(state, 'c', 'city', 20, 20, 24000);
     const villages = [
-      ...ringSpots(20, 20, 3, 6).map((o, i) => found(state, `v3-${i}`, 'village', o.col, o.row, 600)),
-      ...ringSpots(20, 20, 4, 4).map((o, i) => found(state, `v4-${i}`, 'village', o.col, o.row, 600)),
+      ...ringSpots(20, 20, 3, 6).map((o, i) => found(state, `v3-${i}`, 'village', o.col, o.row, 1800)),
+      ...ringSpots(20, 20, 4, 4).map((o, i) => found(state, `v4-${i}`, 'village', o.col, o.row, 1800)),
     ];
     let villageHunger = 0, received = 0;
     for (let i = 0; i < 240; i++) {
@@ -179,14 +179,14 @@ describe('20-year scenarios (ROADMAP Phase 1 acceptance)', () => {
     }
     expect(villageHunger).toBe(0);
     expect(received).toBeGreaterThan(0);
-    expect(totalPopulation(c.pop)).toBeGreaterThan(4500);
+    expect(totalPopulation(c.pop)).toBeGreaterThan(13500);
     for (const v of villages) expect(v.parent).toBe(c.id);
   });
 
   it('people are conserved: migration moves people, only births/deaths/hunger change the total', () => {
     const state = createGameState('m', mixMap());
-    const t = found(state, 't', 'town', 20, 20, 3000);
-    const v = found(state, 'v', 'village', ...Object.values(ringSpots(20, 20, 3, 1)[0]) as [number, number], 1400); // overfull village
+    const t = found(state, 't', 'town', 20, 20, 9000);
+    const v = found(state, 'v', 'village', ...Object.values(ringSpots(20, 20, 3, 1)[0]) as [number, number], 4200); // overfull village
     for (let m = 0; m < 11; m++) {
       const before = totalPopulation(t.pop) + totalPopulation(v.pop);
       economyMonth(state, m);
@@ -198,8 +198,8 @@ describe('20-year scenarios (ROADMAP Phase 1 acceptance)', () => {
   it('is deterministic and survives a save/load round trip', () => {
     const run = () => {
       const state = createGameState('x', mixMap());
-      found(state, 'c', 'city', 20, 20, 8000);
-      ringSpots(20, 20, 3, 6).forEach((o, i) => found(state, `v${i}`, 'village', o.col, o.row, 600));
+      found(state, 'c', 'city', 20, 20, 24000);
+      ringSpots(20, 20, 3, 6).forEach((o, i) => found(state, `v${i}`, 'village', o.col, o.row, 1800));
       years(state, 5);
       return state;
     };

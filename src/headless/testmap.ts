@@ -88,7 +88,7 @@ const rows: Row[] = [];
 for (const pick of picks) {
   const state: GameState = createGameState(`tm-${pick.i}`, map);
   const col = pick.i % W, row = Math.floor(pick.i / W);
-  applyCommand(state, { type: 'foundSettlement', settlement: { name: 'City', tier: 'city', col, row, population: 8000, faction: 'A' } });
+  applyCommand(state, { type: 'foundSettlement', settlement: { name: 'City', tier: 'city', col, row, population: 24000, faction: 'A' } });
   const city = Object.values(state.settlements)[0];
 
   // villages: best ring-1 capacity first, at distance 3–5, not within 2 of another village, land that can feed them
@@ -98,7 +98,7 @@ for (const pick of picks) {
   for (const c of zone) {
     if (placed.some((p) => dist(p, c) < 3)) continue;
     const cap = villageCap[c];
-    const pop = cap >= 700 ? 600 : cap >= 450 ? 400 : cap >= 300 ? 250 : 0;
+    const pop = cap >= 2100 ? 1800 : cap >= 1350 ? 1200 : cap >= 900 ? 750 : 0; // model scale ×3
     if (!pop) continue;
     placed.push(c);
     applyCommand(state, { type: 'foundSettlement', settlement: { name: `v${placed.length}`, tier: 'village', col: c % W, row: Math.floor(c / W), population: pop, faction: 'A' } });

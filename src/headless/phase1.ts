@@ -1,4 +1,5 @@
 // Phase 1 headless scenario (ROADMAP Phase 1, session 1):
+// Populations are at MODEL SCALE ×3 (DESIGN §5.8; data/economy.json modelScale).
 // 20 years of settlements on synthetic land, no map UI. Prints yearly tables so
 // the designer can judge the demographic and food numbers in data/*.json.
 // Usage: npm run sim -- --scenario phase1 [--years 20] [--csv out/phase1.csv]
@@ -24,7 +25,7 @@ const YEARS = Number(arg('years', '20'));
 const CSV = arg('csv', '');
 
 // Tier overrides for A/B tests of the zone numbers (scenario only; data/settlements.json stays canonical).
-// e.g. --cityRings 5 --metroRings 6 --metroPop 12000
+// e.g. --cityRings 5 --metroRings 6 --metroPop 36000
 const cityT = TIERS.find((t) => t.id === 'city')!, metroT = TIERS.find((t) => t.id === 'metropolis')!;
 cityT.influenceRings = Number(arg('cityRings', String(cityT.influenceRings)));
 metroT.influenceRings = Number(arg('metroRings', String(metroT.influenceRings)));
@@ -145,70 +146,70 @@ function record(title: string, groups: Record<string, YearRow[]>): void {
 
 const t0 = performance.now();
 
-// A — a lone village of 300 on average land
+// A — a lone village of 900 on average land
 {
   const st = createGameState('p1a', landMap());
-  found(st, 'Lone village', 'village', 20, 20, 300);
-  record('A lone village 300', runCase('A — lone village of 300 (7 hexes, average land)', st, tierName));
+  found(st, 'Lone village', 'village', 20, 20, 900);
+  record('A lone village 900', runCase('A — lone village of 900 (7 hexes, average land)', st, tierName));
 }
 
-// B — a lone town of 3,000
+// B — a lone town of 9,000
 {
   const st = createGameState('p1b', landMap());
-  found(st, 'Lone town', 'town', 20, 20, 3000);
-  record('B lone town 3000', runCase('B — lone town of 3,000 (19 hexes)', st, tierName));
+  found(st, 'Lone town', 'town', 20, 20, 9000);
+  record('B lone town 9000', runCase('B — lone town of 9,000 (19 hexes)', st, tierName));
 }
 
-// C — a city of 8,000 with 10 villages of 600 (6 at distance 3, 4 at distance 4)
+// C — a city of 24,000 with 10 villages of 1,800 (6 at distance 3, 4 at distance 4)
 {
   const st = createGameState('p1c', landMap());
-  found(st, 'City', 'city', 20, 20, 8000);
-  ringSpots(20, 20, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 600));
-  ringSpots(20, 20, 4, 4).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 600));
-  record('C city 8000 + 10 villages', runCase('C — city of 8,000 with 10 villages of 600', st, tierName));
+  found(st, 'City', 'city', 20, 20, 24000);
+  ringSpots(20, 20, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 1800));
+  ringSpots(20, 20, 4, 4).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 1800));
+  record('C city 24000 + 10 villages', runCase('C — city of 24,000 with 10 villages of 1,800', st, tierName));
 }
 
 // D — the same city alone
 {
   const st = createGameState('p1d', landMap());
-  found(st, 'City alone', 'city', 20, 20, 8000);
-  record('D city 8000 alone', runCase('D — city of 8,000 with no villages', st, tierName));
+  found(st, 'City alone', 'city', 20, 20, 24000);
+  record('D city 24000 alone', runCase('D — city of 24,000 with no villages', st, tierName));
 }
 
-// E — a town of 3,000 with 6 villages of 600 at distance 3
+// E — a town of 9,000 with 6 villages of 1,800 at distance 3
 {
   const st = createGameState('p1e', landMap());
-  found(st, 'Town', 'town', 20, 20, 3000);
-  ringSpots(20, 20, 3, 6).forEach((o, i) => found(st, `Village ${i + 1}`, 'village', o.col, o.row, 600));
-  record('E town 3000 + 6 villages', runCase('E — town of 3,000 with 6 villages of 600', st, tierName));
+  found(st, 'Town', 'town', 20, 20, 9000);
+  ringSpots(20, 20, 3, 6).forEach((o, i) => found(st, `Village ${i + 1}`, 'village', o.col, o.row, 1800));
+  record('E town 9000 + 6 villages', runCase('E — town of 9,000 with 6 villages of 1,800', st, tierName));
 }
 
-// G — a city of 8,000 with villages on rings 3, 4 and 5 (6 + 8 + 10 = 24 villages of 600)
+// G — a city of 24,000 with villages on rings 3, 4 and 5 (6 + 8 + 10 = 24 villages of 1,800)
 {
   const st = createGameState('p1g', landMap(61, 61));
-  found(st, 'City', 'city', 30, 30, 8000);
-  ringSpots(30, 30, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 600));
-  ringSpots(30, 30, 4, 8).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 600));
-  ringSpots(30, 30, 5, 10).forEach((o, i) => found(st, `Village d5-${i + 1}`, 'village', o.col, o.row, 600));
-  record('G city 8000 + 24 villages r3-5', runCase('G — city of 8,000 with 24 villages of 600 on rings 3–5', st, tierName));
+  found(st, 'City', 'city', 30, 30, 24000);
+  ringSpots(30, 30, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 1800));
+  ringSpots(30, 30, 4, 8).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 1800));
+  ringSpots(30, 30, 5, 10).forEach((o, i) => found(st, `Village d5-${i + 1}`, 'village', o.col, o.row, 1800));
+  record('G city 24000 + 24 villages r3-5', runCase('G — city of 24,000 with 24 villages of 1,800 on rings 3–5', st, tierName));
 }
 
-// H — a city of 12,000 with the same 24 villages
+// H — a city of 36,000 (the metropolis gate) with the same 24 villages
 {
   const st = createGameState('p1h', landMap(61, 61));
-  found(st, 'City', 'city', 30, 30, 12000);
-  ringSpots(30, 30, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 600));
-  ringSpots(30, 30, 4, 8).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 600));
-  ringSpots(30, 30, 5, 10).forEach((o, i) => found(st, `Village d5-${i + 1}`, 'village', o.col, o.row, 600));
-  record('H city 12000 + 24 villages r3-5', runCase('H — city of 12,000 with 24 villages of 600 on rings 3–5', st, tierName));
+  found(st, 'City', 'city', 30, 30, 36000);
+  ringSpots(30, 30, 3, 6).forEach((o, i) => found(st, `Village d3-${i + 1}`, 'village', o.col, o.row, 1800));
+  ringSpots(30, 30, 4, 8).forEach((o, i) => found(st, `Village d4-${i + 1}`, 'village', o.col, o.row, 1800));
+  ringSpots(30, 30, 5, 10).forEach((o, i) => found(st, `Village d5-${i + 1}`, 'village', o.col, o.row, 1800));
+  record('H city 36000 + 24 villages r3-5', runCase('H — city of 36,000 with 24 villages of 1,800 on rings 3–5', st, tierName));
 }
 
-// F — coastal vs inland village of 200 (sea to the west; the coastal village has shore hexes in its ring)
+// F — coastal vs inland village of 600 (sea to the west; the coastal village has shore hexes in its ring)
 {
   const st = createGameState('p1f', landMap(41, 41, 20));
-  found(st, 'Coastal village', 'village', 20, 20, 200, 'A');
-  found(st, 'Inland village', 'village', 32, 20, 200, 'B');
-  record('F coastal vs inland 200', runCase('F — coastal vs inland village of 200', st, (s) => s.name));
+  found(st, 'Coastal village', 'village', 20, 20, 600, 'A');
+  found(st, 'Inland village', 'village', 32, 20, 600, 'B');
+  record('F coastal vs inland 600', runCase('F — coastal vs inland village of 600', st, (s) => s.name));
 }
 
 console.log(`\nran in ${(performance.now() - t0).toFixed(0)} ms`);
