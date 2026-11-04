@@ -6,20 +6,22 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 ## CURRENT STATE (always kept up to date — overwrite this block, don't append to it)
 
-- **Phase:** **0 signed off by Omer 2026-11-04. Phase 1 (settlements, people and food) is next** — see ROADMAP Phase 1 for the suggested session order. No Phase 1 code exists yet.
+- **Phase:** **1 (settlements, people and food) — session 1 done: the model exists and runs headless; no map UI for it yet.** Phase 0 signed off 2026-11-04.
 - **Repository:** GitHub `omerglickman/realms` (private). Claude has push access. Default branch `main`.
-- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (37 passing). Map diff: `npm run mapdiff -- <file>`. Headless: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json` to write a map file).
-- **Last playable build:** `realms.html` from Session 4c (2026-11-04) — opens on test map rev 3 (with resources); **map editor** (E or "Edit map"): terrain palette with number keys, Brush (B) sizes 1/2/3/5 (`[` `]`), Fill (F), Pick (I), undo/redo (Ctrl+Z / Ctrl+Y, 200 steps), Export .json / Import…, autosave with Restore/Discard prompt, unsaved-edits warning; **resources**: palette (click = resource tool, brush size 1; X = eraser), Spawn resources (seed + density slider, replaces all), Fill empty (only hexes without a resource), Clear all — all undoable; R toggles the resource layer; glyphs hidden below zoom 0.3; hover shows the resource. Left-drag paints, right/middle-drag pans. Generator folded into "New draft…".
-- **The map:** `maps/testmap.json` = "vinral", 160×100, **revision 3** (file v2, **with resources**: 881 placed — fish 309 incl. some offshore, game 179, furs 125, stone 124, iron 57, wine 49, salt 26, silver 12; terrain: rev 1 changed 1,571 hexes, rev 2 935, rev 3 37; ~48 % land) on top of the generated draft (seed `vinral`; DESIGN §2.2). The file is canonical; the generator only makes new drafts. `meta.revision` counts Omer's committed edit batches. **`data/resources.json` is index-stable from now on.**
-- **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude draft generator (1–3 continents in horizontal slots with sea channels between them + islands, domain-warped coastlines, fractal noise, sea level from land fraction, ridged-noise mountain ranges, moisture bands, northern tundra, lakes, meandering downhill rivers); map file format `src/sim/mapfile.ts` (v2: terrain + resource layers, ids stored for safe re-mapping, v1 files migrate with an empty resource layer); terrain yields fertility/pasture/timber 0–4 in `data/terrain.json`; resources `data/resources.json` + `src/sim/resources.ts` (8 resources: game, stone, iron, fish, furs, salt, wine, silver; per-mille spawn weights per terrain, min spacing, coastal-only fish; deterministic `computeResourceSpawn`); command layer `src/sim/commands.ts` (`setTerrain`, `setResource`, `replaceMap`, helpers for brush/fill/layer); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, Home = fit, G = grid toggle; HUD; map editor (see Last playable build).
-- **Known broken / limitations:** resource `gives` values are placeholders (no economy yet); glyphs are simple coloured shapes (placeholder art); no map resize in the editor; editing works on the embedded copy of the test map — Omer's edited file must be sent back (attach the exported .json to a chat) for the session to commit it as `maps/testmap.json`; generator produces fewer islands than requested when they fall near a continent (they merge) — acceptable for a draft; at land ≥55% continents tend to touch.
-- **Performance (measured by Omer 2026-11-04):** 60–61 fps at every map size including 400×250 fully zoomed out. Budget met.
+- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (57 passing). Map diff: `npm run mapdiff -- <file>`. Headless draft map: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json`). **Phase 1 scenario: `npm run sim -- --scenario phase1 [--years 20] [--csv out/phase1.csv]`** — 20 years of six cases, yearly tables.
+- **Last playable build:** `realms.html` from Session 5 (2026-11-04) — identical UI to Session 4c (map + editor on test map rev 3); the Phase 1 simulation is in the bundle but not yet reachable from the UI.
+- **The map:** `maps/testmap.json` = "vinral", 160×100, revision 3 (file v2, with 881 resources). Canonical; the generator only makes new drafts. `data/resources.json` and `data/settlements.json` are index-stable.
+- **What works (Phase 1):** `data/demography.json`, `data/economy.json`, `data/settlements.json` (4 tiers incl. metropolis), `data/buildings.json` (halls + granaries with hands); `src/sim/demography.ts` (cohort model sex × 5 bands, yearly update in December, hunger deaths, slices for migration); `src/sim/settlements.ts` (Settlement entity, work/influence zones per tier, contested hexes → higher tier wins, parent resolution by influence/tier/faction with override); `src/sim/economy.ts` (labour plan: buildings first then jobs best-per-hand; farm/herd/fish/hunt jobs incl. shore detection; harvest 60/40 Sept/Oct; consume + hunger; granary spoilage/cap by staffing; surplus to parent keeping food-until-harvest + 3 months; migration of 10 % idle hands/month with dependants); `endTurn` runs the economy monthly and demography yearly; `GameState` v2 (settlements, nextId; v1 saves migrate); commands `foundSettlement` / `removeSettlement` / `restoreSettlement`; headless scenario `src/headless/phase1.ts`.
+- **What works (Phase 0):** unchanged — hex math, map store, terrain/resources tables, generator, map file v2, command layer, renderer, camera, HUD, map editor.
+- **Known broken / limitations:** no settlement on the map or in the UI yet; no factions entity (settlements carry a faction string); no roads (surplus only moves inside influence zones); fishing on offshore sea (ports) not implemented; metropolis upgrade prerequisites not implemented (tier exists); migration fires on "stock < 3 months" even in late summer when the harvest is a month away — ~100 people/yr leave healthy villages in scenario C (see Session 5 findings); growth is birth-limited, so coast and inland villages grow identically when both are fed (scenario F).
+- **Phase 1 scenario results (2026-11-04, starting numbers):** lone village 300 → 415 in 20 y (+1.6 %/y, never hungry); lone town 3,000 → peaks 3,571 then settles ≈3,360 = its land; city 8,000 alone → 3,344 in ~6 y (≈4,500 hunger deaths); city 8,000 + 10 villages of 600 → ≈5,200 (fed ≈2,700 extra by village surplus that shrinks from 32k to 19k food/yr as villages grow 6,000 → 6,770); town 3,000 + 6 villages → 4,146, villages 3,642 → 4,836, nobody hungry.
 - **Next steps (in order):**
-  1. Whenever Omer attaches a newly exported map `.json`: `npm run mapdiff -- <file>` (validates + diffs against `maps/testmap.json`), set `name` to "vinral" and bump `meta.revision`, commit, rebuild, deliver.
-  2. **Phase 1, session 1:** reread DESIGN §3.3, §4.1, §4.2. Open by proposing concrete draft constants to Omer (people fed per hex by fertility level, birth/death rates per cohort, consumption per head, granary spoilage, village/town/city thresholds) — then build `src/sim/demography.ts` and `src/sim/economy.ts` with a headless 20-year scenario (`npm run sim`) printing population/food curves for a village, a town, a city with villages, and a city without. No map UI in that session.
-  3. **Phase 1, session 2:** `data/factions.json` (6 factions: ask Omer whether hand-designed names/positions or generated), `data/settlements.json`, settlement + faction entities in `GameState`, editor tool to place settlements/assign factions, influence and work zones drawn on the map, settlement hover/panel.
+  1. Whenever Omer attaches a newly exported map `.json`: `npm run mapdiff -- <file>`, set `name` "vinral", bump `meta.revision`, commit, rebuild, deliver.
+  2. Omer's verdict on the Session 5 curves — tuning of `data/demography.json` / `data/economy.json` (growth speed, the city's fall, migration trigger). Candidate fixes: migration trigger "stock < food until harvest" instead of a flat 3 months; faster births if 20 years should show more change.
+  3. **Phase 1, session 2:** `data/factions.json` (6 factions — ask Omer: hand-designed names/positions or generated), faction entity in `GameState`, editor tool to place settlements and assign factions on the test map, influence and work zones drawn, settlement hover/panel showing hands (staffed/field/idle), granary months, parent.
+  4. Session 3: end-turn button + yearly reports in the UI; starter buildings with effects; tuning against the headless curves.
 - **Scheduled design sessions:** "Government & Institutions" (DESIGN §4.3) before Phase 2.
-- **Open questions for Omer:** DESIGN.md §5 (desert; draft yield rows; whether the 6 factions are hand-designed or generated).
+- **Open questions for Omer:** DESIGN.md §5 (desert; draft yield rows; factions hand-designed or generated; village/metropolis hall names; river 200+75; metropolis prerequisites).
 
 ---
 
@@ -247,3 +249,42 @@ Omer's third export: 37 terrain hexes changed and **881 resources placed** (seed
 ## 2026-11-04 — Session 4d — Phase 0 sign-off
 
 Omer: 6 factions on the test map; game = food resource, furs = trade good, both kept (furs more common than game in tundra — already true: game does not spawn on tundra). **Phase 0 signed off.** DESIGN §3.1/§4.8/§5 and ROADMAP (v0.3) updated. Next: Phase 1 in a fresh chat, starting with the numbers and a headless scenario.
+
+## 2026-11-04 — Session 5 — Phase 1 design decisions and the food/people model (headless)
+
+**Phase:** 1 — **Goal of session:** propose the demographic and food constants to Omer, record his decisions, build `demography.ts` + `economy.ts` + settlements with a 20-year headless scenario. No map UI.
+
+**Done:**
+- Design conversation (see DESIGN.md v0.3): work zone vs influence zone separated; tiers 1/1, 2/3, 2/4 and a new **metropolis** tier 2/5; contested hexes → higher tier wins; subordination to a parent by influence; water hexes workable (shore = sea touching land; 75 food/10 hands, 150/30 with Fish; river keeps farming too); buildings need hands — every settlement has a hall and a granary (10/50/100/200 and 30/60/120/240 hands), staffing linear, idle hands = the rest; migration of 10 % of idle hands per month with dependants to the parent when the granary is under 3 months; settlers stay a player action.
+- `data/demography.json`, `data/economy.json`, `data/settlements.json`, `data/buildings.json` with all constants (draft, Omer-approved as starting values).
+- `src/sim/demography.ts`, `src/sim/settlements.ts`, `src/sim/economy.ts`; `state.ts` v2; `turn.ts` runs them; `commands.ts` found/remove/restore settlement.
+- `src/headless/phase1.ts` (`npm run sim -- --scenario phase1`): six cases × 20 years, yearly tables, optional CSV.
+- Tests: 20 new (57 total) — demography rates, hunger weighting, slices; hex jobs incl. shore/river/fish/game; labour plan staffing order and hands-limited village; harvest timing; granary terms; contested hexes; parent resolution with override and faction; four 20-year scenario tests; people conservation under migration; determinism + save/load + v1 migration; command inversion.
+
+**How it was done / decisions of note:**
+- Yields in data are *people fed per year*; food units are people-months, so production = fedPerYear × 12 (the first run forgot the ×12 and everyone starved — caught by the scenario).
+- The 3-month reserve alone starved villages: they sent everything above 3 months in October and had nothing by June. Rule implemented as "keep what you eat until the next harvest + 3 months" — the DESIGN text was updated to say so (Omer's intent was the 3-month margin; the until-harvest part is the implementation reading, marked as such).
+- Settlements are founded with 12 months of food (was 6) so a January start reaches the first harvest; founding stock will become a settlers rule in Phase 2.
+- Job priority is "best food per hand first": herding (5 hands) and shore fishing (10) are worked before farms (30). A village of 300 has 134 field hands against 245 needed for 7 hexes — Omer's "a village can't work its full capacity without spare hands" holds; the land ceiling binds only from ~500 people.
+- Cohort counts are real numbers, not integers (smooth small-settlement behaviour; UI rounds).
+- PLACEHOLDERS: "Moot Hall" / "Great Hall" names; metropolis prerequisites (data only); `parentOverride` has no UI yet.
+
+**Design decisions made by Omer this session (written into DESIGN.md v0.3):** all of the above design bullets; starting numbers for both models approved for tuning.
+
+**Findings for Omer (from the curves):**
+- A city of 8,000 with 10 villages settles at ≈5,200: the orbit feeds ≈6,000 and village exports fall from 32k to 19k food/yr as the villages grow — the "villages eat their own surplus" pressure is real. A city of 8,000 needs roads, as intended.
+- Growth is birth-limited (+1.1 to +1.6 %/yr): 20 years changes a town by ~1,000 people. If Omer wants more visible change in a 20-year window, raise births or add a food-driven growth term.
+- Coast vs inland: identical growth when both are fed — water only matters when hands are scarce (small or levied villages) or land is poor. The "coast grows faster" intuition from the chat was wrong under this model.
+- Migration trigger (stock < 3 months) fires in late summer in healthy villages (~100 people/yr in scenario C) because the reserve is at its yearly low right before harvest. Candidate fix: trigger on "stock < what is needed until the next harvest".
+
+**Broken / unfinished:** nothing broken; no UI for any of it.
+
+**Tests & build:** pass (57/57; `tsc` clean; build clean; headless browser load clean, zero console errors).
+
+**Commit(s):** `phase1: demography + food economy + settlements model, data files, headless 20-year scenario, tests` (+ docs mirror).
+
+**Build delivered:** `realms.html` (Session 5; UI unchanged) + the scenario tables and chart in chat.
+
+**Next session should:**
+1. Take Omer's tuning verdict on the curves; adjust `data/*.json`; rerun `--scenario phase1`.
+2. Phase 1 session 2: factions data + settlements on the test map in the editor, zones drawn, settlement panel.

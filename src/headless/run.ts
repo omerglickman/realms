@@ -17,6 +17,16 @@ function arg(name: string, def: string): string {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : def;
 }
 
+// Named scenarios live in their own files: `npm run sim -- --scenario phase1`.
+const scenario = arg('scenario', '');
+if (scenario) {
+  await import(`./${scenario}.ts`);
+} else {
+  await main();
+}
+
+async function main(): Promise<void> {
+
 const seed = arg('seed', 'realms');
 const width = Number(arg('width', '160'));
 const height = Number(arg('height', '100'));
@@ -51,3 +61,4 @@ TERRAIN.forEach((t, i) => {
 const rc = countResources(map);
 console.log('Resources:');
 RESOURCES.forEach((r, i) => console.log(`  ${r.name.padEnd(12)} ${String(rc[i]).padStart(6)}`));
+}

@@ -1,0 +1,13 @@
+{
+  "_comment": "Buildings inside settlements (DESIGN §3.3). Every building needs 'hands' to run; staffing is linear (half staff = half effect). 'mandatory' buildings exist from founding and cannot be demolished. Phase 1 session 1 defines only the two mandatory families (hall, granary); the starter list from DESIGN §3.3 will be added with effects in a later session. Names of the village hall and the metropolis hall are PLACEHOLDERS (DESIGN §5). Hands are draft.",
+  "buildings": [
+    { "id": "moot_hall", "name": "Moot Hall", "family": "hall", "tier": "village", "hands": 10, "mandatory": true, "effects": { "government": 1 } },
+    { "id": "town_hall", "name": "Town Hall", "family": "hall", "tier": "town", "hands": 50, "mandatory": true, "effects": { "government": 1 } },
+    { "id": "city_hall", "name": "City Hall", "family": "hall", "tier": "city", "hands": 100, "mandatory": true, "effects": { "government": 1 } },
+    { "id": "metropolis_hall", "name": "Great Hall", "family": "hall", "tier": "metropolis", "hands": 200, "mandatory": true, "effects": { "government": 1 } },
+    { "id": "granary_village", "name": "Granary", "family": "granary", "tier": "village", "hands": 30, "mandatory": true, "effects": { "granary": 1 } },
+    { "id": "granary_town", "name": "Granary", "family": "granary", "tier": "town", "hands": 60, "mandatory": true, "effects": { "granary": 1 } },
+    { "id": "granary_city", "name": "Granary", "family": "granary", "tier": "city", "hands": 120, "mandatory": true, "effects": { "granary": 1 } },
+    { "id": "granary_metropolis", "name": "Granary", "family": "granary", "tier": "metropolis", "hands": 240, "mandatory": true, "effects": { "granary": 1 } }
+  ]
+}

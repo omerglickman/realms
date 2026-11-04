@@ -2,12 +2,13 @@
 // plain-data command applied through `applyCommand`, which returns the inverse
 // command so the UI can undo. The AI will issue the same commands as the player.
 //
-// Phase 0: map-editing commands only.
+// Phase 0: map-editing commands. Phase 1: founding and removing settlements.
 
 import type { GameState } from './state';
 import type { MapData } from './map';
 import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
+import { makeSettlement, settlementIdAt, type FoundOptions, type Settlement } from './settlements';
 
 export interface CellEdit {
   /** flat index = row * width + col */
@@ -32,7 +33,29 @@ export interface ReplaceMapCommand {
   map: MapData;
 }
 
-export type Command = SetTerrainCommand | SetResourceCommand | ReplaceMapCommand;
+export interface FoundSettlementCommand {
+  type: 'foundSettlement';
+  settlement: FoundOptions;
+}
+
+export interface RemoveSettlementCommand {
+  type: 'removeSettlement';
+  id: string;
+}
+
+/** Inverse of removeSettlement: put a settlement object back exactly as it was. */
+export interface RestoreSettlementCommand {
+  type: 'restoreSettlement';
+  settlement: Settlement;
+}
+
+export type Command =
+  | SetTerrainCommand
+  | SetResourceCommand
+  | ReplaceMapCommand
+  | FoundSettlementCommand
+  | RemoveSettlementCommand
+  | RestoreSettlementCommand;
 
 /** Apply a command, mutating the state, and return the inverse command. */
 export function applyCommand(state: GameState, cmd: Command): Command {
@@ -66,6 +89,23 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       state.map = cloneMap(cmd.map);
       return { type: 'replaceMap', map: prev };
     }
+    case 'foundSettlement': {
+      const o = cmd.settlement;
+      if (settlementIdAt(state, o.col, o.row)) throw new Error(`A settlement already stands at ${o.col},${o.row}`);
+      const s = makeSettlement(state, o);
+      state.settlements[s.id] = s;
+      return { type: 'removeSettlement', id: s.id };
+    }
+    case 'removeSettlement': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      delete state.settlements[cmd.id];
+      return { type: 'restoreSettlement', settlement: s };
+    }
+    case 'restoreSettlement': {
+      state.settlements[cmd.settlement.id] = cmd.settlement;
+      return { type: 'removeSettlement', id: cmd.settlement.id };
+    }
   }
 }
 
@@ -76,7 +116,9 @@ export function isNoop(cmd: Command): boolean {
 
 /** Cells touched by a command (for renderer invalidation); 'all' for whole-map commands. */
 export function commandCells(cmd: Command): number[] | 'all' {
-  return cmd.type === 'replaceMap' ? 'all' : cmd.cells.map((c) => c.i);
+  if (cmd.type === 'setTerrain' || cmd.type === 'setResource') return cmd.cells.map((c) => c.i);
+  if (cmd.type === 'replaceMap') return 'all';
+  return [];
 }
 
 export function setResourceCommand(map: MapData, cells: Iterable<number>, resource: number): SetResourceCommand {

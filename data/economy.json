@@ -1,0 +1,41 @@
+{
+  "_comment": "Food model (DESIGN §4.2, §3.1). 1 food = one person fed for one month. Yields are people fed PER YEAR by a fully worked hex; 'hands' = working hands needed to work it fully; output scales linearly with hands. Omer-approved STARTING VALUES for tuning (2026-11-04).",
+  "foodPerPersonPerMonth": 1,
+  "farming": {
+    "_comment": "indexed by terrain fertility level 0–4",
+    "fedPerYearByFertility": [0, 50, 100, 150, 200],
+    "hands": 30,
+    "harvest": {
+      "_comment": "share of the yearly farming output arriving in each month (0 = January). Sums to 1.",
+      "shares": [0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0.4, 0, 0]
+    }
+  },
+  "herding": {
+    "_comment": "indexed by terrain pasture level 0–4; arrives monthly in twelfths",
+    "fedPerYearByPasture": [0, 15, 30, 45, 60],
+    "hands": 5
+  },
+  "fishing": {
+    "_comment": "Lake, River and shore (sea touching land) hexes. Offshore sea needs a port (later). With a Fish resource the richer row applies instead. Arrives monthly in twelfths.",
+    "fedPerYear": 75,
+    "hands": 10,
+    "withFish": { "fedPerYear": 150, "hands": 30 },
+    "waterTerrains": ["lake", "river", "sea"],
+    "seaNeedsLandNeighbour": true
+  },
+  "hunting": {
+    "_comment": "Game resource on a worked hex. Arrives monthly in twelfths.",
+    "fedPerYear": 60,
+    "hands": 10
+  },
+  "granary": {
+    "_comment": "Every settlement has one (DESIGN §3.3). capacity in months of the settlement's monthly consumption; spoilage = share of stock lost per month. Linear between unstaffed and fully staffed.",
+    "unstaffed": { "capacityMonths": 15, "spoilagePerMonth": 0.015 },
+    "staffed": { "capacityMonths": 24, "spoilagePerMonth": 0.005 }
+  },
+  "sharing": {
+    "_comment": "A subordinate settlement keeps what it will eat until the next harvest PLUS this many months, and sends the rest to its parent each month; the parent takes what it has room for.",
+    "reserveMonths": 3
+  },
+  "staffingOrder": ["buildings", "fields"]
+}
