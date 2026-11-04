@@ -115,7 +115,7 @@ export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boo
   const suff = Math.max(0, Math.min(1, foodSufficiency));
   let mult = suff;
   if (plenty && suff >= 1) mult *= DEMOGRAPHY.plentyBirthMultiplier;
-  // PLACEHOLDER (DESIGN §4.1, proposed 2026-11-04): crowding lowers births; off while penalty = 0
+  // Crowding lowers births in villages (DESIGN §4.1, DECIDED 2026-11-04); penalty 0 turns it off
   mult *= Math.max(0, 1 - DEMOGRAPHY.crowdingBirthPenalty * Math.max(0, Math.min(1, idleShare)));
   const births = fertileWomen(p) * DEMOGRAPHY.birthsPerWomanPerYear * mult;
   // 3. aging: 1/width of each band moves up; the last band is terminal

@@ -123,8 +123,8 @@ describe('zones, contested hexes and parents', () => {
   it('resolves the parent by influence zone, tier and faction; override wins when valid', () => {
     const state = createGameState('t', createMap(40, 40, G));
     const city = found(state, 'c', 'city', 20, 20, 8000);
-    const town = found(state, 't', 'town', 26, 20, 3000); // distance 6: outside the city's 4 rings
-    const v = found(state, 'v', 'village', 23, 20, 600); // distance 3 from both
+    const town = found(state, 't', 'town', 27, 20, 3000); // distance 7: outside the city's 5 rings
+    const v = found(state, 'v', 'village', 24, 20, 600); // distance 4 from the city, 3 from the town
     expect(resolveParent(state, v)).toBe(city.id); // higher tier wins
     v.parentOverride = town.id;
     expect(resolveParent(state, v)).toBe(town.id);

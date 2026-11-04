@@ -1,14 +1,14 @@
 {
-  "_comment": "Settlement tiers (DESIGN §3.3, DECIDED 2026-11-04). ORDER IS INDEX-STABLE: never reorder or remove, only append. Zones are in rings around the centre (ring 1 = centre + 6 neighbours = 7 hexes; 2 → 19; 3 → 37; 4 → 61; 5 → 91). Population ranges are draft. 'hall' and 'granary' are the two buildings every settlement has from founding (data/buildings.json).",
+  "_comment": "Settlement tiers (DESIGN §3.3, DECIDED 2026-11-04). ORDER IS INDEX-STABLE: never reorder or remove, only append. Zones are in rings around the centre (ring 1 = centre + 6 neighbours = 7 hexes; 2 → 19; 3 → 37; 4 → 61; 5 → 91; 6 → 127). City 5 rings and metropolis 6 rings from 12,000 decided by Omer 2026-11-04 after the A/B test.. Population ranges are draft. 'hall' and 'granary' are the two buildings every settlement has from founding (data/buildings.json).",
   "tiers": [
     { "id": "village", "name": "Village", "rank": 0, "workRings": 1, "influenceRings": 1, "popMin": 200, "popMax": 1500, "hall": "moot_hall", "granary": "granary_village" },
     { "id": "town", "name": "Town", "rank": 1, "workRings": 2, "influenceRings": 3, "popMin": 1500, "popMax": 6000, "hall": "town_hall", "granary": "granary_town" },
-    { "id": "city", "name": "City", "rank": 2, "workRings": 2, "influenceRings": 4, "popMin": 6000, "popMax": 9000, "hall": "city_hall", "granary": "granary_city" },
-    { "id": "metropolis", "name": "Metropolis", "rank": 3, "workRings": 2, "influenceRings": 5, "popMin": 9000, "popMax": null, "hall": "metropolis_hall", "granary": "granary_metropolis" }
+    { "id": "city", "name": "City", "rank": 2, "workRings": 2, "influenceRings": 5, "popMin": 6000, "popMax": 12000, "hall": "city_hall", "granary": "granary_city" },
+    { "id": "metropolis", "name": "Metropolis", "rank": 3, "workRings": 2, "influenceRings": 6, "popMin": 12000, "popMax": null, "hall": "metropolis_hall", "granary": "granary_metropolis" }
   ],
   "metropolisUpgrade": {
     "_comment": "PROPOSED (DESIGN §3.3): prerequisites for upgrading a city to a metropolis. Not implemented until roads and institutions exist.",
-    "popAtLeast": 9000,
+    "popAtLeast": 12000,
     "forConsecutiveYears": 3,
     "pavedRoadsToTowns": 2,
     "institution": "chancery"

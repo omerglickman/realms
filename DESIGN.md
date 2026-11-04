@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3 — 2026-11-04 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3a — 2026-11-04 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 Working title: **Realms, Kings and Other Stuff** (DECIDED 2026-11-03; may change later).
 
@@ -141,19 +141,19 @@ Four tiers: **Village**, **Town**, **City**, **Metropolis**. Every settlement ha
 
 | | Village | Town | City | Metropolis |
 |---|---|---|---|---|
-| Population *(draft)* | 200–1,500 | 1,500–6,000 | 6,000–9,000+ | 9,000+ (upgrade) |
+| Population *(draft)* | 200–1,500 | 1,500–6,000 | 6,000–12,000 | 12,000+ (upgrade) |
 | **Work zone** | 1 ring (7 hexes) | 2 rings (19) | 2 rings (19) | 2 rings (19) |
-| **Influence zone** | 1 ring (7) | 3 rings (37) | 4 rings (61) | 5 rings (91) |
-| Food | Surplus | Balanced alone; ~5,500 with ~6 villages | Own land feeds ~2,850; orbit of 8–10 villages feeds ~6,500; beyond that needs roads | Orbit feeds ~11,000 |
+| **Influence zone** | 1 ring (7) | 3 rings (37) | **5 rings (91)** | **6 rings (127)** |
+| Food | Surplus | Balanced alone; ~6,000 with ~6 villages | Own land feeds ~2,850; an orbit of up to ~24 villages holds ~8,000–9,000 (headless, average land); beyond that needs roads | Orbit feeds more; exact ceiling TBD |
 | Economy / culture | Little | Moderate | Large | Largest; unique features (TBD) |
 
-*(Why these numbers: a 7-hex village zone cannot sit inside a 2-ring influence zone without most of its fields being the town's. With town influence 3 and city influence 4, six villages fit at distance 3 and eight at distance 4, and the resulting food ceilings land exactly on the tier population ranges. Omer approved 2026-11-04.)*
+*(Why these numbers: a 7-hex village zone cannot sit inside a 2-ring influence zone without most of its fields being the town's. With town influence 3, six villages fit at distance 3 and the town's ceiling lands on its tier range. City influence was 4 rings until an A/B test on 2026-11-04 showed that 5 rings plus the crowding rule in §4.1 holds a city of 8,000–9,000 stably, where 4 rings held ~6,200; Omer chose 5 and moved the metropolis threshold to 12,000 with 6 rings.)*
 
 **Contested hexes (DECIDED 2026-11-04):** each hex is worked by exactly one settlement. Where work zones overlap, the **higher tier wins**; ties go to the nearer centre; the player may reassign any hex by hand.
 
 **Subordination (DECIDED 2026-11-04):** a lower-tier settlement is subordinate to ("parent") the settlement whose influence zone covers its centre. If several qualify, default to the highest tier, then the nearest; the player can choose the parent explicitly. Surplus and migration go to the parent.
 
-**Metropolis (DECIDED 2026-11-04 as a tier; prerequisites PROPOSED):** a city of 9,000+ may be upgraded to a metropolis — 5 rings of influence and features to be defined. It must be rare and require roads and good land. PROPOSED prerequisites: population ≥ 9,000 for 3 consecutive years; a paved road to at least two towns; an institutional prerequisite from §4.3 (e.g. Chancery). *(A city's own 4-ring orbit feeds ~6,500, so 9,000 is reachable only with food arriving by road — the rarity is built into the geometry.)*
+**Metropolis (DECIDED 2026-11-04 as a tier; prerequisites PROPOSED):** a city of 12,000+ may be upgraded to a metropolis — 6 rings of influence and features to be defined. It must be rare and require roads and good land. PROPOSED prerequisites: population ≥ 12,000 for 3 consecutive years; a paved road to at least two towns; an institutional prerequisite from §4.3 (e.g. Chancery). *(A city's own 5-ring orbit holds ~8,000–9,000, so 12,000 is reachable only with food arriving by road — the rarity is built into the geometry.)*
 
 Other details:
 
@@ -189,6 +189,7 @@ The world contains a fixed, countable population: the sum of everyone in every s
 | Working hands | everyone 15–59 (≈ 58 % of a settled population) |
 | Recruitable | men 15–44 (by unit type, §4.6); taking them lowers working hands |
 | Hunger (granary empty) | extra deaths that month = shortfall fraction × 5 % of population, children and 60+ hit twice as hard; order drops |
+| Crowding (DECIDED 2026-11-04) | **villages only**: births × (1 − 1.0 × share of hands that are idle). A village whose land is full stops growing instead of starving, and settles with ≈ 28 % spare hands — its standing levy pool. Towns and cities are exempt: their idle hands are the workshop/recruit pool. |
 | Net result | ≈ +1.1 %/year well fed → a village doubles in ~65 years |
 
 - **Raids and sieges** kill or carry off people, skewed toward the vulnerable or the able-bodied depending on the attacker's intent; the demographic shape of the loss shapes the recovery.
@@ -318,7 +319,8 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 6. Whether River keeps both farming (200) and fishing (75) — currently yes (§3.1).
 7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
 
-Resolved 2026-11-04 (Phase 1 design): work vs influence zones per tier (1/1, 2/3, 2/4, metropolis 2/5); contested hexes → higher tier wins; subordination to the parent by influence; metropolis tier; water hexes workable (shore = sea touching land); buildings need hands, every settlement has a hall and a granary; cohort demographic model with the §4.1 starting numbers; food model with the §4.2 starting numbers; migration of 10 % of idle hands/month with dependants to the parent when the settlement forecasts running out before the next harvest; settlers are a player action, never automatic.
+Resolved 2026-11-04 (Phase 1 design, evening): city influence 5 rings, metropolis from 12,000 with 6 rings (A/B tested); crowding birth penalty 1.0 for villages; migration trigger = forecast of running out before the next harvest.
+Resolved 2026-11-04 (Phase 1 design): work vs influence zones per tier (1/1, 2/3, 2/4 → 2/5 in the evening, metropolis 2/5 → 2/6); contested hexes → higher tier wins; subordination to the parent by influence; metropolis tier; water hexes workable (shore = sea touching land); buildings need hands, every settlement has a hall and a granary; cohort demographic model with the §4.1 starting numbers; food model with the §4.2 starting numbers; migration of 10 % of idle hands/month with dependants to the parent when the settlement forecasts running out before the next harvest; settlers are a player action, never automatic.
 Resolved 2026-11-04: 6 factions on the test map; game = food, furs = trade (both kept); horses via pasture access; offshore fish for ports; terrain yields instead of soil/pasture/timber resources.
 Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement tuned for fun); map size (160×100 test map, engine for 400×250); institutions + policies as the advancement system; ruler as a mortal character with succession; builds delivered as a single HTML file Omer opens from disk (plus a private web page as backup); code hosted on GitHub (`omerglickman/realms`).
 
@@ -326,12 +328,12 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## 6. Glossary
 
-- **Influence zone** — rings of hexes around a settlement (1/3/4/5 for village/town/city/metropolis): surplus flows up through it, bonuses trickle down, borders are drawn from it.
+- **Influence zone** — rings of hexes around a settlement (1/3/5/6 for village/town/city/metropolis): surplus flows up through it, bonuses trickle down, borders are drawn from it.
 - **Work zone** — hexes a settlement's own hands extract from (1 ring for a village, 2 for the rest).
 - **Parent settlement** — the higher-tier settlement a village or town is subordinate to; receives its surplus and its migrants.
 - **Shore** — a sea hex with at least one land neighbour; workable for fish. Sea touching no land is *offshore* (needs a port).
 - **Hands** — working adults 15–59. *Staffed* hands run buildings, *field* hands work hexes, *idle hands* do neither.
-- **Metropolis** — the fourth settlement tier: a city of 9,000+ upgraded to 5 rings of influence and unique features.
+- **Metropolis** — the fourth settlement tier: a city of 12,000+ upgraded to 6 rings of influence and unique features.
 - **Group** — several units on one hex acting as one; an *army* is a group of military units.
 - **Administrative capacity** — how much a faction can govern before corruption and disorder rise.
 - **Government form** — the faction's type of state; sets what institutions and policies are available.
@@ -344,6 +346,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3a (2026-11-04, evening): city 5 rings / metropolis 12,000 @ 6 rings after A/B test; crowding birth penalty for villages; migration trigger by forecast.
 - 0.3 (2026-11-04, Phase 1 design): §3.3 rewritten — work vs influence zones, four tiers incl. metropolis, contested hexes, subordination, staffed buildings (hall + granary); §3.1 water hexes workable; §4.1 cohort model and starting rates, migration; §4.2 food model starting numbers; §5 and glossary updated.
 - 0.2e (2026-11-04): 6 factions; game/furs roles; Phase 0 signed off.
 - 0.2d (2026-11-04): horses via pasture access; offshore fish for ports.
