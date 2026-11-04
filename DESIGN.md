@@ -115,7 +115,7 @@ Hexes are *unknown*, *explored* or *visible*. Settlements and units see 2 hexes 
 | Wine | River 4.5% · Hills 3.5% · Plains 1.2% | luxury |
 | Silver | Mountains 2.8% · Hills 0.5% (min 4 hexes apart) | money |
 
-Horses are not a resource (DECIDED 2026-11-04): to recruit mounted units — and possibly to sustain them — a settlement needs **access to a pasture-bearing hex**, either by direct control (in its zone) or via a road connection to a settlement that has one. Fish may also be placed **offshore**, away from the coast (DECIDED 2026-11-04): such hexes are only workable by a town or city with an improved port — a later building; the spawner still only auto-places fish on coastal sea, offshore fish are hand-placed. The test map's resources are placed in the editor (seeded spawn, then hand-edits) and live in the map file. OPEN: Furs and Game overlap (both forest/woodland/tundra) — keep both, or fold furs into game?
+**Game vs Furs (DECIDED 2026-11-04):** both stay. Game is a food-producing resource (hunting); Furs are a trade good; furs are more common than game in tundra (game does not spawn there). Horses are not a resource (DECIDED 2026-11-04): to recruit mounted units — and possibly to sustain them — a settlement needs **access to a pasture-bearing hex**, either by direct control (in its zone) or via a road connection to a settlement that has one. Fish may also be placed **offshore**, away from the coast (DECIDED 2026-11-04): such hexes are only workable by a town or city with an improved port — a later building; the spawner still only auto-places fish on coastal sea, offshore fish are hand-placed. The test map's resources are placed in the editor (seeded spawn, then hand-edits) and live in the map file.
 
 ### 3.2 Units (DECIDED concept, PROPOSED roster)
 
@@ -269,7 +269,7 @@ PROPOSED: a relations value per pair of factions, treaty types (peace, non-aggre
 
 ### 4.8 Factions and AI (DECIDED)
 
-The player controls one faction; the computer controls all others. PROPOSED: 6–10 factions on the test map, each with a *persona* (expansionist, trader, raider, defensive) that weights a utility-based AI. The AI uses the same rules and information as the player as far as practical; any cheat is documented.
+The player controls one faction; the computer controls all others. **The test map starts with 6 factions (DECIDED 2026-11-04)**; until the AI exists only the player's faction acts. PROPOSED: each faction has a *persona* (expansionist, trader, raider, defensive) that weights a utility-based AI. The AI uses the same rules and information as the player as far as practical; any cheat is documented.
 
 ### 4.9 Events — PROPOSED (optional flavour)
 
@@ -284,10 +284,11 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 ## 5. Open decisions (need Omer)
 
 1. **Desert** terrain: yes/no.
-2. **Furs vs Game** overlap (§3.1); draft yield rows in the terrain table (§3.1).
-3. **Number of factions** on the test map (proposed 6–10) and whether they are hand-designed or generated.
+2. Draft yield rows in the terrain table (§3.1) — confirm or change.
+3. Whether the 6 factions are hand-designed (names, start positions) or generated — needed early in Phase 1.
 4. **Government & Institutions** detailed design — scheduled as a dedicated design session before Phase 2 (§4.3 is a sketch only).
 
+Resolved 2026-11-04: 6 factions on the test map; game = food, furs = trade (both kept); horses via pasture access; offshore fish for ports; terrain yields instead of soil/pasture/timber resources.
 Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement tuned for fun); map size (160×100 test map, engine for 400×250); institutions + policies as the advancement system; ruler as a mortal character with succession; builds delivered as a single HTML file Omer opens from disk (plus a private web page as backup); code hosted on GitHub (`omerglickman/realms`).
 
 ---
@@ -308,6 +309,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.2e (2026-11-04): 6 factions; game/furs roles; Phase 0 signed off.
 - 0.2d (2026-11-04): horses via pasture access; offshore fish for ports.
 - 0.2c (2026-11-04): §3.1 rewritten — fertility/pasture/timber are terrain yields (Omer's decision); Game added; resource table with current spawn chances.
 - 0.2b (2026-11-04): §3.1 note on the implemented resource table.

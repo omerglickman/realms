@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.2 — 2026-11-03 — Status: ACTIVE (Phase 0 in progress)**
+**Version 0.3 — 2026-11-04 — Status: ACTIVE (Phase 0 signed off; Phase 1 next)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -124,7 +124,7 @@ Written for a non-programmer first; the technical specifics follow.
 
 Each phase ends with a **playable build**, a **DEVLOG entry**, and **Omer's sign-off**. A phase is not "done" until Omer says so. Session counts are rough guesses for planning only.
 
-### Phase 0 — Skeleton and map (≈ 2–3 sessions) — IN PROGRESS
+### Phase 0 — Skeleton and map — DONE, signed off by Omer 2026-11-04
 
 Goal: see the world, edit the world.
 
@@ -139,20 +139,22 @@ Goal: see the world, edit the world.
 - [x] Save/load of the map (download/upload JSON). *(Session 3)*
 - [x] First test map draft (~160×100) generated, saved to `maps/testmap.json`, and handed to Omer for editing. *(Session 2)*
 - [x] Omer's edited map committed back as `maps/testmap.json` (revisions 1–2, Sessions 3b–3c). Repeat as he edits.
-- [ ] Omer spawns/places resources on the test map and exports it (→ revision 3, first v2 file with resources).
-- [ ] **Phase 0 acceptance review** with Omer.
+- [x] Omer spawns/places resources on the test map and exports it (→ revision 3, first v2 file with resources). *(Session 4c)*
+- [x] **Phase 0 acceptance**: met in practice (three edit round-trips, 60 fps at 400×250) and signed off by Omer 2026-11-04.
 
-**Acceptance**: Omer can generate a draft, paint it, save it, reload it; 400×250 renders smoothly on his machine.
+**Acceptance**: Omer can generate a draft, paint it, save it, reload it; 400×250 renders smoothly on his machine. ✔
 
 ### Design session — Government & Institutions (before Phase 2)
 
 A chat devoted to DESIGN §4.3: government forms, the institution list and prerequisites, the policy list and trade-offs, administrative capacity. Output: DESIGN.md §4.3 moved from PROPOSED to DECIDED and `data/institutions.json` drafted.
 
-### Phase 1 — Settlements, people and food (≈ 3–4 sessions)
+### Phase 1 — Settlements, people and food (≈ 3–4 sessions) — NEXT
 
 Goal: a living economy with no enemies.
 
-- Factions (data-defined) with colours and a treasury; one player faction.
+Suggested order (each session ends with a build): (1) numbers first — propose the demographic and food model constants to Omer, build `demography.ts` + `economy.ts` in `src/sim` with a headless 20-year village/town/city scenario and a results table, *before any map UI*; (2) settlements and factions as data + on the map, editor placement, influence/work zones drawn; (3) buildings, build queue, panels, end-turn; (4) tuning with Omer against the headless curves.
+
+- Factions (data-defined; **6 on the test map**) with colours and a treasury; one player faction.
 - Settlements (village/town/city) with influence zones and work zones drawn on the map; editor can place them.
 - Demographic cohort model; births, deaths, aging; working hands.
 - Economy loop: gather → produce → consume → store → share → tax. Food sharing within influence zones and along roads.
@@ -224,6 +226,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.3 (2026-11-04): Phase 0 signed off; Phase 1 marked next with a suggested session order.
 - 0.2b (2026-11-04): Phase 0 checklist updated through Session 4 (resources).
 - 0.2 (2026-11-03): hosting (GitHub) and delivery (single HTML file) decided; stack versions recorded; Phase 0 checklist with progress; Government & Institutions design session added before Phase 2.
 - 0.1 (2026-11-03): first draft.
