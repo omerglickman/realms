@@ -281,7 +281,7 @@ Omer: 6 factions on the test map; game = food resource, furs = trade good, both 
 
 **Tests & build:** pass (57/57; `tsc` clean; build clean; headless browser load clean, zero console errors).
 
-**Commit(s):** `phase1: demography + food economy + settlements model, data files, headless 20-year scenario, tests` (+ docs mirror).
+**Commit(s):** `phase1: demography + food economy + settlements model, data files, headless 20-year scenario, tests` — commit `599b800`.
 
 **Build delivered:** `realms.html` (Session 5; UI unchanged) + the scenario tables and chart in chat.
 
