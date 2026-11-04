@@ -176,10 +176,6 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 1. Read Omer's feedback on the editor.
 2. Resources: `data/resources.json` with spawn weights per terrain (DESIGN §3.1 list), a resource layer in `MapData` (and the map file, version 2 with migration), spawning in the generator and a "Spawn resources" action in the editor, resource painting/erasing, small icon rendering, HUD readout.
 
-## 2026-11-04 — Session 3c — Map revision 2
-
-Second edit batch from Omer: 935 hexes changed (5.8 %) vs revision 1 — mostly sea → land (433 sea hexes painted over; coasts filled in, islands enlarged), plus plains/grassland reshuffling, more hills and forest, tundra extended. Committed as `maps/testmap.json` revision 2. Added `npm run mapdiff -- <file> [base]` (`src/headless/mapdiff.ts`) for this loop. Tests 28/28, build clean, delivered `realms.html`.
-
 ## 2026-11-04 — Session 3b — First map edits committed
 
 **Phase:** 0 — **Goal of session:** import Omer's first edited map.
@@ -201,3 +197,7 @@ Second edit batch from Omer: 935 hexes changed (5.8 %) vs revision 1 — mostly 
 
 **Next session should:**
 1. Resources (see Session 3 "Next session should" 2).
+
+## 2026-11-04 — Session 3c — Map revision 2
+
+Second edit batch from Omer: 935 hexes changed (5.8 %) vs revision 1 — mostly sea → land (433 sea hexes painted over; coasts filled in, islands enlarged), plus plains/grassland reshuffling, more hills and forest, tundra extended. Committed as `maps/testmap.json` revision 2. Added `npm run mapdiff -- <file> [base]` (`src/headless/mapdiff.ts`) for this loop. Tests 28/28, build clean, delivered `realms.html`.
