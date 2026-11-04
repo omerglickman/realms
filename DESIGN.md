@@ -319,7 +319,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 3. Whether the 6 factions are hand-designed (names, start positions) or generated — needed in Phase 1 session 2.
 4. **Government & Institutions** detailed design — scheduled as a dedicated design session before Phase 2 (§4.3 is a sketch only).
 5. Name of the village hall (placeholder *Moot Hall*; alternatives *Reeve's House*, *Manor*) and of the metropolis hall.
-6. Whether River keeps both farming (200) and fishing (75) — currently yes (§3.1).
+6. Whether River keeps both farming (600) and fishing (225) — currently yes (§3.1).
 7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
 8. **Tier upgrade thresholds — RESOLVED 2026-11-04 (Omer, late evening); IMPLEMENTED in Session 6 (2026-11-04), proven scale-invariant by `tests/scale.test.ts` and by a row-by-row comparison of the 20-year scenario tables before and after.** The model is linear in population, so **everything scales ×3**: hex yields (people fed per year) and the hands to work them, building hands, settler/scenario populations — curves stay identical with labels ×3. The **town gate stays 1,500 and the city gate stays 6,000**; at ×3 a village plateaus ~2,100 (crosses 1,500 by growth, ~30 years after founding), a town alone levels at ~10,000 and with villages ~18,000 (crosses 6,000 in 25–40 years). The **metropolis gate scales to 36,000** (it was calibrated to the orbit's ceiling: a good site reaches ~31,000 without roads). Tier population ranges in §3.3 become typical sizes, not gates. All later unit/settler sizes are written at the ×3 scale; `data/economy.json` carries `modelScale: 3`.
 
