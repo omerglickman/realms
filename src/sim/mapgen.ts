@@ -118,6 +118,10 @@ export function generateDraftMap(p: MapGenParams): MapData {
   const tempNoise = makeNoise(rng);
   const warpX = makeNoise(rng);
   const warpY = makeNoise(rng);
+  const warpX2 = makeNoise(rng);
+  const warpY2 = makeNoise(rng);
+  const inletNoise = makeNoise(rng);
+  const detailNoise = makeNoise(rng);
 
   const T = {
     plains: terrainIndex('plains'),
@@ -161,8 +165,13 @@ export function generateDraftMap(p: MapGenParams): MapData {
       // domain warp: bend the coordinates before sampling the land masses so
       // coastlines are not ellipses
       const warp = Math.min(width, height) * 0.11;
-      const wx = col + warp * (fbm(warpX, col / (scale * 2) + 700, row / (scale * 2) + 700, 3) - 0.5) * 2;
-      const wy = row + warp * (fbm(warpY, col / (scale * 2) + 900, row / (scale * 2) + 900, 3) - 0.5) * 2;
+      const warp2 = 5; // hexes — small-scale wobble for bays and headlands
+      const wx = col
+        + warp * (fbm(warpX, col / (scale * 2) + 700, row / (scale * 2) + 700, 3) - 0.5) * 2
+        + warp2 * (fbm(warpX2, col / 6 + 1100, row / 6 + 1100, 2) - 0.5) * 2;
+      const wy = row
+        + warp * (fbm(warpY, col / (scale * 2) + 900, row / (scale * 2) + 900, 3) - 0.5) * 2
+        + warp2 * (fbm(warpY2, col / 6 + 1300, row / 6 + 1300, 2) - 0.5) * 2;
       let m = massField(masses, wx, wy);
       // sea channels between continent slots so that 2 or 3 continents stay separate
       for (let b = 1; b < continents; b++) {
@@ -170,6 +179,13 @@ export function generateDraftMap(p: MapGenParams): MapData {
         m *= 1 - 0.85 * Math.exp(-d * d);
       }
       let e = m * (0.3 + 0.7 * n) + 0.12 * n;
+      // carve inlets: ridged noise at a few-hex scale subtracted from the elevation
+      // cuts fjords, estuaries and narrow bays into the coast, and splits off
+      // peninsulas and offshore islets. Strongest where the land is low (coasts).
+      const inlet = ridged(inletNoise, col / 7 + 1500, row / 7 + 1500, 3);
+      const detail = fbm(detailNoise, col / 3.5 + 1700, row / 3.5 + 1700, 2);
+      const lowness = Math.max(0, 1 - m * 1.4);
+      e -= 0.16 * inlet * (0.35 + 0.65 * lowness) + 0.05 * (detail - 0.5);
       const ex = Math.min(col, width - 1 - col) / (width * 0.08);
       const ey = Math.min(row, height - 1 - row) / (height * 0.08);
       const edge = Math.min(1, Math.min(ex, ey));
@@ -197,8 +213,8 @@ export function generateDraftMap(p: MapGenParams): MapData {
       const cold = temp < 0.13;
 
       let t: number;
-      if (ridge > 0.78 && h > 0.12) t = T.mountains;
-      else if (ridge > 0.66 && h > 0.08) t = T.hills;
+      if (ridge > 0.72 && h > 0.1) t = T.mountains;
+      else if (ridge > 0.62 && h > 0.06) t = T.hills;
       else if (h > 0.85) t = T.hills;
       else if (cold) t = moist > 0.6 ? T.forest : T.tundra;
       else if (moist > 0.68) t = T.forest;

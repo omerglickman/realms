@@ -1,5 +1,5 @@
 // Headless runner: runs the simulation without any graphics (ROADMAP B.1).
-// Usage: npm run sim -- --seed realms --width 160 --height 100 --turns 24
+// Usage: npm run sim -- --seed realms --width 160 --height 100 --turns 24 --continents 2 --islands 6 --land 45
 // Phase 0: generates a draft map, runs N empty turns, prints a summary.
 // Later phases: AI-vs-AI games, CSV statistics for balancing.
 
@@ -18,9 +18,12 @@ const seed = arg('seed', 'realms');
 const width = Number(arg('width', '160'));
 const height = Number(arg('height', '100'));
 const turns = Number(arg('turns', '12'));
+const continents = Number(arg('continents', '2'));
+const islands = Number(arg('islands', '6'));
+const landFraction = Number(arg('land', '45')) / 100;
 
 const t0 = performance.now();
-const map = generateDraftMap({ width, height, seed });
+const map = generateDraftMap({ width, height, seed, continents, islands, landFraction });
 const state = createGameState(seed, map);
 for (let i = 0; i < turns; i++) endTurn(state);
 const ms = performance.now() - t0;

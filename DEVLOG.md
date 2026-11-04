@@ -125,6 +125,8 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 **Done:**
 - `src/sim/mapgen.ts` rewritten: land-mass field (continents placed in horizontal slots with Gaussian sea channels between slots; islands with a height boost so they clear the sea level), domain warping of the mass field for non-elliptical coastlines, fractal noise, sea level from land fraction, ridged noise for mountain ranges (mountains > 0.78, hills > 0.66 — tuned so mountains ≈ 3–4 % and hills ≈ 8 % of the map at 45 % land), northern tundra band with noise, lakes, meandering rivers that stop when they join another river.
 - HUD: continents (1–3), islands (0–20), land % slider, Random seed button, Enter in the seed box regenerates; all settings read from / written to the URL hash so a map can be shared or scripted (`realms.html#seed=karlin&w=160&h=100&continents=3&islands=5&land=45`).
+- Coastline ruggedness (Omer asked for less blobby continents): a second, small-scale domain warp (±5 hexes) for bays and headlands, plus ridged "inlet" noise subtracted from the elevation near the coast to carve fjords, estuaries and peninsulas; ridge thresholds re-tuned (mountains > 0.72, hills > 0.62) to keep mountains ≈ 2–4 % and hills ≈ 8–10 %.
+- Headless runner accepts `--continents --islands --land`.
 - Contact sheet of 8 candidates rendered via Playwright (`file://` load, HUD hidden, fit-to-screen) and composed with PIL → delivered to Omer.
 
 **How it was done / decisions of note:**
@@ -139,7 +141,7 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 **Commit(s):** `phase0: continents/islands draft generator, HUD controls, URL-hash params`.
 
-**Build delivered:** `realms.html` (Session 2) + `map_candidates.png`.
+**Build delivered:** `realms.html` (Session 2) + `map_candidates.png` (v1) and `map_candidates_v2.png` (rugged coasts, same eight seeds).
 
 **Next session should:**
 1. Note Omer's chosen canvas (seed/settings) in DESIGN §2.2 or DEVLOG.
