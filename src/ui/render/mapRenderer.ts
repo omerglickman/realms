@@ -7,6 +7,7 @@
 import { Container, Graphics, Rectangle } from 'pixi.js';
 import type { MapData } from '../../sim/map';
 import { TERRAIN, colorToNumber } from '../../sim/terrain';
+import { RESOURCES, type Glyph } from '../../sim/resources';
 import { offsetToPixel, hexCorners, hexWidth, hexRowStep } from '../../sim/hex';
 
 export const HEX_SIZE = 12; // world units (pixels at zoom 1), centre to corner
@@ -17,9 +18,33 @@ interface Chunk {
   cy: number;
   container: Container;
   fill: Graphics;
+  res: Graphics;
   grid: Graphics;
   built: boolean;
   bounds: Rectangle; // world-space bounds
+}
+
+/** Draw a resource glyph centred at (x, y) with radius r. */
+function drawGlyph(g: Graphics, glyph: Glyph, x: number, y: number, r: number): void {
+  switch (glyph) {
+    case 'circle': g.circle(x, y, r); break;
+    case 'ring': g.circle(x, y, r * 0.72); break; // stroked, not filled (see buildChunk)
+    case 'triangle': g.poly([x, y - r, x + r * 0.95, y + r * 0.7, x - r * 0.95, y + r * 0.7]); break;
+    case 'square': g.rect(x - r * 0.8, y - r * 0.8, r * 1.6, r * 1.6); break;
+    case 'diamond': g.poly([x, y - r, x + r * 0.75, y, x, y + r, x - r * 0.75, y]); break;
+    case 'hex': g.poly(hexCorners(x, y, r)); break;
+    case 'cross': g.rect(x - r * 0.3, y - r, r * 0.6, r * 2); g.rect(x - r, y - r * 0.3, r * 2, r * 0.6); break;
+    case 'star': {
+      const pts: number[] = [];
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const rr = i % 2 === 0 ? r : r * 0.45;
+        pts.push(x + rr * Math.cos(a), y + rr * Math.sin(a));
+      }
+      g.poly(pts);
+      break;
+    }
+  }
 }
 
 export class MapRenderer {
@@ -29,12 +54,16 @@ export class MapRenderer {
   private terrainColors: number[];
   private showGrid = true;
   private gridZoomOk = true;
+  private showResources = true;
+  private resZoomOk = true;
+  private resourceColors: number[];
   /** milliseconds spent building chunks during the last cull() call */
   lastBuildMs = 0;
 
   constructor(map: MapData) {
     this.map = map;
     this.terrainColors = TERRAIN.map((t) => colorToNumber(t.color));
+    this.resourceColors = RESOURCES.map((r) => colorToNumber(r.color));
     this.rebuildChunks();
   }
 
@@ -55,18 +84,30 @@ export class MapRenderer {
     this.applyGridVisibility();
   }
 
-  /** Grid lines are thinner than a pixel below this zoom and only cause moiré, so hide them. */
+  setResourcesVisible(v: boolean): void {
+    this.showResources = v;
+    this.applyGridVisibility();
+  }
+
+  get resourcesVisible(): boolean {
+    return this.showResources;
+  }
+
+  /** Grid lines are thinner than a pixel below zoom 0.5 and only cause moiré; resource glyphs are unreadable below 0.3. */
   setZoom(zoom: number): void {
     const ok = zoom >= 0.5;
-    if (ok !== this.gridZoomOk) {
+    const rok = zoom >= 0.3;
+    if (ok !== this.gridZoomOk || rok !== this.resZoomOk) {
       this.gridZoomOk = ok;
+      this.resZoomOk = rok;
       this.applyGridVisibility();
     }
   }
 
   private applyGridVisibility(): void {
     const v = this.showGrid && this.gridZoomOk;
-    for (const c of this.chunks) c.grid.visible = v;
+    const rv = this.showResources && this.resZoomOk;
+    for (const c of this.chunks) { c.grid.visible = v; c.res.visible = rv; }
   }
 
   get gridVisible(): boolean {
@@ -101,23 +142,26 @@ export class MapRenderer {
       for (let cx = 0; cx < cols; cx++) {
         const container = new Container();
         const fill = new Graphics();
+        const res = new Graphics();
         const grid = new Graphics();
         grid.visible = this.showGrid && this.gridZoomOk;
-        container.addChild(fill, grid);
+        res.visible = this.showResources && this.resZoomOk;
+        container.addChild(fill, grid, res);
         container.visible = false;
         this.root.addChild(container);
         const x0 = cx * CHUNK * w - w;
         const y0 = cy * CHUNK * step - HEX_SIZE;
         const bounds = new Rectangle(x0, y0, (CHUNK + 1.5) * w, (CHUNK + 1) * step + HEX_SIZE);
-        this.chunks.push({ cx, cy, container, fill, grid, built: false, bounds });
+        this.chunks.push({ cx, cy, container, fill, res, grid, built: false, bounds });
       }
     }
   }
 
   private buildChunk(c: Chunk): void {
-    const { fill, grid } = c;
+    const { fill, grid, res } = c;
     fill.clear();
     grid.clear();
+    res.clear();
     const map = this.map;
     const c0 = c.cx * CHUNK, r0 = c.cy * CHUNK;
     const c1 = Math.min(map.width, c0 + CHUNK), r1 = Math.min(map.height, r0 + CHUNK);
@@ -144,6 +188,39 @@ export class MapRenderer {
       }
     }
     grid.stroke({ width: 0.5, color: 0x000000, alpha: 0.18 });
+    // resources: group by resource, dark outline then fill
+    const byRes: number[][] = this.resourceColors.map(() => []);
+    for (let row = r0; row < r1; row++) {
+      for (let col = c0; col < c1; col++) {
+        const r = map.resource[row * map.width + col];
+        if (r >= 0) byRes[r].push(col, row);
+      }
+    }
+    const gr = HEX_SIZE * 0.42;
+    for (let r = 0; r < byRes.length; r++) {
+      const cells = byRes[r];
+      if (cells.length === 0) continue;
+      const glyph = RESOURCES[r].glyph;
+      if (glyph === 'ring') {
+        for (let i = 0; i < cells.length; i += 2) {
+          const p = offsetToPixel(cells[i], cells[i + 1], HEX_SIZE);
+          drawGlyph(res, glyph, p.x, p.y, gr);
+        }
+        res.stroke({ width: gr * 0.7, color: 0x000000, alpha: 0.55 });
+        for (let i = 0; i < cells.length; i += 2) {
+          const p = offsetToPixel(cells[i], cells[i + 1], HEX_SIZE);
+          drawGlyph(res, glyph, p.x, p.y, gr);
+        }
+        res.stroke({ width: gr * 0.4, color: this.resourceColors[r] });
+        continue;
+      }
+      for (let i = 0; i < cells.length; i += 2) {
+        const p = offsetToPixel(cells[i], cells[i + 1], HEX_SIZE);
+        drawGlyph(res, glyph, p.x, p.y, gr);
+      }
+      res.fill(this.resourceColors[r]);
+      res.stroke({ width: 1, color: 0x000000, alpha: 0.55 });
+    }
     c.built = true;
   }
 

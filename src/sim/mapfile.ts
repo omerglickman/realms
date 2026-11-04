@@ -3,8 +3,10 @@
 
 import { MAX_MAP_HEIGHT, MAX_MAP_WIDTH, type MapData } from './map';
 import { TERRAIN } from './terrain';
+import { RESOURCES, NO_RESOURCE } from './resources';
 
-export const MAPFILE_VERSION = 1;
+/** v1: terrain only. v2: + resource layer. Older versions are migrated on load. */
+export const MAPFILE_VERSION = 2;
 
 export interface MapFile {
   format: 'realms-map';
@@ -16,6 +18,10 @@ export interface MapFile {
    *  re-mapped if data/terrain.json ever changes (it is index-stable, but belt and braces). */
   terrainIds: string[];
   terrain: number[];
+  /** v2+: resource ids in index order at save time */
+  resourceIds?: string[];
+  /** v2+: resource index per hex, -1 = none */
+  resource?: number[];
   meta?: Record<string, unknown>;
 }
 
@@ -28,6 +34,8 @@ export function saveMapFile(map: MapData, name: string, meta?: Record<string, un
     height: map.height,
     terrainIds: TERRAIN.map((t) => t.id),
     terrain: map.terrain.slice(),
+    resourceIds: RESOURCES.map((r) => r.id),
+    resource: map.resource.slice(),
     meta,
   };
 }
@@ -50,5 +58,21 @@ export function loadMapFile(file: unknown): { map: MapData; name: string } {
   });
   const identity = remap.every((v, i) => v === i);
   const terrain = identity ? f.terrain.slice() : f.terrain.map((t) => remap[t]);
-  return { map: { width: f.width, height: f.height, terrain }, name: f.name ?? 'untitled' };
+
+  // resource layer: absent in v1 files → none everywhere
+  let resource: number[];
+  if (Array.isArray(f.resource)) {
+    if (f.resource.length !== f.width * f.height) throw new Error('Map file resource length does not match its size');
+    const rids = f.resourceIds ?? RESOURCES.map((r) => r.id);
+    const rremap = rids.map((id) => {
+      const i = RESOURCES.findIndex((r) => r.id === id);
+      if (i < 0) throw new Error(`Map file uses unknown resource "${id}"`);
+      return i;
+    });
+    const ridentity = rremap.every((v, i) => v === i);
+    resource = ridentity ? f.resource.slice() : f.resource.map((r) => (r < 0 ? NO_RESOURCE : rremap[r]));
+  } else {
+    resource = new Array<number>(f.width * f.height).fill(NO_RESOURCE);
+  }
+  return { map: { width: f.width, height: f.height, terrain, resource }, name: f.name ?? 'untitled' };
 }

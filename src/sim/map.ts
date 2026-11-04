@@ -12,13 +12,24 @@ export interface MapData {
   height: number;
   /** terrain index per hex, row-major, odd-r offset. Length = width*height. */
   terrain: number[];
+  /** resource index per hex (data/resources.json), -1 = none. Length = width*height. */
+  resource: number[];
 }
 
 export function createMap(width: number, height: number, fill = 0): MapData {
   if (width < 1 || height < 1 || width > MAX_MAP_WIDTH || height > MAX_MAP_HEIGHT) {
     throw new Error(`Map size ${width}x${height} out of range (max ${MAX_MAP_WIDTH}x${MAX_MAP_HEIGHT})`);
   }
-  return { width, height, terrain: new Array<number>(width * height).fill(fill) };
+  return {
+    width,
+    height,
+    terrain: new Array<number>(width * height).fill(fill),
+    resource: new Array<number>(width * height).fill(-1),
+  };
+}
+
+export function cloneMap(map: MapData): MapData {
+  return { width: map.width, height: map.height, terrain: map.terrain.slice(), resource: map.resource.slice() };
 }
 
 export function inBounds(map: MapData, col: number, row: number): boolean {
@@ -35,6 +46,10 @@ export function getTerrain(map: MapData, col: number, row: number): number {
 
 export function setTerrain(map: MapData, col: number, row: number, t: number): void {
   map.terrain[idx(map, col, row)] = t;
+}
+
+export function getResource(map: MapData, col: number, row: number): number {
+  return map.resource[idx(map, col, row)];
 }
 
 export function axialInBounds(map: MapData, h: Axial): boolean {

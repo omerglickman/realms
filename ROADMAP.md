@@ -135,10 +135,12 @@ Goal: see the world, edit the world.
 - [x] **Map editor** (terrain): palette, brush sizes 1/2/3/5, flood fill, pick, undo/redo, export/import `.json`, autosave. *(Session 3)* — resource placement comes with resources.
 - [x] Command layer (`commands.ts`) — editor edits go through it. *(Session 3)*
 - [x] Generator parameters (continents, islands, land %) and the chosen canvas frozen as `maps/testmap.json`. *(Session 2)*
-- [ ] Resource spawning from `data/resources.json` terrain weights.
+- [x] Resource spawning from `data/resources.json` terrain weights; resource layer in map + file (v2); editor: resource palette/eraser, Spawn / Fill empty / Clear, glyph rendering, hover readout. *(Session 4)*
 - [x] Save/load of the map (download/upload JSON). *(Session 3)*
 - [x] First test map draft (~160×100) generated, saved to `maps/testmap.json`, and handed to Omer for editing. *(Session 2)*
-- [x] Omer's edited map committed back as `maps/testmap.json` (revision 1, Session 3b). Repeat as he edits.
+- [x] Omer's edited map committed back as `maps/testmap.json` (revisions 1–2, Sessions 3b–3c). Repeat as he edits.
+- [ ] Omer spawns/places resources on the test map and exports it (→ revision 3, first v2 file with resources).
+- [ ] **Phase 0 acceptance review** with Omer.
 
 **Acceptance**: Omer can generate a draft, paint it, save it, reload it; 400×250 renders smoothly on his machine.
 
@@ -222,5 +224,6 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.2b (2026-11-04): Phase 0 checklist updated through Session 4 (resources).
 - 0.2 (2026-11-03): hosting (GitHub) and delivery (single HTML file) decided; stack versions recorded; Phase 0 checklist with progress; Government & Institutions design session added before Phase 2.
 - 0.1 (2026-11-03): first draft.

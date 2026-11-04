@@ -6,17 +6,18 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 ## CURRENT STATE (always kept up to date — overwrite this block, don't append to it)
 
-- **Phase:** 0 — Skeleton and map. Skeleton, canvas and terrain editor done; resources remain, then Phase 0 acceptance.
+- **Phase:** 0 — Skeleton and map. Skeleton, canvas, terrain editor and resources done. Remaining: Omer places resources on the test map (→ revision 3), then Phase 0 acceptance review.
 - **Repository:** GitHub `omerglickman/realms` (private). Claude has push access. Default branch `main`.
-- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (28 passing). Headless: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json` to write a map file).
-- **Last playable build:** `realms.html` from Session 3 (2026-11-04) — opens on the frozen test map; **map editor** (E or "Edit map"): terrain palette with number keys, Brush (B) sizes 1/2/3/5 (`[` `]`), Fill (F), Pick (I), undo/redo (Ctrl+Z / Ctrl+Y, 200 steps), Export .json / Import…, autosave to browser storage with a Restore/Discard prompt on next open, unsaved-edits warning on close; left-drag paints, right/middle-drag pans. Generator is folded into a "New draft…" disclosure.
-- **The map:** `maps/testmap.json` = "vinral", 160×100, **revision 2 — Omer's second edit batch (2026-11-04; rev 1 changed 1,571 hexes, rev 2 a further 935)** on top of the generated draft (seed `vinral`, 2 continents, 6 islands, 45 % land; DESIGN §2.2). The file is canonical; the editor edits it; the generator only makes new drafts. `meta.revision` in the file counts Omer's committed edit batches.
-- **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude draft generator (1–3 continents in horizontal slots with sea channels between them + islands, domain-warped coastlines, fractal noise, sea level from land fraction, ridged-noise mountain ranges, moisture bands, northern tundra, lakes, meandering downhill rivers); map file format `src/sim/mapfile.ts` (versioned, terrain ids stored for safe re-mapping); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, Home = fit, G = grid toggle; HUD; map editor (see Last playable build).
-- **Known broken / limitations:** no resources yet; no map resize in the editor; editing works on the embedded copy of the test map — Omer's edited file must be sent back (attach the exported .json to a chat) for the session to commit it as `maps/testmap.json`; generator produces fewer islands than requested when they fall near a continent (they merge) — acceptable for a draft; at land ≥55% continents tend to touch.
+- **How to run:** open `dist/realms.html` in a browser. Development: `npm install`, `npm run dev`. Build: `npm run build` → `dist/realms.html`. Tests: `npm test` (36 passing). Map diff: `npm run mapdiff -- <file>`. Headless: `npm run sim -- --seed vinral --continents 2 --islands 6 --land 45 --turns 24` (add `--out maps/x.json` to write a map file).
+- **Last playable build:** `realms.html` from Session 4 (2026-11-04) — opens on the test map (rev 2, no resources yet); **map editor** (E or "Edit map"): terrain palette with number keys, Brush (B) sizes 1/2/3/5 (`[` `]`), Fill (F), Pick (I), undo/redo (Ctrl+Z / Ctrl+Y, 200 steps), Export .json / Import…, autosave with Restore/Discard prompt, unsaved-edits warning; **resources**: palette (click = resource tool, brush size 1; X = eraser), Spawn resources (seed + density slider, replaces all), Fill empty (only hexes without a resource), Clear all — all undoable; R toggles the resource layer; glyphs hidden below zoom 0.3; hover shows the resource. Left-drag paints, right/middle-drag pans. Generator folded into "New draft…".
+- **The map:** `maps/testmap.json` = "vinral", 160×100, **revision 2** (Omer's edits: rev 1 changed 1,571 hexes, rev 2 a further 935; now ~48 % land) on top of the generated draft (seed `vinral`, 2 continents, 6 islands; DESIGN §2.2). Still a **v1 file with no resources** — loads with an empty resource layer; Omer will spawn/place resources in the editor and export (→ rev 3, v2). The file is canonical; the generator only makes new drafts. `meta.revision` counts Omer's committed edit batches.
+- **What works:** hex math (odd-r offset ↔ axial, distance, rings, pixel conversion); map store up to 400×250; index-stable terrain table from `data/terrain.json`; seeded RNG; crude draft generator (1–3 continents in horizontal slots with sea channels between them + islands, domain-warped coastlines, fractal noise, sea level from land fraction, ridged-noise mountain ranges, moisture bands, northern tundra, lakes, meandering downhill rivers); map file format `src/sim/mapfile.ts` (v2: terrain + resource layers, ids stored for safe re-mapping, v1 files migrate with an empty resource layer); resources `data/resources.json` + `src/sim/resources.ts` (10 resources, per-mille spawn weights per terrain, min spacing, coastal-only fish; deterministic `computeResourceSpawn`); command layer `src/sim/commands.ts` (`setTerrain`, `setResource`, `replaceMap`, helpers for brush/fill/layer); `GameState` with monthly clock and JSON save/load; chunked PixiJS renderer (32×32-hex chunks, lazy build, viewport culling, grid auto-hidden below zoom 0.5); camera with drag-pan, wheel-zoom, arrow keys, Home = fit, G = grid toggle; HUD; map editor (see Last playable build).
+- **Known broken / limitations:** resource `gives` values are placeholders (no economy yet); glyphs are simple coloured shapes (placeholder art); no map resize in the editor; editing works on the embedded copy of the test map — Omer's edited file must be sent back (attach the exported .json to a chat) for the session to commit it as `maps/testmap.json`; generator produces fewer islands than requested when they fall near a continent (they merge) — acceptable for a draft; at land ≥55% continents tend to touch.
 - **Performance (measured by Omer 2026-11-04):** 60–61 fps at every map size including 400×250 fully zoomed out. Budget met.
 - **Next steps (in order):**
   1. Whenever Omer attaches a newly exported map `.json`: `npm run mapdiff -- <file>` (validates + diffs against `maps/testmap.json`), set `name` to "vinral" and bump `meta.revision`, commit, rebuild, deliver.
-  2. Session 4: resources (`data/resources.json`, spawn weights by terrain, render as small icons/dots), resource painting in the editor, map save/load polish, Phase 0 acceptance review with Omer.
+  2. When Omer sends a map with resources (v2 file): commit as rev 3. Then **Phase 0 acceptance review**: walk the checklist in ROADMAP Phase 0 with Omer, collect editor annoyances, fix small ones, get sign-off.
+  3. Phase 1 kick-off (settlements, people and food) — reread DESIGN §3.3, §4.1, §4.2 first; start with factions + settlements data and the demographic cohort model in `src/sim`, headless scenario before any UI.
 - **Scheduled design sessions:** "Government & Institutions" (DESIGN §4.3) before Phase 2.
 - **Open questions for Omer:** DESIGN.md §5 (desert; number of factions).
 
@@ -201,3 +202,36 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 ## 2026-11-04 — Session 3c — Map revision 2
 
 Second edit batch from Omer: 935 hexes changed (5.8 %) vs revision 1 — mostly sea → land (433 sea hexes painted over; coasts filled in, islands enlarged), plus plains/grassland reshuffling, more hills and forest, tundra extended. Committed as `maps/testmap.json` revision 2. Added `npm run mapdiff -- <file> [base]` (`src/headless/mapdiff.ts`) for this loop. Tests 28/28, build clean, delivered `realms.html`.
+
+## 2026-11-04 — Session 4 — Resources
+
+**Phase:** 0 — **Goal of session:** resources — data table, map layer, spawning, editor tools, rendering.
+
+**Done:**
+- `data/resources.json` — the ten DESIGN §3.1 resources (fertile soil, pasture, timber, stone, iron, fish, furs, salt, wine, silver) with colour, glyph, per-mille spawn chance per terrain, `minSpacing`, `coastalOnly` (fish on sea), draft `gives`. Index-stable like terrain.
+- `src/sim/resources.ts` — `RESOURCES`, `computeResourceSpawn(map, rng, {density, replace})` (deterministic; one weighted roll per hex, spacing check against resources placed so far, coastal check), `countResources`.
+- `MapData.resource: number[]` (-1 = none); `cloneMap`, `getResource`. Map file **v2** adds `resourceIds` + `resource`; v1 files load with an empty resource layer (so testmap rev 2 still loads).
+- Commands: `setResource`, `resourceLayerCommand` (whole-layer replace as one undo step), `commandCells` helper; `replaceMap` now copies the resource layer.
+- Generator spawns resources at the end (`resources: false` to skip). Headless `run` prints resource counts; `mapdiff` reports resource changes.
+- Renderer: third Graphics per chunk with glyphs (circle, ring, triangle, square, diamond, hex, cross, star) in the resource colour with a dark outline; hidden below zoom 0.3; R toggles.
+- Editor: resource palette (Erase + ten resources; selecting one switches to the `resource` tool, brush size 1), Spawn (seed + density 25–300 %), Fill empty, Clear all; counter; hover shows `Terrain · Resource`.
+- Tests: 8 new (36 total) — data sanity (ids, known terrains, ≤100 % per terrain), determinism, terrain respect, coastal fish, silver spacing, replace=false, density 0, commands invert, v2 round trip + v1 migration.
+
+**How it was done / decisions of note:**
+- Spawn on the generated `vinral` draft at density 100 %: ≈1,000 resources on ≈7,200 land hexes (≈14 %). On testmap rev 2 the editor spawn gave 1,092. Omer tunes `data/resources.json` and/or the density slider.
+- The test map is deliberately **not** auto-populated: Omer spawns and hand-places in the editor, exports, and that becomes rev 3 (first v2 file).
+- Headless check: spawn → 1,092; paint iron → hover shows it; Ctrl+Z reverts; export is version 2 with 10 resourceIds; Clear → 0; zero console errors.
+
+**Design decisions made by Omer this session:** none new.
+
+**Broken / unfinished:** `gives` values unused until Phase 1; glyph art is placeholder.
+
+**Tests & build:** pass (36/36; build clean; headless browser run clean).
+
+**Commit(s):** `phase0: resources — data table, map layer v2, spawning, editor tools, glyph rendering`.
+
+**Build delivered:** `realms.html` (Session 4).
+
+**Next session should:**
+1. Commit Omer's resource-bearing map as rev 3 if sent.
+2. Phase 0 acceptance review; then Phase 1.

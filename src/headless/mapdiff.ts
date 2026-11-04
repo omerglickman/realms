@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { loadMapFile } from '../sim/mapfile';
 import { TERRAIN } from '../sim/terrain';
+import { RESOURCES } from '../sim/resources';
 
 const newPath = process.argv[2];
 const basePath = process.argv[3] ?? 'maps/testmap.json';
@@ -27,3 +28,14 @@ console.log(`changed: ${changed} hexes (${((100 * changed) / a.map.terrain.lengt
 const fmt = (o: Record<string, number>) => Object.entries(o).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${v}`).join(', ');
 console.log('painted over:', fmt(from) || '—');
 console.log('painted as:  ', fmt(to) || '—');
+let rchanged = 0;
+const rfrom: Record<string, number> = {}, rto: Record<string, number> = {};
+const rname = (i: number) => (i < 0 ? 'none' : RESOURCES[i].id);
+for (let i = 0; i < a.map.resource.length; i++) {
+  if (a.map.resource[i] === b.map.resource[i]) continue;
+  rchanged++;
+  rfrom[rname(a.map.resource[i])] = (rfrom[rname(a.map.resource[i])] ?? 0) + 1;
+  rto[rname(b.map.resource[i])] = (rto[rname(b.map.resource[i])] ?? 0) + 1;
+}
+console.log(`resources changed: ${rchanged} hexes`);
+if (rchanged) { console.log('  was:', fmt(rfrom)); console.log('  now:', fmt(rto)); }

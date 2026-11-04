@@ -44,7 +44,7 @@
       <div class="hud-row hud-info"><span id="info-map"></span></div>
       <div class="hud-row hud-info"><span id="info-hex">Hover a hex</span></div>
       <div class="hud-row hud-info hud-dim"><span id="info-perf"></span></div>
-      <div class="hud-row hud-help hud-dim" id="help-view">Drag to pan · wheel to zoom · arrows scroll · Home fits · G grid · E editor</div>
+      <div class="hud-row hud-help hud-dim" id="help-view">Drag to pan · wheel to zoom · arrows scroll · Home fits · G grid · R resources · E editor</div>
     </div>
 
     <div id="editor" class="hidden">
@@ -78,6 +78,18 @@
       </div>
       <div class="section">Terrain</div>
       <div id="palette"></div>
+      <div class="section">Resources <span class="dim">(brush size 1)</span></div>
+      <div id="res-palette"></div>
+      <div class="row small">
+        <label>Seed <input id="res-seed" type="text" value="vinral" size="8" /></label>
+        <label>Density <input id="res-density" type="range" min="25" max="300" value="100" style="width:5em" /> <span id="res-density-val">100%</span></label>
+      </div>
+      <div class="row small">
+        <button id="res-spawn" title="Place resources everywhere by the terrain weights in data/resources.json (undoable)">Spawn resources</button>
+        <button id="res-fill" title="Only fill hexes that have no resource yet (undoable)">Fill empty</button>
+        <button id="res-clear" title="Remove all resources (undoable)">Clear all</button>
+      </div>
+      <div class="row small"><span id="res-count" class="dim"></span></div>
       <div class="help dim">Left-drag paints · right-drag or middle-drag pans · wheel zooms · Ctrl+Z / Ctrl+Y undo/redo · number keys pick terrain</div>
     </div>
 

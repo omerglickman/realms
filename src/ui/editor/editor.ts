@@ -4,13 +4,15 @@
 // app forwards pointer and key events to it while edit mode is on.
 
 import type { GameState } from '../../sim/state';
-import type { Command, SetTerrainCommand } from '../../sim/commands';
-import { applyCommand, brushCells, floodFillCommand, isNoop, paintCommand } from '../../sim/commands';
+import type { Command, SetTerrainCommand, SetResourceCommand } from '../../sim/commands';
+import { applyCommand, brushCells, floodFillCommand, isNoop, paintCommand, commandCells, setResourceCommand, resourceLayerCommand } from '../../sim/commands';
 import { TERRAIN } from '../../sim/terrain';
+import { RESOURCES, NO_RESOURCE, computeResourceSpawn, countResources } from '../../sim/resources';
+import { seedRng } from '../../sim/rng';
 import { inBounds, idx } from '../../sim/map';
 import { loadMapFile, saveMapFile } from '../../sim/mapfile';
 
-export type Tool = 'brush' | 'fill' | 'pick';
+export type Tool = 'brush' | 'fill' | 'pick' | 'resource';
 export const BRUSH_RADII = [0, 1, 2, 4] as const; // sizes 1, 2, 3, 5
 
 const AUTOSAVE_KEY = 'realms.editor.autosave';
@@ -40,16 +42,18 @@ export class Editor {
   active = false;
   tool: Tool = 'brush';
   terrain = 1; // grassland
+  resource = NO_RESOURCE; // selected resource for the resource tool (-1 = eraser)
   radiusIndex = 1; // size 2
   dirty = false;
 
   private undoStack: UndoEntry[] = [];
   private redoStack: UndoEntry[] = [];
-  private stroke: Map<number, number> | null = null; // cell index -> original terrain
+  private stroke: Map<number, number> | null = null; // cell index -> original terrain (brush) or resource (resource tool)
   private autosaveTimer: number | undefined;
 
   constructor(private host: EditorHost) {
     this.buildPalette();
+    this.buildResourcePalette();
     this.wirePanel();
     this.refreshPanel();
     this.checkAutosave();
@@ -78,6 +82,14 @@ export class Editor {
     return [idx(map, col, row)];
   }
 
+  private applyStrokeCommand(cmd: SetTerrainCommand | SetResourceCommand): void {
+    const state = this.host.getState();
+    const layer = cmd.type === 'setTerrain' ? state.map.terrain : state.map.resource;
+    for (const c of cmd.cells) if (!this.stroke!.has(c.i)) this.stroke!.set(c.i, layer[c.i]);
+    applyCommand(state, cmd);
+    this.host.onChanged(cmd.cells.map((c) => c.i));
+  }
+
   pointerDown(col: number, row: number): void {
     const state = this.host.getState();
     const map = state.map;
@@ -93,7 +105,8 @@ export class Editor {
         this.execute(cmd);
         return;
       }
-      case 'brush': {
+      case 'brush':
+      case 'resource': {
         this.stroke = new Map();
         this.paintAt(col, row);
         return;
@@ -102,18 +115,20 @@ export class Editor {
   }
 
   pointerMove(col: number, row: number): void {
-    if (this.stroke && this.tool === 'brush') this.paintAt(col, row);
+    if (this.stroke && (this.tool === 'brush' || this.tool === 'resource')) this.paintAt(col, row);
   }
 
   pointerUp(): void {
     if (!this.stroke) return;
     const map = this.host.getState().map;
     if (this.stroke.size > 0) {
-      const undo: SetTerrainCommand = { type: 'setTerrain', cells: [] };
-      const redo: SetTerrainCommand = { type: 'setTerrain', cells: [] };
+      const type = this.tool === 'resource' ? 'setResource' : 'setTerrain';
+      const layer = this.tool === 'resource' ? map.resource : map.terrain;
+      const undo: SetTerrainCommand | SetResourceCommand = { type, cells: [] };
+      const redo: SetTerrainCommand | SetResourceCommand = { type, cells: [] };
       for (const [i, orig] of this.stroke) {
         undo.cells.push({ i, t: orig });
-        redo.cells.push({ i, t: map.terrain[i] });
+        redo.cells.push({ i, t: layer[i] });
       }
       this.pushUndo({ undo, redo });
       this.markDirty();
@@ -122,14 +137,29 @@ export class Editor {
   }
 
   private paintAt(col: number, row: number): void {
-    const state = this.host.getState();
-    const map = state.map;
+    const map = this.host.getState().map;
     if (!inBounds(map, col, row)) return;
-    const cmd = paintCommand(map, brushCells(map, col, row, this.brushRadius), this.terrain);
+    const cmd = this.tool === 'resource'
+      ? setResourceCommand(map, [idx(map, col, row)], this.resource)
+      : paintCommand(map, brushCells(map, col, row, this.brushRadius), this.terrain);
     if (isNoop(cmd)) return;
-    for (const c of cmd.cells) if (!this.stroke!.has(c.i)) this.stroke!.set(c.i, map.terrain[c.i]);
-    applyCommand(state, cmd);
-    this.host.onChanged(cmd.cells.map((c) => c.i));
+    this.applyStrokeCommand(cmd);
+  }
+
+  // ---------- resource spawning ----------
+
+  spawnResources(mode: 'replace' | 'fill' | 'clear'): void {
+    const map = this.host.getState().map;
+    let layer: number[];
+    if (mode === 'clear') {
+      layer = new Array<number>(map.resource.length).fill(NO_RESOURCE);
+    } else {
+      const seed = el<HTMLInputElement>('res-seed').value.trim() || 'realms';
+      const density = (Number(el<HTMLInputElement>('res-density').value) || 100) / 100;
+      layer = computeResourceSpawn(map, seedRng(seed), { density, replace: mode === 'replace' });
+    }
+    this.execute(resourceLayerCommand(map, layer));
+    el('editor-msg').textContent = mode === 'clear' ? 'Resources cleared.' : `Resources ${mode === 'fill' ? 'filled' : 'spawned'}.`;
   }
 
   /** Apply a command as one undo step. */
@@ -138,7 +168,7 @@ export class Editor {
     const state = this.host.getState();
     const inverse = applyCommand(state, cmd);
     this.pushUndo({ undo: inverse, redo: cmd });
-    this.host.onChanged(cmd.type === 'setTerrain' ? cmd.cells.map((c) => c.i) : 'all');
+    this.host.onChanged(commandCells(cmd));
     this.markDirty();
   }
 
@@ -154,7 +184,7 @@ export class Editor {
     if (!e) return;
     applyCommand(this.host.getState(), e.undo);
     this.redoStack.push(e);
-    this.host.onChanged(e.undo.type === 'setTerrain' ? e.undo.cells.map((c) => c.i) : 'all');
+    this.host.onChanged(commandCells(e.undo));
     this.markDirty();
     this.refreshPanel();
   }
@@ -164,7 +194,7 @@ export class Editor {
     if (!e) return;
     applyCommand(this.host.getState(), e.redo);
     this.undoStack.push(e);
-    this.host.onChanged(e.redo.type === 'setTerrain' ? e.redo.cells.map((c) => c.i) : 'all');
+    this.host.onChanged(commandCells(e.redo));
     this.markDirty();
     this.refreshPanel();
   }
@@ -193,6 +223,7 @@ export class Editor {
     if (up === 'B') { this.tool = 'brush'; this.refreshPanel(); return true; }
     if (up === 'F') { this.tool = 'fill'; this.refreshPanel(); return true; }
     if (up === 'I') { this.tool = 'pick'; this.refreshPanel(); return true; }
+    if (up === 'X') { this.tool = 'resource'; this.resource = NO_RESOURCE; this.refreshPanel(); return true; }
     if (k === '[') { this.radiusIndex = Math.max(0, this.radiusIndex - 1); this.refreshPanel(); return true; }
     if (k === ']') { this.radiusIndex = Math.min(BRUSH_RADII.length - 1, this.radiusIndex + 1); this.refreshPanel(); return true; }
     const ti = TERRAIN_KEYS.indexOf(up);
@@ -283,7 +314,29 @@ export class Editor {
     });
   }
 
+  private buildResourcePalette(): void {
+    const pal = el('res-palette');
+    pal.innerHTML = '';
+    const mk = (label: string, index: number, color: string | null) => {
+      const b = document.createElement('button');
+      b.className = 'swatch';
+      b.dataset.index = String(index);
+      b.innerHTML = `<span class="chip${color ? '' : ' none'}" style="${color ? `background:${color}` : ''}"></span>${label}`;
+      b.addEventListener('click', () => { this.tool = 'resource'; this.resource = index; this.refreshPanel(); });
+      pal.appendChild(b);
+    };
+    mk('Erase (X)', NO_RESOURCE, null);
+    RESOURCES.forEach((r, i) => mk(r.name, i, r.color));
+  }
+
   private wirePanel(): void {
+    el('res-spawn').addEventListener('click', () => this.spawnResources('replace'));
+    el('res-fill').addEventListener('click', () => this.spawnResources('fill'));
+    el('res-clear').addEventListener('click', () => this.spawnResources('clear'));
+    const dens = el<HTMLInputElement>('res-density');
+    const syncDens = () => { el('res-density-val').textContent = `${dens.value}%`; };
+    dens.addEventListener('input', syncDens);
+    syncDens();
     el('edit-toggle').addEventListener('click', () => this.setActive(!this.active));
     el('tool-brush').addEventListener('click', () => { this.tool = 'brush'; this.refreshPanel(); });
     el('tool-fill').addEventListener('click', () => { this.tool = 'fill'; this.refreshPanel(); });
@@ -315,6 +368,12 @@ export class Editor {
     document.querySelectorAll<HTMLButtonElement>('#palette .swatch').forEach((b) => {
       b.classList.toggle('selected', Number(b.dataset.index) === this.terrain);
     });
+    document.querySelectorAll<HTMLButtonElement>('#res-palette .swatch').forEach((b) => {
+      b.classList.toggle('selected', this.tool === 'resource' && Number(b.dataset.index) === this.resource);
+    });
+    const rc = countResources(this.host.getState().map);
+    const total = rc.reduce((a, b) => a + b, 0);
+    el('res-count').textContent = total ? `${total} resources on the map` : 'no resources on the map';
     el('tool-brush').classList.toggle('selected', this.tool === 'brush');
     el('tool-fill').classList.toggle('selected', this.tool === 'fill');
     el('tool-pick').classList.toggle('selected', this.tool === 'pick');

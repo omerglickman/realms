@@ -11,6 +11,7 @@
 import { createMap, type MapData, inBounds, idx, neighborsOffset } from './map';
 import { terrainIndex } from './terrain';
 import { seedRng, nextFloat, nextInt, type RngState } from './rng';
+import { computeResourceSpawn } from './resources';
 
 export interface MapGenParams {
   width: number;
@@ -26,6 +27,8 @@ export interface MapGenParams {
   scale?: number;
   /** number of rivers to attempt. default ~ land hexes / 350 */
   rivers?: number;
+  /** spawn resources after terrain (default true) */
+  resources?: boolean;
 }
 
 export const MAPGEN_DEFAULTS = {
@@ -277,6 +280,9 @@ export function generateDraftMap(p: MapGenParams): MapData {
       if (map.terrain[i] !== T.mountains) map.terrain[i] = T.river;
     }
   }
+
+  // 7. resources
+  if (p.resources ?? true) map.resource = computeResourceSpawn(map, rng);
 
   return map;
 }

@@ -8,6 +8,7 @@ import { createGameState, calendar } from '../sim/state';
 import { endTurn } from '../sim/turn';
 import { countTerrain } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
+import { RESOURCES, countResources } from '../sim/resources';
 import { saveMapFile } from '../sim/mapfile';
 import { writeFileSync } from 'node:fs';
 
@@ -47,3 +48,6 @@ TERRAIN.forEach((t, i) => {
   const n = counts[i] ?? 0;
   console.log(`  ${t.name.padEnd(10)} ${String(n).padStart(7)}  ${((100 * n) / total).toFixed(1).padStart(5)}%`);
 });
+const rc = countResources(map);
+console.log('Resources:');
+RESOURCES.forEach((r, i) => console.log(`  ${r.name.padEnd(12)} ${String(rc[i]).padStart(6)}`));

@@ -8,8 +8,9 @@ import { Editor } from './editor/editor';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
 import { pixelToAxial, axialToOffset, offsetToPixel, hexCorners } from '../sim/hex';
-import { inBounds, getTerrain, countTerrain } from '../sim/map';
+import { inBounds, getTerrain, getResource, countTerrain } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
+import { resourceByIndex } from '../sim/resources';
 import { loadMapFile } from '../sim/mapfile';
 import testmapJson from '../../maps/testmap.json';
 
@@ -219,6 +220,7 @@ export async function startApp(): Promise<void> {
     else if (e.key === 'ArrowUp') camera.panBy(0, step);
     else if (e.key === 'ArrowDown') camera.panBy(0, -step);
     else if (e.key === 'g' || e.key === 'G') renderer.setGridVisible(!renderer.gridVisible);
+    else if (e.key === 'r' || e.key === 'R') renderer.setResourcesVisible(!renderer.resourcesVisible);
     else if (e.key === 'Home') camera.fit();
     else if (e.key === 'e' || e.key === 'E') editor.setActive(!editor.active);
     if (mouseX >= 0) updateHover(mouseX, mouseY);
@@ -237,8 +239,9 @@ export async function startApp(): Promise<void> {
       return;
     }
     const t = TERRAIN[getTerrain(state.map, h.col, h.row)];
+    const r = resourceByIndex(getResource(state.map, h.col, h.row));
     el('info-hex').textContent =
-      `hex (${h.col}, ${h.row})  ${t.name}  move ${t.passable ? t.moveCost : '—'}  food ${t.food}`;
+      `hex (${h.col}, ${h.row})  ${t.name}${r ? ` · ${r.name}` : ''}  move ${t.passable ? t.moveCost : '—'}  food ${t.food}`;
     const lw = 2 / camera.zoom;
     if (editor.active) {
       const w = state.map.width;

@@ -6,7 +6,7 @@
 
 import type { GameState } from './state';
 import type { MapData } from './map';
-import { inBounds, idx, neighborsOffset } from './map';
+import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
 
 export interface CellEdit {
@@ -21,12 +21,18 @@ export interface SetTerrainCommand {
   cells: CellEdit[];
 }
 
+export interface SetResourceCommand {
+  type: 'setResource';
+  /** t = resource index, -1 = none */
+  cells: CellEdit[];
+}
+
 export interface ReplaceMapCommand {
   type: 'replaceMap';
   map: MapData;
 }
 
-export type Command = SetTerrainCommand | ReplaceMapCommand;
+export type Command = SetTerrainCommand | SetResourceCommand | ReplaceMapCommand;
 
 /** Apply a command, mutating the state, and return the inverse command. */
 export function applyCommand(state: GameState, cmd: Command): Command {
@@ -43,9 +49,21 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       }
       return { type: 'setTerrain', cells: inverse };
     }
+    case 'setResource': {
+      const map = state.map;
+      const inverse: CellEdit[] = [];
+      for (const c of cmd.cells) {
+        if (c.i < 0 || c.i >= map.resource.length) continue;
+        const prev = map.resource[c.i];
+        if (prev === c.t) continue;
+        inverse.push({ i: c.i, t: prev });
+        map.resource[c.i] = c.t;
+      }
+      return { type: 'setResource', cells: inverse };
+    }
     case 'replaceMap': {
       const prev = state.map;
-      state.map = { width: cmd.map.width, height: cmd.map.height, terrain: cmd.map.terrain.slice() };
+      state.map = cloneMap(cmd.map);
       return { type: 'replaceMap', map: prev };
     }
   }
@@ -53,7 +71,25 @@ export function applyCommand(state: GameState, cmd: Command): Command {
 
 /** Does this command change anything? (used to skip empty undo entries) */
 export function isNoop(cmd: Command): boolean {
-  return cmd.type === 'setTerrain' && cmd.cells.length === 0;
+  return (cmd.type === 'setTerrain' || cmd.type === 'setResource') && cmd.cells.length === 0;
+}
+
+/** Cells touched by a command (for renderer invalidation); 'all' for whole-map commands. */
+export function commandCells(cmd: Command): number[] | 'all' {
+  return cmd.type === 'replaceMap' ? 'all' : cmd.cells.map((c) => c.i);
+}
+
+export function setResourceCommand(map: MapData, cells: Iterable<number>, resource: number): SetResourceCommand {
+  const edits: CellEdit[] = [];
+  for (const i of cells) if (map.resource[i] !== resource) edits.push({ i, t: resource });
+  return { type: 'setResource', cells: edits };
+}
+
+/** Replace the whole resource layer (from a spawn) as one undoable command. */
+export function resourceLayerCommand(map: MapData, layer: number[]): SetResourceCommand {
+  const edits: CellEdit[] = [];
+  for (let i = 0; i < layer.length; i++) if (map.resource[i] !== layer[i]) edits.push({ i, t: layer[i] });
+  return { type: 'setResource', cells: edits };
 }
 
 // ---- helpers that build commands (pure; they don't touch the state) ----

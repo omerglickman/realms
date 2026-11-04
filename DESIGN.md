@@ -105,7 +105,7 @@ PROPOSED initial list:
 | Wine / luxury crop | River, Hills (south) | luxury goods | Public order in cities |
 | Silver | Mountains | money | Rare, high value |
 
-Spawn weights are a data table (`data/resources.json`) that Omer can edit.
+Spawn weights are a data table (`data/resources.json`) that Omer can edit. *Implemented (Session 4, draft numbers):* each resource lists a per-mille chance per terrain, an optional minimum spacing from the same resource, and for Fish a "coastal only" rule (sea hexes must touch land); `gives` values are placeholders until the economy exists. A hex has at most one resource; the test map's resources are placed by the editor (seeded spawn, then hand-edits) and live in the map file like terrain.
 
 ### 3.2 Units (DECIDED concept, PROPOSED roster)
 
@@ -297,6 +297,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.2b (2026-11-04): §3.1 note on the implemented resource table.
 - 0.2a (2026-11-04): starting canvas chosen (seed vinral) and frozen as `maps/testmap.json`.
 - 0.2 (2026-11-03): Omer's decisions recorded — title, turn/scale, map size, institutions+policies, mortal ruler, HTML delivery, GitHub hosting. §4.3 restructured into government form / institutions / policies.
 - 0.1 (2026-11-03): first draft from Omer's brief plus Claude's proposals.
