@@ -16,6 +16,7 @@
         <button id="end-turn" title="Advance one month (Space)">End turn</button>
         <label class="bar-run">Run <input id="run-years" type="number" min="1" max="200" value="10" /> yrs</label>
         <button id="run-years-btn" title="Run the simulation for that many years">Run</button>
+        <button id="realm-btn" title="The whole realm: people, food and the clusters (K)">Realm</button>
         <span class="bar-sep"></span>
         <button id="edit-toggle">Edit map</button>
         <button id="start-position" title="Reload the shipped starting position (Omer's realm)">Start position</button>
@@ -59,7 +60,7 @@
         <span id="info-event" class="bar-info event-line"></span>
         <span id="info-perf" class="bar-info bar-dim"></span>
         <span class="bar-spacer"></span>
-        <span class="bar-help bar-dim">Drag to pan · wheel to zoom · Home fits · Space ends the turn · click a settlement for details · G grid · R resources · Z zones · E editor</span>
+        <span class="bar-help bar-dim">Drag to pan · wheel to zoom · Home fits · Space ends the turn · click a settlement for details · K realm · G grid · R resources · Z zones &amp; clusters · E editor</span>
       </div>
     </div>
 
@@ -138,7 +139,7 @@
           <label>Name <input id="settle-name" type="text" size="14" placeholder="(automatic)" /></label>
         </div>
         <div class="row small"><span id="settle-count" class="dim"></span></div>
-        <div class="help dim">Place: hatched hexes are already worked; dotted lines are the influence edges of towns and cities (a new village inside one becomes its dependant). Pick: opens a settlement so you can change its name and population or remove it.</div>
+        <div class="help dim">Place: hatched hexes are already worked; dotted lines are the influence edges of towns and cities (a new village inside one becomes its dependant); the pale solid lines are cluster outlines. Pick: opens a settlement so you can change its name and population or remove it.</div>
       </div>
     </div>
 

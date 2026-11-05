@@ -43,7 +43,9 @@
   },
   "sharing": {
     "_comment": "A subordinate settlement keeps what it will eat until the next harvest PLUS this many months, and sends the rest to its parent each month; the parent takes what it has room for.",
-    "reserveMonths": 3
+    "reserveMonths": 3,
+    "_titheComment": "DECIDED 2026-11-05 (DESIGN §4.2): the parent takes this share of every subordinate's food production in kind, the moment it is produced, before the subordinate reckons its own needs. 0.10 = customary tithe (draft). Must become a player policy (light / customary / heavy) with DESIGN §4.3.",
+    "titheShare": 0.10
   },
   "staffingOrder": ["buildings", "fields"]
 }

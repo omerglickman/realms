@@ -276,6 +276,14 @@ body.editing #map { cursor: crosshair; }
 #settlement a { color: #8fc0ff; text-decoration: none; }
 #settlement a:hover { text-decoration: underline; }
 #settlement .warn { color: #f08060; }
+#settlement .good { color: #9ad28a; }
+#settlement .panel-head .pname { flex: 1; font-family: Georgia, serif; font-size: 16px; color: #f0e8d4; }
+#settlement .section { margin-top: 8px; color: #c9b98a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+#settlement .members { margin-top: 2px; }
+#settlement .member { padding: 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#settlement .member.d1 { padding-left: 16px; }
+#settlement .member.d2 { padding-left: 32px; }
+#settlement .member.d3 { padding-left: 48px; }
 #settlement .row { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 #settlement .edit-pop input { font: inherit; font-size: 12px; width: 6em; background: #2a3240; color: #e8e0cc; border: 1px solid #5a4a2e; border-radius: 3px; padding: 2px 6px; }
 #settlement .edit-pop button, #settlement button.danger { font: inherit; font-size: 12px; border-radius: 3px; padding: 2px 8px; cursor: pointer; }

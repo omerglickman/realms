@@ -65,6 +65,9 @@ export interface SettlementReport {
   spoiled: number;
   sent: number;
   received: number;
+  /** tithe (DESIGN §4.2) taken from this settlement's production / received from subordinates this month */
+  titheOut: number;
+  titheIn: number;
   migrantsOut: number;
   migrantsIn: number;
   capacity: number;
@@ -78,6 +81,32 @@ export interface SettlementReport {
   epidemic: boolean;
   /** the year's average food sufficiency at the last December (0–1) */
   sufficiency: number;
+}
+
+/** Running food/people totals over a calendar year (reset each December; the finished year is kept in `lastYear`). */
+export interface YearTotals {
+  produced: number;
+  consumed: number;
+  hungerDeaths: number;
+  sent: number;
+  received: number;
+  titheOut: number;
+  titheIn: number;
+  migrantsOut: number;
+  migrantsIn: number;
+  /** months accumulated so far (12 for a finished year) */
+  months: number;
+}
+
+export function emptyYearTotals(): YearTotals {
+  return { produced: 0, consumed: 0, hungerDeaths: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0, months: 0 };
+}
+
+export function addYearTotals(into: YearTotals, from: YearTotals): void {
+  into.produced += from.produced; into.consumed += from.consumed; into.hungerDeaths += from.hungerDeaths;
+  into.sent += from.sent; into.received += from.received; into.titheOut += from.titheOut; into.titheIn += from.titheIn;
+  into.migrantsOut += from.migrantsOut; into.migrantsIn += from.migrantsIn;
+  into.months = Math.max(into.months, from.months);
 }
 
 export interface Settlement {
@@ -107,6 +136,10 @@ export interface Settlement {
   foundedTurn: number;
   /** this year's farming multiplier, drawn in January (PROPOSED harvest variance, Session 9); 1 = average year */
   harvestFactor: number;
+  /** this calendar year's running totals (Session 10, for the cluster panel and the yearly report) */
+  year: YearTotals;
+  /** the last finished calendar year's totals; null until a December has passed */
+  lastYear: YearTotals | null;
 }
 
 /** Population below which a settlement is abandoned (DECIDED 2026-11-05; data/settlements.json). Read live so tests can switch it off. */
@@ -124,7 +157,7 @@ export const POP_HISTORY_YEARS = 30;
 export function emptyReport(): SettlementReport {
   return {
     hands: 0, staffedHands: 0, fieldHands: 0, idleHands: 0, produced: 0, landCapacity: 0, consumed: 0,
-    shortfall: 0, hungerDeaths: 0, spoiled: 0, sent: 0, received: 0, migrantsOut: 0, migrantsIn: 0,
+    shortfall: 0, hungerDeaths: 0, spoiled: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0,
     capacity: 0, births: 0, deaths: 0, trickleOut: 0, trickleIn: 0, epidemic: false, sufficiency: 1,
   };
 }
@@ -175,6 +208,8 @@ export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
     popHistory: [],
     foundedTurn: state.turn,
     harvestFactor: 1,
+    year: emptyYearTotals(),
+    lastYear: null,
   };
 }
 

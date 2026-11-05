@@ -6,7 +6,7 @@
 
 import type { MapData } from './map';
 import { type RngState, seedRng } from './rng';
-import { type Settlement, emptyReport } from './settlements';
+import { type Settlement, emptyReport, emptyYearTotals } from './settlements';
 import { type Faction, initialFactions, PLAYER_FACTION } from './factions';
 
 /** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. */
@@ -109,6 +109,10 @@ export function deserializeState(json: string): GameState {
     // fields added within v3 (Session 9): harvest factor, trickle/epidemic/sufficiency in the report
     if (typeof st.harvestFactor !== 'number') st.harvestFactor = 1;
     st.report = { ...emptyReport(), ...(st.report ?? {}) };
+    // Session 10: yearly running totals
+    st.year = { ...emptyYearTotals(), ...(st.year ?? {}) };
+    if (st.lastYear && typeof st.lastYear === 'object') st.lastYear = { ...emptyYearTotals(), ...st.lastYear };
+    else st.lastYear = null;
   }
   return s;
 }

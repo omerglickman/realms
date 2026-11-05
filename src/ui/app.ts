@@ -8,6 +8,8 @@ import { SettlementLayer } from './render/settlementLayer';
 import { Camera } from './camera';
 import { Editor } from './editor/editor';
 import { renderPanel, renderPopover } from './panels/settlementPanel';
+import { renderClusterPanel, renderRealmPanel } from './panels/clusterPanel';
+import { clusterOf } from '../sim/clusters';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
 import { endTurn } from '../sim/turn';
@@ -91,6 +93,9 @@ export async function startApp(): Promise<void> {
   // ---- selection / hover of settlements ----
   let selectedId: string | null = null;
   let hoverId: string | null = null;
+  /** what the #settlement panel shows: a settlement, its cluster, or the whole realm */
+  type PanelMode = 'settlement' | 'cluster' | 'realm';
+  let panelMode: PanelMode = 'settlement';
   let workAssign = computeWorkAssignment(state);
   const panel = el<HTMLDivElement>('settlement');
   let mouseX = -1, mouseY = -1;
@@ -232,30 +237,60 @@ export async function startApp(): Promise<void> {
     el('info-event').textContent = ev ? `${calendar(ev.turn).monthName} ${calendar(ev.turn).year}: ${ev.text}` : '';
   }
 
-  // ---- settlement selection and panel ----
+  // ---- settlement selection and panel (settlement / cluster / realm views share #settlement) ----
   function select(id: string | null): void {
     selectedId = id && state.settlements[id] ? id : null;
+    panelMode = 'settlement';
     refreshLayer();
     refreshPanel();
   }
+  /** Open the cluster panel of the cluster `root` heads; the root is selected so the outline lights up. */
+  function showCluster(root: string): void {
+    if (!state.settlements[root]) return;
+    selectedId = root;
+    panelMode = 'cluster';
+    refreshLayer();
+    refreshPanel();
+  }
+  function showRealm(): void {
+    if (panelMode === 'realm') { select(null); return; }
+    selectedId = null;
+    panelMode = 'realm';
+    refreshLayer();
+    refreshPanel();
+  }
+  function focusSettlement(id: string): void {
+    const t = state.settlements[id];
+    if (!t) return;
+    select(id);
+    const p = offsetToPixel(t.col, t.row, HEX_SIZE);
+    camera.centerOn(p.x, p.y);
+  }
   function refreshPanel(): void {
+    const clusterHost = { onFocus: focusSettlement, onCluster: showCluster, onRealm: showRealm, onClose: () => select(null) };
+    if (panelMode === 'realm') {
+      panel.classList.remove('hidden');
+      renderRealmPanel(panel, state, clusterHost);
+      return;
+    }
     const s = selectedId ? state.settlements[selectedId] : null;
-    if (!s) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+    if (!s) { panel.classList.add('hidden'); panel.innerHTML = ''; panelMode = 'settlement'; return; }
     panel.classList.remove('hidden');
+    if (panelMode === 'cluster') {
+      const c = clusterOf(state, s.id);
+      if (c) { renderClusterPanel(panel, state, c, clusterHost); return; }
+      panelMode = 'settlement';
+    }
     renderPanel(panel, state, s, {
       onRename: (id, name) => { editor.editSettlement(id, { name }); },
       onSetPopulation: (id, population) => { editor.editSettlement(id, { population }); },
       onRemove: (id) => { editor.removeSettlement(id); },
-      onFocus: (id) => {
-        const t = state.settlements[id];
-        if (!t) return;
-        select(id);
-        const p = offsetToPixel(t.col, t.row, HEX_SIZE);
-        camera.centerOn(p.x, p.y);
-      },
+      onFocus: focusSettlement,
+      onCluster: showCluster,
       onClose: () => select(null),
     }, editor.active);
   }
+  el<HTMLButtonElement>('realm-btn').addEventListener('click', showRealm);
 
   // ---- turns ----
   function advance(months: number): void {
@@ -387,6 +422,7 @@ export async function startApp(): Promise<void> {
     else if (e.key === 'Home') camera.fit();
     else if (e.key === 'e' || e.key === 'E') { editor.setActive(!editor.active); }
     else if (e.key === ' ') { e.preventDefault(); advance(1); }
+    else if (e.key === 'k' || e.key === 'K') showRealm();
     else if (e.key === 'Escape') select(null);
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   });

@@ -8,6 +8,7 @@ import { TIERS, growthTrend, childrenOf, workedCellsBySettlement, buildingDef, t
 import { totalPopulation, workingHands } from '../../sim/demography';
 import { planLabour, granaryTerms, type LabourPlan } from '../../sim/economy';
 import { calendar } from '../../sim/state';
+import { clusterLine } from './clusterPanel';
 
 const fmt = (n: number): string => Math.round(n).toLocaleString('en-US');
 const pct = (x: number): string => `${x >= 0 ? '+' : ''}${(100 * x).toFixed(1)} %`;
@@ -57,6 +58,7 @@ export function renderPopover(root: HTMLElement, state: GameState, s: Settlement
     ${row('Growth', t === null ? '— (new)' : `${pct(t)} / yr`)}
     ${row('Food', `${months.toFixed(1)} months <span class="dim">(${fmt(s.food)})</span>`)}
     ${row('Subordinate to', parent ? `${esc(parent.name)} <span class="dim">(${tierName(parent)})</span>` : TIERS[s.tier].rank < 2 ? '<span class="dim">none in range</span>' : '<span class="dim">independent</span>')}
+    ${(() => { const c = clusterLine(state, s); return c ? row('Cluster', esc(c.text)) : ''; })()}
     ${Math.abs(s.harvestFactor - 1) > 0.005 ? row('Harvest this year', `${Math.round(100 * s.harvestFactor)} % of normal`) : ''}
     ${s.report.epidemic ? '<div class="warn">⚠ epidemic this year</div>' : ''}
     ${s.report.hungerDeaths > 0.5 ? `<div class="warn">⚠ ${fmt(s.report.hungerDeaths)} starved last month</div>` : ''}
@@ -69,6 +71,7 @@ export interface PanelHost {
   onSetPopulation(id: string, population: number): void;
   onRemove(id: string): void;
   onFocus(id: string): void;
+  onCluster(root: string): void;
   onClose(): void;
 }
 
@@ -99,8 +102,9 @@ export function renderPanel(root: HTMLElement, state: GameState, s: Settlement, 
     ['Land', `${worked.length} hexes worked · feeds ${fmt(plan.plannedPerYear)} / yr now, ${fmt(plan.landCapacity)} at full labour`],
     ['Subordinate to', parent ? `<a href="#" data-focus="${parent.id}">${esc(parent.name)}</a> (${tierName(parent)})` : TIERS[s.tier].rank < 2 ? '<span class="dim">nobody in range</span>' : '<span class="dim">— (independent)</span>'],
     ['Dependants', children.length ? children.map((c) => `<a href="#" data-focus="${c.id}">${esc(c.name)}</a>`).join(', ') : '<span class="dim">none</span>'],
+    ['Cluster', (() => { const c = clusterLine(state, s); return c ? `<a href="#" data-cluster="${c.root}">${esc(c.text)}</a>` : '<span class="dim">—</span>'; })()],
     ['Buildings', plan.buildings.map((b) => `${esc(buildingDef(b.id).name)} <span class="dim">${Math.round(100 * b.fraction)} %</span>`).join(' · ')],
-    ['Last month', `${r.produced ? `+${fmt(r.produced)} grown` : 'nothing grown'}, ${fmt(r.consumed)} eaten` + (r.received ? `, +${fmt(r.received)} received` : '') + (r.sent ? `, ${fmt(r.sent)} sent up` : '') + (r.hungerDeaths > 0.5 ? `, <b class="warn">${fmt(r.hungerDeaths)} starved</b>` : '') + (r.migrantsOut > 0.5 ? `, ${fmt(r.migrantsOut)} left` : '') + (r.migrantsIn > 0.5 ? `, ${fmt(r.migrantsIn)} arrived` : '')],
+    ['Last month', `${r.produced ? `+${fmt(r.produced)} grown` : 'nothing grown'}, ${fmt(r.consumed)} eaten` + (r.titheIn > 0.5 ? `, +${fmt(r.titheIn)} tithe` : '') + (r.received ? `, +${fmt(r.received)} received` : '') + (r.titheOut > 0.5 ? `, ${fmt(r.titheOut)} tithed` : '') + (r.sent ? `, ${fmt(r.sent)} sent up` : '') + (r.hungerDeaths > 0.5 ? `, <b class="warn">${fmt(r.hungerDeaths)} starved</b>` : '') + (r.migrantsOut > 0.5 ? `, ${fmt(r.migrantsOut)} left` : '') + (r.migrantsIn > 0.5 ? `, ${fmt(r.migrantsIn)} arrived` : '')],
     ['Founded', `${founded.monthName}, year ${founded.year} · hex (${s.col}, ${s.row})`],
   ];
 
@@ -125,5 +129,8 @@ export function renderPanel(root: HTMLElement, state: GameState, s: Settlement, 
   root.querySelector<HTMLButtonElement>('#sp-close')!.addEventListener('click', () => host.onClose());
   root.querySelectorAll<HTMLAnchorElement>('a[data-focus]').forEach((a) => {
     a.addEventListener('click', (e) => { e.preventDefault(); host.onFocus(a.dataset.focus!); });
+  });
+  root.querySelectorAll<HTMLAnchorElement>('a[data-cluster]').forEach((a) => {
+    a.addEventListener('click', (e) => { e.preventDefault(); host.onCluster(a.dataset.cluster!); });
   });
 }

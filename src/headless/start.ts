@@ -2,7 +2,7 @@
 // realm's demography behaves under the Session 9 knobs.
 // Usage: npm run sim -- --scenario start [--years 60] [--file scenarios/start.json]
 //        [--preset baseline|noise|trickle|all] [--seed x] [--csv out.csv]
-//        [--sampling 0|1] [--harvestSd 0.15] [--epidemic 0.01] [--trickle 0.04] [--minIdle 0.15]
+//        [--sampling 0|1] [--harvestSd 0.15] [--epidemic 0.01] [--trickle 0.04] [--minIdle 0.15] [--tithe 0.10]
 // Presets: baseline = every knob off (the deterministic model); noise = sampling + harvest + epidemic;
 //          trickle = the migration trickle only (0.04 if the data file has it off); all = the data-file values (Omer's decisions).
 
@@ -15,6 +15,7 @@ import { TIERS, type Settlement } from '../sim/settlements';
 import { totalPopulation } from '../sim/demography';
 import { setNoise, NO_NOISE, noise, type NoiseKnobs } from '../sim/noise';
 import { seedRng } from '../sim/rng';
+import { titheShare, setTitheShare } from '../sim/economy';
 
 function arg(name: string, def: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -41,12 +42,15 @@ if (process.argv.includes('--epidemic')) knobs.epidemicChance = Number(arg('epid
 if (process.argv.includes('--trickle')) knobs.trickleShare = Number(arg('trickle', '0'));
 if (process.argv.includes('--minIdle')) knobs.trickleMinIdle = Number(arg('minIdle', '0.15'));
 setNoise(knobs);
+if (process.argv.includes('--tithe')) setTitheShare(Number(arg('tithe', '0')));
+else if (PRESET === 'baseline') setTitheShare(0);
+const TITHE = titheShare();
 
 const { state, name } = loadScenarioFile(JSON.parse(readFileSync(FILE, 'utf8')));
 if (SEED) state.rng = seedRng(SEED);
 const cal0 = calendar(state.turn);
 console.log(`scenario "${name}" from ${cal0.monthName}, year ${cal0.year} · ${Object.keys(state.settlements).length} settlements · preset ${PRESET}${SEED ? ` · seed ${SEED}` : ''}`);
-console.log(`knobs: sampling ${knobs.vitalSampling} · harvest sd ${knobs.harvestSd} (regional ${knobs.harvestRegionalShare}) · epidemic ${knobs.epidemicChance}×${knobs.epidemicDeathMultiplier} · trickle ${knobs.trickleShare} above ${knobs.trickleMinIdle} idle ±${knobs.trickleSpread}${knobs.trickleRequireFedParent ? ' (fed parent only)' : ''}`);
+console.log(`knobs: sampling ${knobs.vitalSampling} · harvest sd ${knobs.harvestSd} (regional ${knobs.harvestRegionalShare}) · epidemic ${knobs.epidemicChance}×${knobs.epidemicDeathMultiplier} · trickle ${knobs.trickleShare} above ${knobs.trickleMinIdle} idle ±${knobs.trickleSpread}${knobs.trickleRequireFedParent ? ' (fed parent only)' : ''} · tithe ${TITHE}`);
 
 const list = (): Settlement[] => Object.values(state.settlements);
 const rankOf = (s: Settlement) => TIERS[s.tier].rank;
@@ -64,6 +68,7 @@ const start: Record<string, number> = {};
 for (const s of list()) start[s.id] = totalPopulation(s.pop);
 const minPop: Record<string, number> = { ...start }, maxPop: Record<string, number> = { ...start };
 const hungerBy: Record<string, number> = {}, famineBy: Record<string, number> = {};
+const hungerByRank = [0, 0, 0, 0];
 let yHunger: Record<string, number> = {}, yFamine: Record<string, number> = {};
 
 interface YearRow { year: number; total: number; byGroup: number[]; hunger: number; epidemics: number; trickle: number; famineMig: number; harvest: number }
@@ -82,6 +87,7 @@ for (let y = 1; y <= YEARS; y++) {
       hunger += s.report.hungerDeaths; famineMig += s.report.migrantsOut;
       yHunger[s.id] = (yHunger[s.id] ?? 0) + s.report.hungerDeaths; yFamine[s.id] = (yFamine[s.id] ?? 0) + s.report.migrantsOut;
       hungerBy[s.id] = (hungerBy[s.id] ?? 0) + s.report.hungerDeaths; famineBy[s.id] = (famineBy[s.id] ?? 0) + s.report.migrantsOut;
+      hungerByRank[rankOf(s)] += s.report.hungerDeaths;
     }
   } while (calendar(state.turn).month !== 0);
   for (const s of list()) {
@@ -121,6 +127,7 @@ console.log(`\n  ${villages.length} villages: mean ${Math.round(mean).toLocaleSt
 const last = rows[rows.length - 1];
 const first = startRow;
 console.log(`  realm: ${Math.round(first.total).toLocaleString('en-US')} → ${Math.round(last.total).toLocaleString('en-US')} (${((100 * (last.total / first.total - 1))).toFixed(1)} % over ${YEARS} years) · hunger deaths total ${Math.round(rows.reduce((t, r) => t + r.hunger, 0)).toLocaleString('en-US')} · epidemic-years ${rows.reduce((t, r) => t + r.epidemics, 0)} · trickle total ${Math.round(rows.reduce((t, r) => t + r.trickle, 0)).toLocaleString('en-US')}`);
+console.log(`  hunger deaths per year by tier: villages ${Math.round(hungerByRank[0] / YEARS).toLocaleString('en-US')} · towns ${Math.round(hungerByRank[1] / YEARS).toLocaleString('en-US')} · cities ${Math.round(hungerByRank[2] / YEARS).toLocaleString('en-US')} · metropolis ${Math.round(hungerByRank[3] / YEARS).toLocaleString('en-US')} · famine migrants per year ${Math.round(rows.reduce((t, r) => t + r.famineMig, 0) / YEARS).toLocaleString('en-US')}`);
 console.log(`  ran ${YEARS} years in ${ms.toFixed(0)} ms`);
 
 if (CSV) {

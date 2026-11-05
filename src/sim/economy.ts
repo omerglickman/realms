@@ -14,7 +14,7 @@ import { neighborsOffset } from './map';
 import { TERRAIN, terrainIndex } from './terrain';
 import { RESOURCES } from './resources';
 import {
-  type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, POP_HISTORY_YEARS, abandonBelow,
+  type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, emptyYearTotals, POP_HISTORY_YEARS, abandonBelow,
 } from './settlements';
 import { logEvent } from './state';
 import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate } from './demography';
@@ -22,6 +22,14 @@ import { seedRng, nextFloat, nextGaussian, nextU32 } from './rng';
 import { noise } from './noise';
 
 export const ECONOMY = economyData;
+
+/** Tithe share (DESIGN §4.2, DECIDED 2026-11-05) — read live so the runner and tests can change it. */
+export function titheShare(): number {
+  return (ECONOMY.sharing as { titheShare?: number }).titheShare ?? 0;
+}
+export function setTitheShare(x: number): void {
+  (ECONOMY.sharing as { titheShare?: number }).titheShare = x;
+}
 
 const WATER = new Set(ECONOMY.fishing.waterTerrains.map(terrainIndex));
 const SEA = terrainIndex('sea');
@@ -221,12 +229,14 @@ export function economyMonth(state: GameState, month: number): void {
   const worked = workedCellsBySettlement(state);
   const plans = new Map<string, LabourPlan>();
   const order = settlementsByRank(state);
+  const titheIn = new Map<string, number>();
 
-  // produce → consume → spoil & cap
+  // produce (→ tithe up) → consume → spoil & cap
   for (const s of order) {
     const plan = planLabour(state.map, s, worked.get(s.id) ?? []);
     plans.set(s.id, plan);
     const r = emptyReport();
+    r.titheIn = titheIn.get(s.id) ?? 0;
     // yearly figures survive the monthly reset until the next December overwrites them
     r.births = s.report.births;
     r.deaths = s.report.deaths;
@@ -242,6 +252,22 @@ export function economyMonth(state: GameState, month: number): void {
 
     r.produced = monthlyProduction(plan, month, s.harvestFactor);
     s.food += r.produced;
+
+    // tithe (DESIGN §4.2): the parent takes its share of the food the moment it is produced,
+    // before this settlement eats or reckons its reserve. Subordinates are processed before
+    // their parents (villages → towns → cities), so the grain arrives before the parent eats.
+    const tithe = titheShare();
+    if (tithe > 0 && r.produced > 0 && s.parent) {
+      const p = state.settlements[s.parent];
+      if (p) {
+        const take = r.produced * tithe;
+        s.food -= take;
+        p.food += take;
+        r.titheOut = take;
+        // the parent's report for this month is built when its own turn comes; keep the figure aside
+        titheIn.set(p.id, (titheIn.get(p.id) ?? 0) + take);
+      }
+    }
 
     const need = monthlyNeed(s);
     if (need > 0) {
@@ -303,6 +329,15 @@ export function economyMonth(state: GameState, month: number): void {
     addPopulation(p.pop, slice);
     s.report.migrantsOut += n;
     p.report.migrantsIn += n;
+  }
+
+  // yearly running totals (Session 10): the month's figures added to the calendar year
+  for (const s of Object.values(state.settlements)) {
+    const y = s.year, r = s.report;
+    y.produced += r.produced; y.consumed += r.consumed; y.hungerDeaths += r.hungerDeaths;
+    y.sent += r.sent; y.received += r.received; y.titheOut += r.titheOut; y.titheIn += r.titheIn;
+    y.migrantsOut += r.migrantsOut; y.migrantsIn += r.migrantsIn;
+    y.months += 1;
   }
 }
 
@@ -374,6 +409,9 @@ export function demographyYear(state: GameState): void {
   for (const s of list) {
     s.popHistory.push(totalPopulation(s.pop));
     if (s.popHistory.length > POP_HISTORY_YEARS) s.popHistory.splice(0, s.popHistory.length - POP_HISTORY_YEARS);
+    // close the calendar year's totals (Session 10)
+    s.lastYear = s.year;
+    s.year = emptyYearTotals();
   }
 }
 

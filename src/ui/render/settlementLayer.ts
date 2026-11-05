@@ -1,14 +1,17 @@
 // Settlement layer for PixiJS 8: influence zones (faction-coloured fill with
-// an outer border), the worked hexes of the hovered / selected settlement with
-// a dotted outline of its influence edge, tier markers and name labels, and —
-// while the player is choosing where to settle — a hatch over every hex that
-// is already worked plus the dotted influence edges of all towns and cities.
+// an outer border), cluster outlines (DESIGN §3.3 — one inset line around the
+// union of a cluster's influence zones, faint for lone villages), the worked
+// hexes of the hovered / selected settlement with a dotted outline of its own
+// influence edge, tier markers and name labels, and — while the player is
+// choosing where to settle — a hatch over every hex that is already worked plus
+// the dotted influence edges of all towns and cities.
 // Settlements are few, so this is a plain (unchunked) set of Graphics redrawn
 // whenever the state or the zoom changes. Purely visual: never changes state.
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js';
 import type { GameState } from '../../sim/state';
 import { TIERS, influenceCells, workedCellsBySettlement, computeWorkAssignment, type Settlement } from '../../sim/settlements';
+import { clustersOf, clusterInfluenceCells } from '../../sim/clusters';
 import { factionColor } from '../../sim/factions';
 import { colorToNumber } from '../../sim/terrain';
 import { offsetToPixel, hexCorners, offsetToAxial, axialToOffset, AXIAL_DIRECTIONS, SQRT3 } from '../../sim/hex';
@@ -53,9 +56,47 @@ const LABEL_STYLE = new TextStyle({
 
 type Segment = [number, number, number, number];
 
+/** Mix a 0xRRGGBB colour toward white (k = 0 → unchanged, 1 → white). */
+function lighten(color: number, k: number): number {
+  const r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
+  const f = (c: number) => Math.round(c + (255 - c) * k);
+  return (f(r) << 16) | (f(g) << 8) | f(b);
+}
+
+function focusIn(members: string[], view: LayerView): boolean {
+  const f = view.selected ?? view.hover;
+  return f !== null && members.includes(f);
+}
+
+/** A boundary segment with the centre of the hex it belongs to. */
+type EdgeSeg = { seg: Segment; cx: number; cy: number };
+
+/**
+ * Move each boundary edge inward (toward its hex centre) by `inset` and extend
+ * its ends by inset·tan 30° so the inset outline still closes at the corners.
+ */
+function insetSegments(edges: EdgeSeg[], inset: number): Segment[] {
+  const ext = inset * Math.tan(Math.PI / 6);
+  const out: Segment[] = [];
+  for (const { seg: [x1, y1, x2, y2], cx, cy } of edges) {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    let nx = cx - mx, ny = cy - my;
+    const nl = Math.hypot(nx, ny) || 1;
+    nx /= nl; ny /= nl;
+    const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+    out.push([
+      x1 + nx * inset - ux * ext, y1 + ny * inset - uy * ext,
+      x2 + nx * inset + ux * ext, y2 + ny * inset + uy * ext,
+    ]);
+  }
+  return out;
+}
+
 export class SettlementLayer {
   readonly root = new Container();
   private zones = new Graphics();
+  private clusters = new Graphics();
   private hatch = new Graphics();
   private work = new Graphics();
   private edges = new Graphics();
@@ -65,10 +106,10 @@ export class SettlementLayer {
   private showZones = true;
 
   constructor() {
-    this.root.addChild(this.zones, this.hatch, this.work, this.edges, this.markers, this.labels);
+    this.root.addChild(this.zones, this.clusters, this.hatch, this.work, this.edges, this.markers, this.labels);
   }
 
-  setZonesVisible(v: boolean): void { this.showZones = v; this.zones.visible = v; }
+  setZonesVisible(v: boolean): void { this.showZones = v; this.zones.visible = v; this.clusters.visible = v; }
   get zonesVisible(): boolean { return this.showZones; }
 
   /** Screen-independent marker radius in world units for a settlement at this zoom. */
@@ -102,6 +143,24 @@ export class SettlementLayer {
       this.zones.fill({ color, alpha: 0.13 });
       for (const [x1, y1, x2, y2] of this.outerEdges(map, set)) this.zones.moveTo(x1, y1).lineTo(x2, y2);
       this.zones.stroke({ width: borderWidth, color, alpha: 0.9 });
+    }
+
+    // ---- cluster outlines (DESIGN §3.3): a solid line inset from the edge of each cluster's
+    //      influence union, lighter than the faction border so the two read apart; lone
+    //      villages faint. Replaces the always-on dotted influence line of Session 8. ----
+    this.clusters.clear();
+    const inset = HEX_SIZE * 0.16;
+    for (const c of clustersOf(state)) {
+      const base = colorToNumber(factionColor(state.factions, c.faction));
+      const single = c.members.length === 1;
+      const focused = focusIn(c.members, view);
+      const segs = this.outerEdgeSegs(map, clusterInfluenceCells(state, c));
+      for (const [x1, y1, x2, y2] of insetSegments(segs, inset)) this.clusters.moveTo(x1, y1).lineTo(x2, y2);
+      this.clusters.stroke({
+        width: single ? Math.max(0.8, 1 / view.zoom) : Math.max(1.4, (focused ? 2.6 : 2) / view.zoom),
+        color: lighten(base, focused ? 0.75 : 0.55),
+        alpha: single ? 0.35 : focused ? 1 : 0.8,
+      });
     }
 
     // ---- settle mode: hatch every worked hex; dotted influence edges of all towns and cities ----
@@ -198,8 +257,13 @@ export class SettlementLayer {
 
   /** Segments (world coordinates) of the hex edges that separate `set` from everything outside it. */
   private outerEdges(map: GameState['map'], set: Set<number>): Segment[] {
+    return this.outerEdgeSegs(map, set).map((e) => e.seg);
+  }
+
+  /** As outerEdges, with the centre of the owning hex kept for insetting. */
+  private outerEdgeSegs(map: GameState['map'], set: Set<number>): EdgeSeg[] {
     const w = map.width;
-    const out: Segment[] = [];
+    const out: EdgeSeg[] = [];
     for (const i of set) {
       const col = i % w, row = Math.floor(i / w);
       const a = offsetToAxial(col, row);
@@ -210,7 +274,7 @@ export class SettlementLayer {
         const inside = n.col >= 0 && n.row >= 0 && n.col < w && n.row < map.height && set.has(n.row * w + n.col);
         if (inside) continue;
         const [ca, cb] = EDGE_CORNERS[d];
-        out.push([corners[2 * ca], corners[2 * ca + 1], corners[2 * cb], corners[2 * cb + 1]]);
+        out.push({ seg: [corners[2 * ca], corners[2 * ca + 1], corners[2 * cb], corners[2 * cb + 1]], cx: p.x, cy: p.y });
       }
     }
     return out;
