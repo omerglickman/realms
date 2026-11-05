@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.4f — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–5 done)**
+**Version 0.4g — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–5 done)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -152,7 +152,7 @@ A chat devoted to DESIGN §4.3: government forms, the institution list and prere
 
 Goal: a living economy with no enemies.
 
-Progress: **Session 5 (2026-11-04)** — design decisions (zones, tiers incl. metropolis, contested hexes, water hexes, staffed buildings, migration) recorded in DESIGN v0.3; `demography.ts`, `economy.ts`, `settlements.ts`, four data files, `foundSettlement` command, headless scenario `npm run sim -- --scenario phase1`, 20 new tests. Remaining: factions data, settlements on the map + editor placement + zones drawn, panels, end-turn in the UI, buildings with effects, tuning. **Session 6 (2026-11-04)** — model scale ×3 applied (DESIGN §5.8) with a scale-invariance test. **Session 7 (2026-11-05)** — settlements placeable in the editor, zones drawn, hover + panel, end turn / run years, scenario files; player faction only (Omer's decision, DESIGN §4.8). **Session 8 (2026-11-05)** — UI pass: top bar, tabbed editor with Place/Pick, hover card, dotted influence edges, hatched worked hexes, population editing. **Session 9 (2026-11-05)** — Omer's starting position committed (`scenarios/start.json`, build opens on it); demographic realism knobs with a 60-year A/B on the start position; Omer decided the values (sampling on, harvest ±12.5 %, epidemics, trickle off) and automatic abandonment of emptied settlements.
+Progress: **Session 5 (2026-11-04)** — design decisions (zones, tiers incl. metropolis, contested hexes, water hexes, staffed buildings, migration) recorded in DESIGN v0.3; `demography.ts`, `economy.ts`, `settlements.ts`, four data files, `foundSettlement` command, headless scenario `npm run sim -- --scenario phase1`, 20 new tests. Remaining: factions data, settlements on the map + editor placement + zones drawn, panels, end-turn in the UI, buildings with effects, tuning. **Session 6 (2026-11-04)** — model scale ×3 applied (DESIGN §5.8) with a scale-invariance test. **Session 7 (2026-11-05)** — settlements placeable in the editor, zones drawn, hover + panel, end turn / run years, scenario files; player faction only (Omer's decision, DESIGN §4.8). **Session 8 (2026-11-05)** — UI pass: top bar, tabbed editor with Place/Pick, hover card, dotted influence edges, hatched worked hexes, population editing. **Session 9 (2026-11-05)** — Omer's starting position committed (`scenarios/start.json`, build opens on it); demographic realism knobs with a 60-year A/B on the start position; Omer decided the values (sampling on, harvest ±12.5 %, epidemics, trickle off) and automatic abandonment of emptied settlements. **Session 10 (2026-11-05)** — clusters (derived view, outlines, cluster and realm panels, yearly totals) and the tithe, with the finding that city hunger is a growth equilibrium, not a food shortage.
 
 Suggested order (each session ends with a build): (1) numbers first — propose the demographic and food model constants to Omer, build `demography.ts` + `economy.ts` in `src/sim` with a headless 20-year village/town/city scenario and a results table, *before any map UI*; (2) settlements and factions as data + on the map, editor placement, influence/work zones drawn; (3) buildings, build queue, panels, end-turn; (4) tuning with Omer against the headless curves.
 
@@ -163,8 +163,8 @@ Suggested order (each session ends with a build): (1) numbers first — propose 
 - [~] Buildings inside settlements — halls and granaries with hands (Session 5); starter list with effects and build queue: pending.
 - [x] Turn structure: 12 months, harvest in Sept/Oct, yearly update in December. *(Session 5; winter effects belong to armies, Phase 4)*
 - [~] Settlement panel, end-turn button, run-years, scenario save/load (Session 7); faction panel and yearly report: pending.
-- [ ] **Cluster view** (DESIGN §3.3, decided 2026-11-05): derived clusters, cluster outline on the map, cluster panel; realm report as the sum over clusters.
-- [ ] **Tithe** (DESIGN §4.2, decided 2026-11-05): 10 % in kind from subordinates; headless A/B on the start position.
+- [x] **Cluster view** (DESIGN §3.3, decided 2026-11-05): derived clusters, cluster outline on the map, cluster panel; realm report as the sum over clusters. *(Session 10)*
+- [x] **Tithe** (DESIGN §4.2, decided 2026-11-05): 10 % in kind from subordinates; headless A/B on the start position. *(Session 10 — finding: it moves people from towns to cities, not hunger; see DEVLOG)*
 - [x] Headless scenario: 20 years, six cases; population and food curves. *(Session 5)*; `--scenario start` runs the real starting position with knob presets *(Session 9)*.
 
 **Acceptance**: a faction with a city and several villages survives and grows over 20 years; a city with no villages starves. Omer can read why from the panels.
@@ -230,6 +230,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.4g (2026-11-05): Session 10 — cluster view and tithe done.
 - 0.4f (2026-11-05): Session 9c — cluster view and tithe added to the Phase 1 checklist.
 - 0.4e (2026-11-05): Session 9b noted.
 - 0.4d (2026-11-05): Session 9 noted.

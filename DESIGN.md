@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3g — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3h — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -342,6 +342,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 6. Whether River keeps both farming (600) and fishing (225) — currently yes (§3.1).
 7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
 8. **Tier upgrade thresholds — RESOLVED 2026-11-04 (Omer, late evening); IMPLEMENTED in Session 6 (2026-11-04), proven scale-invariant by `tests/scale.test.ts` and by a row-by-row comparison of the 20-year scenario tables before and after.** The model is linear in population, so **everything scales ×3**: hex yields (people fed per year) and the hands to work them, building hands, settler/scenario populations — curves stay identical with labels ×3. The **town gate stays 1,500 and the city gate stays 6,000**; at ×3 a village plateaus ~2,100 (crosses 1,500 by growth, ~30 years after founding), a town alone levels at ~10,000 and with villages ~18,000 (crosses 6,000 in 25–40 years). The **metropolis gate scales to 36,000** (it was calibrated to the orbit's ceiling: a good site reaches ~31,000 without roads). Tier population ranges in §3.3 become typical sizes, not gates. All later unit/settler sizes are written at the ×3 scale; `data/economy.json` carries `modelScale: 3`.
+9. **City growth brake (OPEN, raised Session 10).** Cities and towns have no crowding rule (§4.1), so a city grows until hunger deaths equal its surplus births — on the start position the three cities carry a standing ≈2,100 hunger deaths a year whatever food they get (the tithe and the trickle only raise the ceiling they grow to). Options: accept it as the cost of a city; make births fall when the granary is thin (so a city stops growing *before* famine); or a city-side crowding term tied to idle hands once workshops give towns work. Omer to decide.
 
 Resolved 2026-11-05 (afternoon): tithe 10 % in kind on all subordinate food production, to become a policy with §4.3; requisition deferred to Phase 4; the Cluster adopted as a derived view with outline and panel (§3.3, §4.2). Order of work: cluster view → tithe with an A/B on the start position → buildings.
 Resolved 2026-11-05: factions hand-designed; build with the player faction alone through Phase 3; start positions placed in the editor with tier and population, optionally pre-run for a few years and saved as the starting state; player faction fixed; culture groups exist but are defined later; personas in Phase 5.
@@ -375,6 +376,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3h (2026-11-05, Session 10): §5.9 city growth brake raised as OPEN after the tithe A/B.
 - 0.3g (2026-11-05, Session 9c): §3.3 Cluster DECIDED; §4.2 tithe DECIDED (10 % draft, policy later), requisition deferred to Phase 4; glossary.
 - 0.3f (2026-11-05, Session 9b): §4.1 realism knobs DECIDED (sampling, harvest 0.125, epidemics, trickle off); §3.3 abandonment DECIDED; §4.9 natural events to become game-wide.
 - 0.3e (2026-11-05, Session 9): §4.1 demographic realism knobs (PROPOSED); §4.8 the first starting position.
