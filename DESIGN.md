@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3e — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3f — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -152,6 +152,8 @@ Four tiers: **Village**, **Town**, **City**, **Metropolis**. Every settlement ha
 
 *(Why these numbers: a 7-hex village zone cannot sit inside a 2-ring influence zone without most of its fields being the town's. With town influence 3, six villages fit at distance 3 and the town's ceiling lands on its tier range. City influence was 4 rings until an A/B test on 2026-11-04 showed that 5 rings plus the crowding rule in §4.1 holds a city of 8,000–9,000 stably, where 4 rings held ~6,200 (pre-×3 numbers); Omer chose 5 and moved the metropolis threshold to 12,000 — 36,000 after the ×3 scale — with 6 rings.)*
 
+**Abandonment (DECIDED 2026-11-05):** a settlement whose population falls below a threshold (30 people, draft, `data/settlements.json` `abandonment.abandonBelow`) is removed at the end of that month; whoever is left walks to its parent, its granary is lost, and the event is logged. *(PROPOSED for later: an "abandoned village/town/city" entity with 0 population that marks the site and makes resettling easy.)*
+
 **Contested hexes (DECIDED 2026-11-04):** each hex is worked by exactly one settlement. Where work zones overlap, the **higher tier wins**; ties go to the nearer centre; the player may reassign any hex by hand.
 
 **Subordination (DECIDED 2026-11-04):** a lower-tier settlement is subordinate to ("parent") the settlement whose influence zone covers its centre. If several qualify, default to the highest tier, then the nearest; the player can choose the parent explicitly. Surplus and migration go to the parent.
@@ -198,11 +200,11 @@ The world contains a fixed, countable population: the sum of everyone in every s
 
 - **Raids and sieges** kill or carry off people, skewed toward the vulnerable or the able-bodied depending on the attacker's intent; the demographic shape of the loss shapes the recovery.
 - **Migration (DECIDED 2026-11-04, Phase 1; trigger revised by Omer the same day):** when a settlement **forecasts that it will run out of food before the next harvest** (granary + expected monthly income − consumption until the harvest month < 0) and it has **idle hands** (hands not needed by buildings or fields), **10 % of the idle hands per month leave with their dependants** — a proportional slice of all cohorts — for the **parent settlement** (§3.3). A settlement with no parent sends nobody. Migration outpaces hunger deaths on purpose: people flee famine faster than it kills them. The two famines are thus distinguished automatically: overpopulation (idle hands exist → people leave) vs. a shortage of hands after a levy or raid (no idle hands → nobody leaves; they recover or die).
-- **Demographic realism (PROPOSED, Session 9 — draft values in the data files, every one zero-able; awaiting Omer's verdict):**
-  - *Vital sampling* — births and deaths are drawn as Poisson counts around the expected value instead of exact fractions, so variance = mean: a village of 900 jitters by a few percent a year, a city of 24,000 barely moves. (`demography.json` `noise.vitalSampling`, 1 = on.)
-  - *Harvest variance* — each January every settlement draws a harvest factor for the year, 1 ± 15 % (draft), half of the variance shared by all settlements in the same 12×12-hex block so bad years are regional; floored at 30 %. Forecasts assume an average year, so a bad harvest surprises a settlement. (`economy.json` `farming.harvest.variance`.)
-  - *Epidemics* — 1 % chance per settlement per year (draft) of a year with double deaths. (`demography.json` `noise.epidemic`.)
-  - *Migration trickle* — the countryside feeds the town people as well as grain: each December a settlement whose idle hands exceed 15 % of its hands sends 4 % of them (±50 %, random), with dependants, to its parent — only if the parent was fully fed that year. (`demography.json` `migration.trickle`; `sharePerYear` 0 turns it off.) Finding from the start position: with no work in towns and cities yet (hall and granary only), the trickle piles people into cities that cannot feed them; a *jobs* condition at the destination is the natural fix once workshops exist.
+- **Demographic realism (DECIDED by Omer 2026-11-05 after the Session 9 A/B on the starting position; values are starting values for tuning):**
+  - *Vital sampling* — **adopted.** Births and deaths are drawn as Poisson counts around the expected value instead of exact fractions, so variance = mean: a village of 900 jitters by a few percent a year, a city of 24,000 barely moves. (`demography.json` `noise.vitalSampling` = 1.)
+  - *Harvest variance* — **adopted at ±12.5 %** (a compromise between 10 and 15). Each January every settlement draws a harvest factor for the year, half of the variance shared by all settlements in the same 12×12-hex block so bad years are regional; floored at 30 %. Forecasts assume an average year, so a bad harvest surprises a settlement. (`economy.json` `farming.harvest.variance.sd` = 0.125.)
+  - *Epidemics* — **adopted for now** at 1 % chance per settlement per year of a year with double deaths (`demography.json` `noise.epidemic`). Omer's intent: natural events — droughts, disease and the like — become part of a **bigger game-wide events mechanic later** (§4.9); this is a placeholder for it.
+  - *Migration trickle* — **kept OFF** (`migration.trickle.sharePerYear` = 0) until towns have work. The rule stays implemented: each December a settlement whose idle hands exceed 15 % of its hands would send 4 % of them (±50 %), with dependants, to a fully fed parent. Finding: with no work in towns and cities yet (hall and granary only), it piles people into cities that cannot feed them; a *jobs* condition at the destination is the fix once workshops exist.
   - All draws come from the seeded game RNG, so a game still replays identically; the headless runner and the tests can switch every knob off (`src/sim/noise.ts`).
 - **Settlers from idle hands (DECIDED direction, Phase 2):** raising a settlers unit is the *player's* lever, never automatic — any settlement with idle hands can raise settlers from them (cost: the people); the panel flags "overcrowded". Later a starving city may use the same exit.
 
@@ -317,9 +319,9 @@ The player controls one faction; the computer controls all others. **The test ma
 - The **player faction is fixed** for now (a start screen can come later).
 - **AI personas** are a Phase 5 question.
 
-### 4.9 Events — PROPOSED (optional flavour)
+### 4.9 Events — PROPOSED (Omer 2026-11-05: natural events are to become a bigger, game-wide mechanic)
 
-A small random-event system: plague, bumper harvest, failed harvest, bandits, a comet, a gifted child born to a character. Cheap to build once the state exists; strong return in flavour.
+A random-event system: plague, drought, bumper harvest, failed harvest, bandits, a comet, a gifted child born to a character. The Session 9 epidemics and harvest variance (§4.1) are its first, settlement-local pieces; Omer wants droughts, disease and similar natural events folded into one game-wide mechanic later (regional, multi-year, with player responses). The state already carries an event log (`state.events`).
 
 ### 4.10 Culture — PROPOSED, later
 
@@ -367,6 +369,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3f (2026-11-05, Session 9b): §4.1 realism knobs DECIDED (sampling, harvest 0.125, epidemics, trickle off); §3.3 abandonment DECIDED; §4.9 natural events to become game-wide.
 - 0.3e (2026-11-05, Session 9): §4.1 demographic realism knobs (PROPOSED); §4.8 the first starting position.
 - 0.3d (2026-11-05, Session 7): §3.3 placement rule (PROPOSED placeholder).
 - 0.3c (2026-11-05): §4.8 — factions hand-designed, player faction alone until mechanics work, start positions via editor + optional pre-run, fixed player faction; §5.3 resolved.
