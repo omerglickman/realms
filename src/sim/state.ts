@@ -27,6 +27,21 @@ export interface GameState {
   playerFaction: string;
   /** Counter for generated entity ids. */
   nextId: number;
+  /** Recent notable events (newest last, capped) — abandonments, later famines, successions… */
+  events: GameEvent[];
+}
+
+export interface GameEvent {
+  turn: number;
+  kind: string;
+  text: string;
+}
+
+export const MAX_EVENTS = 200;
+
+export function logEvent(state: GameState, kind: string, text: string): void {
+  state.events.push({ turn: state.turn, kind, text });
+  if (state.events.length > MAX_EVENTS) state.events.splice(0, state.events.length - MAX_EVENTS);
 }
 
 export const MONTHS = [
@@ -45,6 +60,7 @@ export function createGameState(seed: string, map: MapData): GameState {
     factions: initialFactions(),
     playerFaction: PLAYER_FACTION,
     nextId: 1,
+    events: [],
   };
 }
 
@@ -87,6 +103,7 @@ export function deserializeState(json: string): GameState {
   if (!s.factions) s.factions = initialFactions();
   if (!s.playerFaction) s.playerFaction = PLAYER_FACTION;
   if (typeof s.nextId !== 'number') s.nextId = 1;
+  if (!Array.isArray(s.events)) s.events = [];
   if (!Array.isArray(s.map.resource)) s.map.resource = new Array<number>(s.map.terrain.length).fill(-1);
   for (const st of Object.values(s.settlements)) {
     // fields added within v3 (Session 9): harvest factor, trickle/epidemic/sufficiency in the report

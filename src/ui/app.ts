@@ -228,6 +228,8 @@ export async function startApp(): Promise<void> {
     el('info-map').textContent =
       `${state.map.width}×${state.map.height} hexes · ${label} · land ${((100 * land) / state.map.terrain.length).toFixed(0)}%${n ? ` · ${n} settlement${n === 1 ? '' : 's'}` : ''}`;
     el('info-date').textContent = `${cal.monthName}, year ${cal.year}`;
+    const ev = state.events[state.events.length - 1];
+    el('info-event').textContent = ev ? `${calendar(ev.turn).monthName} ${calendar(ev.turn).year}: ${ev.text}` : '';
   }
 
   // ---- settlement selection and panel ----

@@ -109,6 +109,15 @@ export interface Settlement {
   harvestFactor: number;
 }
 
+/** Population below which a settlement is abandoned (DECIDED 2026-11-05; data/settlements.json). Read live so tests can switch it off. */
+export function abandonBelow(): number {
+  return (settlementData as { abandonment?: { abandonBelow: number } }).abandonment?.abandonBelow ?? 0;
+}
+export function setAbandonBelow(n: number): void {
+  const d = settlementData as { abandonment?: { abandonBelow: number } };
+  d.abandonment = { ...(d.abandonment ?? { abandonBelow: 0 }), abandonBelow: n };
+}
+
 /** How many year-end totals a settlement remembers. */
 export const POP_HISTORY_YEARS = 30;
 

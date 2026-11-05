@@ -55,6 +55,8 @@ html, body {
 .bar-info { font-family: Consolas, 'Courier New', monospace; font-size: 12px; white-space: nowrap; }
 .bar-dim { color: #9a9484; }
 .bar-help { font-size: 11px; }
+.event-line { color: #f0b060; }
+.event-line:empty { display: none; }
 .bar-run input { width: 3.2em; }
 
 #topbar label { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }

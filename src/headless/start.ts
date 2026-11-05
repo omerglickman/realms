@@ -4,7 +4,7 @@
 //        [--preset baseline|noise|trickle|all] [--seed x] [--csv out.csv]
 //        [--sampling 0|1] [--harvestSd 0.15] [--epidemic 0.01] [--trickle 0.04] [--minIdle 0.15]
 // Presets: baseline = every knob off (the deterministic model); noise = sampling + harvest + epidemic;
-//          trickle = the migration trickle only; all = everything (the data-file defaults).
+//          trickle = the migration trickle only (0.04 if the data file has it off); all = the data-file values (Omer's decisions).
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -31,7 +31,7 @@ const DATA_DEFAULTS = noise(); // as the data files ship
 const PRESETS: Record<string, NoiseKnobs> = {
   baseline: NO_NOISE,
   noise: { ...DATA_DEFAULTS, trickleShare: 0 },
-  trickle: { ...NO_NOISE, trickleShare: DATA_DEFAULTS.trickleShare, trickleMinIdle: DATA_DEFAULTS.trickleMinIdle, trickleSpread: 0, trickleRequireFedParent: DATA_DEFAULTS.trickleRequireFedParent },
+  trickle: { ...NO_NOISE, trickleShare: DATA_DEFAULTS.trickleShare || 0.04, trickleMinIdle: DATA_DEFAULTS.trickleMinIdle, trickleSpread: 0, trickleRequireFedParent: DATA_DEFAULTS.trickleRequireFedParent },
   all: DATA_DEFAULTS,
 };
 const knobs: NoiseKnobs = { ...(PRESETS[PRESET] ?? DATA_DEFAULTS) };

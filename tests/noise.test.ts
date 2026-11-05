@@ -200,14 +200,15 @@ describe('with every knob on', () => {
     expect(run()).toBe(run());
   });
 
-  it('data defaults: the draft values proposed in Session 9', () => {
+  it('data defaults: the values Omer decided on 2026-11-05', () => {
     // beforeEach zeroed the knobs; re-import the file values through a fresh read of the JSON
     const d = JSON.parse(JSON.stringify(require('../data/demography.json')));
     const e = JSON.parse(JSON.stringify(require('../data/economy.json')));
+    // Omer's decisions of 2026-11-05: sampling on, epidemics 1 %, harvest sd 0.125, trickle off
     expect(d.noise.vitalSampling).toBe(1);
     expect(d.noise.epidemic.chancePerYear).toBe(0.01);
-    expect(d.migration.trickle.sharePerYear).toBe(0.04);
-    expect(e.farming.harvest.variance.sd).toBe(0.15);
+    expect(d.migration.trickle.sharePerYear).toBe(0);
+    expect(e.farming.harvest.variance.sd).toBe(0.125);
     expect(noise().vitalSampling).toBe(0); // the test override is in force
   });
 });

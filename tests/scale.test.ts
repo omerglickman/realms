@@ -15,7 +15,8 @@ import { endTurn } from '../src/sim/turn';
 import { applyCommand } from '../src/sim/commands';
 import { axialRing, axialToOffset, offsetToAxial } from '../src/sim/hex';
 import { totalPopulation, workingHands } from '../src/sim/demography';
-import { BUILDINGS, type Settlement } from '../src/sim/settlements';
+import { BUILDINGS, setAbandonBelow, type Settlement } from '../src/sim/settlements';
+setAbandonBelow(0); // an absolute people-count threshold is not scale-invariant by nature
 import { ECONOMY } from '../src/sim/economy';
 import { setNoise, NO_NOISE } from '../src/sim/noise';
 setNoise(NO_NOISE); // these suites test the deterministic model (Session 9 knobs off)

@@ -137,6 +137,29 @@ describe('editSettlement command', () => {
   });
 });
 
+describe('abandonment', () => {
+  it('removes a settlement under the threshold at month end, walks the rest to the parent, logs an event', () => {
+    const s = createGameState('ab', createMap(30, 30, G));
+    const t = found(s, 'Town', 'town', 15, 15, 9000);
+    const v = found(s, 'Dying', 'village', 18, 15, 900);
+    const lone = found(s, 'Lone', 'village', 5, 25, 900);
+    endTurn(s); // parents resolved
+    expect(v.parent).toBe(t.id);
+    const before = totalPopulation(t.pop) + totalPopulation(v.pop);
+    v.pop = { m: v.pop.m.map((x) => x * 0.02), f: v.pop.f.map((x) => x * 0.02) }; // 18 people left
+    lone.pop = { m: lone.pop.m.map((x) => x * 0.01), f: lone.pop.f.map((x) => x * 0.01) };
+    const vLeft = totalPopulation(v.pop);
+    endTurn(s);
+    expect(s.settlements[v.id]).toBeUndefined();
+    expect(s.settlements[lone.id]).toBeUndefined();
+    expect(s.settlements[t.id]).toBeDefined();
+    // the 18 walked to the town (allowing for the town's own monthly change)
+    expect(totalPopulation(t.pop)).toBeGreaterThan(before - 900 + vLeft - 50);
+    expect(s.events.some((e) => e.kind === 'abandoned' && e.text.includes('Dying') && e.text.includes('Town'))).toBe(true);
+    expect(s.events.some((e) => e.text.startsWith('Lone') && !e.text.includes('walked'))).toBe(true);
+  });
+});
+
 describe('scenario files', () => {
   it('round-trips the whole state and is told apart from a map file', () => {
     const s = createGameState('sc', createMap(20, 20, G));

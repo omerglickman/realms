@@ -29,15 +29,15 @@
     "idleHandsSharePerMonth": 0.10,
     "triggerSafetyMonths": 0,
     "trickle": {
-      "_comment": "PROPOSED (Session 9, draft for Omer): the countryside feeds the town people as well as grain. Once a year (December) a settlement whose idle hands exceed minIdleShare of its hands sends sharePerYear of its idle hands, with dependants, to its parent — but only if the parent was fully fed that year (requireFedParent). spread randomizes the share by ±spread (0.5 → 50 %–150 % of sharePerYear). sharePerYear 0 turns it off.",
-      "sharePerYear": 0.04,
+      "_comment": "DECIDED OFF by Omer 2026-11-05 (sharePerYear 0) until towns have work; the rule stays for later. The countryside feeds the town people as well as grain. Once a year (December) a settlement whose idle hands exceed minIdleShare of its hands sends sharePerYear of its idle hands, with dependants, to its parent — but only if the parent was fully fed that year (requireFedParent). spread randomizes the share by ±spread (0.5 → 50 %–150 % of sharePerYear). sharePerYear 0 turns it off.",
+      "sharePerYear": 0,
       "minIdleShare": 0.15,
       "spread": 0.5,
       "requireFedParent": true
     }
   },
   "noise": {
-    "_comment": "PROPOSED (Session 9, draft for Omer). vitalSampling 1 = births and deaths are drawn as Poisson counts around the expected value (variance = mean, so villages jitter and cities barely move); 0 = exact fractions (the deterministic model). epidemic: each settlement each year has chancePerYear of an epidemic year in which deaths are multiplied by deathMultiplier; chance 0 turns it off. All draws come from the seeded game RNG, so a game still replays identically.",
+    "_comment": "DECIDED by Omer 2026-11-05 (sampling adopted; epidemics adopted for now — natural events will become a game-wide mechanic later). vitalSampling 1 = births and deaths are drawn as Poisson counts around the expected value (variance = mean, so villages jitter and cities barely move); 0 = exact fractions (the deterministic model). epidemic: each settlement each year has chancePerYear of an epidemic year in which deaths are multiplied by deathMultiplier; chance 0 turns it off. All draws come from the seeded game RNG, so a game still replays identically.",
     "vitalSampling": 1,
     "epidemic": { "chancePerYear": 0.01, "deathMultiplier": 2.0 }
   },

@@ -6,6 +6,10 @@
     { "id": "city", "name": "City", "rank": 2, "workRings": 2, "influenceRings": 5, "popMin": 6000, "popMax": 36000, "typicalPop": [6000, 36000], "hall": "city_hall", "granary": "granary_city" },
     { "id": "metropolis", "name": "Metropolis", "rank": 3, "workRings": 2, "influenceRings": 6, "popMin": 36000, "popMax": null, "typicalPop": [36000, null], "hall": "metropolis_hall", "granary": "granary_metropolis" }
   ],
+  "abandonment": {
+    "_comment": "DECIDED by Omer 2026-11-05: a settlement whose population falls below abandonBelow people is removed at the end of that month; whoever is left walks to the parent (if any). Later an 'abandoned settlement' entity may mark the site for easy resettling. The threshold is a draft (×3 scale): cohorts are real numbers and never reach exactly zero.",
+    "abandonBelow": 30
+  },
   "metropolisUpgrade": {
     "_comment": "PROPOSED (DESIGN §3.3): prerequisites for upgrading a city to a metropolis. Not implemented until roads and institutions exist.",
     "popAtLeast": 36000,

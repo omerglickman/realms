@@ -14,8 +14,9 @@ import { neighborsOffset } from './map';
 import { TERRAIN, terrainIndex } from './terrain';
 import { RESOURCES } from './resources';
 import {
-  type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, POP_HISTORY_YEARS,
+  type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, POP_HISTORY_YEARS, abandonBelow,
 } from './settlements';
+import { logEvent } from './state';
 import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate } from './demography';
 import { seedRng, nextFloat, nextGaussian, nextU32 } from './rng';
 import { noise } from './noise';
@@ -284,6 +285,8 @@ export function economyMonth(state: GameState, month: number): void {
     p.report.received += give;
   }
 
+  abandonEmptySettlements(state);
+
   // migration (DESIGN §4.1): a settlement that forecasts running out of food before the
   // next harvest, has idle hands and a parent → 10 % of idle hands leave with dependants
   const mig = DEMOGRAPHY.migration;
@@ -301,6 +304,28 @@ export function economyMonth(state: GameState, month: number): void {
     s.report.migrantsOut += n;
     p.report.migrantsIn += n;
   }
+}
+
+/**
+ * Abandonment (DECIDED 2026-11-05): a settlement below ABANDON_BELOW people is
+ * removed; whoever is left walks to its parent (people are conserved when
+ * there is one); its granary is lost. Logged as an event.
+ */
+export function abandonEmptySettlements(state: GameState): string[] {
+  const gone: string[] = [];
+  const threshold = abandonBelow();
+  if (!(threshold > 0)) return gone;
+  for (const s of settlementsByRank(state)) {
+    const n = totalPopulation(s.pop);
+    if (n >= threshold) continue;
+    const p = s.parent ? state.settlements[s.parent] : null;
+    if (p && n > 0) { addPopulation(p.pop, s.pop); p.report.migrantsIn += n; }
+    delete state.settlements[s.id];
+    gone.push(s.id);
+    logEvent(state, 'abandoned', `${s.name} (${TIERS[s.tier].name.toLowerCase()}) was abandoned${p ? ` — the last ${Math.round(n)} people walked to ${p.name}` : ''}.`);
+  }
+  if (gone.length) resolveAllParents(state);
+  return gone;
 }
 
 /**

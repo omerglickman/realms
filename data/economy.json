@@ -10,8 +10,8 @@
       "_comment": "share of the yearly farming output arriving in each month (0 = January). Sums to 1.",
       "shares": [0, 0, 0, 0, 0, 0, 0, 0, 0.6, 0.4, 0, 0],
       "variance": {
-        "_comment": "PROPOSED (Session 9, draft for Omer): each year every settlement's farming output is multiplied by a harvest factor drawn in January — 1 + sd × noise, floored at minFactor. regionalShare of the variance is shared by every settlement in the same regionSize×regionSize block of hexes (a bad year is regional, not private); the rest is local. sd 0 turns it off. Forecasts assume an average year, so a bad harvest surprises a settlement the way it should.",
-        "sd": 0.15,
+        "_comment": "DECIDED by Omer 2026-11-05 at sd 0.125 (a compromise between 0.10 and 0.15): each year every settlement's farming output is multiplied by a harvest factor drawn in January — 1 + sd × noise, floored at minFactor. regionalShare of the variance is shared by every settlement in the same regionSize×regionSize block of hexes (a bad year is regional, not private); the rest is local. sd 0 turns it off. Forecasts assume an average year, so a bad harvest surprises a settlement the way it should.",
+        "sd": 0.125,
         "regionalShare": 0.5,
         "regionSize": 12,
         "minFactor": 0.3
