@@ -34,8 +34,8 @@ export interface BuildingDef {
   minTier?: string;
   hands: number;
   mandatory: boolean;
-  /** materials paid from the cluster stockpile when queued (Session 11) */
-  cost?: Partial<Materials>;
+  /** paid when queued (Session 11): timber/stone from the cluster stockpile, money from the faction treasury (Session 11b) */
+  cost?: Partial<Materials> & { money?: number };
   /** months of construction at full labour */
   buildMonths?: number;
   /** spare hands needed for full construction speed */
@@ -45,6 +45,8 @@ export interface BuildingDef {
   effects: Record<string, number>;
   /** unit types this building will unlock (Phase 4; recorded only) */
   unlocks?: string[];
+  /** Warehouse family (Session 11b): what it adds to the cluster's stockpile cap */
+  stockCap?: Partial<Materials>;
   blurb?: string;
 }
 
@@ -58,6 +60,8 @@ export interface BuildProject {
   progress: number;
   /** who paid what when the project was queued (for cancel / undo) */
   paid: { id: string; amount: Materials }[];
+  /** money paid from the faction treasury when queued (Session 11b; refunded on cancel) */
+  paidMoney?: number;
   startedTurn: number;
 }
 
@@ -104,6 +108,14 @@ export interface SettlementReport {
   stone: number;
   goods: number;
   sold: number;
+  /** Session 11b (DESIGN §4.2b): private hands (towns and above; 0 in a village), the tax they paid this month,
+   *  the tax forgone because some were on the building site or gathering, and administration quality (0–1) */
+  privateHands: number;
+  tax: number;
+  taxLost: number;
+  adminQuality: number;
+  /** materials that overflowed the cluster's cap to the realm this month (counted on the cluster root) */
+  overflow: number;
   /** last yearly update */
   births: number;
   deaths: number;
@@ -132,13 +144,17 @@ export interface YearTotals {
   stone: number;
   goods: number;
   sold: number;
+  /** materials that overflowed the cluster's cap to the realm stockpile (Session 11b; before that the December surplus share) — counted on the cluster root */
   surplusOut: number;
+  /** Session 11b: tax paid by private hands, and tax forgone while they built or gathered */
+  tax: number;
+  taxLost: number;
   /** months accumulated so far (12 for a finished year) */
   months: number;
 }
 
 export function emptyYearTotals(): YearTotals {
-  return { produced: 0, consumed: 0, hungerDeaths: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0, timber: 0, stone: 0, goods: 0, sold: 0, surplusOut: 0, months: 0 };
+  return { produced: 0, consumed: 0, hungerDeaths: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0, timber: 0, stone: 0, goods: 0, sold: 0, surplusOut: 0, tax: 0, taxLost: 0, months: 0 };
 }
 
 export function addYearTotals(into: YearTotals, from: YearTotals): void {
@@ -146,6 +162,7 @@ export function addYearTotals(into: YearTotals, from: YearTotals): void {
   into.sent += from.sent; into.received += from.received; into.titheOut += from.titheOut; into.titheIn += from.titheIn;
   into.migrantsOut += from.migrantsOut; into.migrantsIn += from.migrantsIn;
   into.timber += from.timber; into.stone += from.stone; into.goods += from.goods; into.sold += from.sold; into.surplusOut += from.surplusOut;
+  into.tax += from.tax; into.taxLost += from.taxLost;
   into.months = Math.max(into.months, from.months);
 }
 
@@ -203,6 +220,7 @@ export function emptyReport(): SettlementReport {
     hands: 0, staffedHands: 0, fieldHands: 0, idleHands: 0, produced: 0, landCapacity: 0, consumed: 0,
     shortfall: 0, hungerDeaths: 0, spoiled: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0,
     capacity: 0, constructionHands: 0, gatherHands: 0, vacancies: 0, timber: 0, stone: 0, goods: 0, sold: 0,
+    privateHands: 0, tax: 0, taxLost: 0, adminQuality: 1, overflow: 0,
     births: 0, deaths: 0, trickleOut: 0, trickleIn: 0, epidemic: false, sufficiency: 1,
   };
 }

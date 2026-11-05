@@ -7,11 +7,11 @@
 import type { MapData } from './map';
 import { type RngState, seedRng } from './rng';
 import { type Settlement, emptyReport, emptyYearTotals } from './settlements';
-import { type Faction, initialFactions, PLAYER_FACTION } from './factions';
+import { type Faction, initialFactions, emptyFactionYear, PLAYER_FACTION } from './factions';
 import { emptyMaterials } from './materials';
 
-/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). */
-export const STATE_VERSION = 4;
+/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). */
+export const STATE_VERSION = 5;
 
 export interface GameState {
   version: number;
@@ -106,6 +106,11 @@ export function deserializeState(json: string): GameState {
     for (const f of Object.values(s.factions ?? {})) if (!f.stock) f.stock = emptyMaterials();
     s.version = 4;
   }
+  if (s.version === 4) {
+    // Session 12: faction yearly flows (tax, sales, spent, overflow, lost); projects may carry paidMoney
+    for (const f of Object.values(s.factions ?? {})) { f.year = emptyFactionYear(); f.lastYear = null; }
+    s.version = 5;
+  }
   if (s.version !== STATE_VERSION) {
     throw new Error(`Save version ${s.version} not supported (expected ${STATE_VERSION})`);
   }
@@ -115,7 +120,13 @@ export function deserializeState(json: string): GameState {
   if (typeof s.nextId !== 'number') s.nextId = 1;
   if (!Array.isArray(s.events)) s.events = [];
   if (!Array.isArray(s.map.resource)) s.map.resource = new Array<number>(s.map.terrain.length).fill(-1);
-  for (const f of Object.values(s.factions)) { if (!f.stock) f.stock = emptyMaterials(); if (typeof f.treasury !== 'number') f.treasury = 0; }
+  for (const f of Object.values(s.factions)) {
+    if (!f.stock) f.stock = emptyMaterials();
+    if (typeof f.treasury !== 'number') f.treasury = 0;
+    const fy = (y: Partial<typeof f.year> | null | undefined) => y ? { ...emptyFactionYear(), ...y, overflowIn: { ...emptyMaterials(), ...(y.overflowIn ?? {}) }, lost: { ...emptyMaterials(), ...(y.lost ?? {}) } } : null;
+    f.year = fy(f.year) ?? emptyFactionYear();
+    f.lastYear = fy(f.lastYear);
+  }
   for (const st of Object.values(s.settlements)) {
     // fields added within v3 (Session 9): harvest factor, trickle/epidemic/sufficiency in the report
     if (typeof st.harvestFactor !== 'number') st.harvestFactor = 1;

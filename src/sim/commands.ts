@@ -11,7 +11,7 @@ import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
 import { makeSettlement, settlementIdAt, buildingDef, type FoundOptions, type Settlement, type BuildProject } from './settlements';
 import { totalPopulation, createPopulation, type Population } from './demography';
-import { canBuild } from './buildings';
+import { canBuild, moneyCost } from './buildings';
 import { payFromCluster, refund, addMaterials, MATERIAL_IDS, type Materials } from './materials';
 
 export interface CellEdit {
@@ -202,8 +202,10 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       if (!s) throw new Error(`No settlement "${cmd.id}"`);
       const check = canBuild(state, s, cmd.building);
       if (!check.ok) throw new Error(`${s.name} cannot build ${buildingDef(cmd.building).name}: ${check.reason}`);
-      const paid = payFromCluster(state, s, buildingDef(cmd.building).cost ?? {});
-      s.build = { building: cmd.building, progress: 0, paid, startedTurn: state.turn };
+      const def = buildingDef(cmd.building);
+      const paid = payFromCluster(state, s, def.cost ?? {});
+      const money = payMoney(state, s, moneyCost(def));
+      s.build = { building: cmd.building, progress: 0, paid, paidMoney: money, startedTurn: state.turn };
       return { type: 'cancelBuilding', id: cmd.id };
     }
     case 'cancelBuilding': {
@@ -212,6 +214,7 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       if (!s.build) throw new Error(`${s.name} is not building anything`);
       const project = s.build;
       refund(state, project.paid, s.id);
+      payMoney(state, s, -(project.paidMoney ?? 0));
       s.build = null;
       return { type: 'restoreProject', id: cmd.id, project };
     }
@@ -224,6 +227,7 @@ export function applyCommand(state: GameState, cmd: Command): Command {
         addMaterials(m.stock, p.amount, -1);
         for (const k of MATERIAL_IDS) if (m.stock[k] < 0) m.stock[k] = 0;
       }
+      payMoney(state, s, cmd.project.paidMoney ?? 0);
       s.build = cmd.project;
       return { type: 'cancelBuilding', id: cmd.id };
     }
@@ -237,6 +241,20 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       return { type: 'transferMaterials', from: cmd.to, to: cmd.from, amount: moved };
     }
   }
+}
+
+/**
+ * Move `amount` coins out of the settlement's faction treasury (negative = refund).
+ * Counted in the faction's yearly `spent`. Returns what was taken (0 without a faction).
+ */
+function payMoney(state: GameState, s: Settlement, amount: number): number {
+  if (!amount || !s.faction) return 0;
+  const f = state.factions[s.faction];
+  if (!f) return 0;
+  f.treasury -= amount;
+  if (f.treasury < 0 && f.treasury > -1e-9) f.treasury = 0;
+  f.year.spent += amount;
+  return amount;
 }
 
 /** The faction key for transferMaterials. */

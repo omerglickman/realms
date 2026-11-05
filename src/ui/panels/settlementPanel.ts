@@ -9,8 +9,9 @@ import { totalPopulation, workingHands } from '../../sim/demography';
 import { planLabour, granaryTerms, type LabourPlan } from '../../sim/economy';
 import { calendar } from '../../sim/state';
 import { clusterLine } from './clusterPanel';
-import { buildableFor, canBuild, monthsLeft } from '../../sim/buildings';
+import { buildableFor, canBuild, monthsLeft, moneyCost } from '../../sim/buildings';
 import { clusterStock, MATERIAL_IDS, type Materials } from '../../sim/materials';
+import type { BuildingDef } from '../../sim/settlements';
 
 const fmt = (n: number): string => Math.round(n).toLocaleString('en-US');
 const pct = (x: number): string => `${x >= 0 ? '+' : ''}${(100 * x).toFixed(1)} %`;
@@ -19,6 +20,13 @@ const pct = (x: number): string => `${x >= 0 ? '+' : ''}${(100 * x).toFixed(1)} 
 export function materialsText(m: Partial<Materials>, showZero = false): string {
   const parts = MATERIAL_IDS.filter((k) => showZero || (m[k] ?? 0) >= 0.5).map((k) => `${fmt(m[k] ?? 0)} ${k}`);
   return parts.length ? parts.join(' · ') : 'nothing';
+}
+
+/** "400 coins · 90 timber · 30 stone" — the full price of a building (Session 12). */
+export function costText(def: BuildingDef): string {
+  const money = moneyCost(def);
+  const mats = materialsText(def.cost ?? {});
+  return (money > 0 ? `${fmt(money)} coins` : '') + (money > 0 && mats !== 'nothing' ? ' · ' : '') + (mats !== 'nothing' ? mats : money > 0 ? '' : 'free');
 }
 
 /** "Mill — 3 of 6 months" for a settlement's project. */
@@ -120,13 +128,14 @@ export function renderPanel(root: HTMLElement, state: GameState, s: Settlement, 
     ['Last year', r.births || r.deaths ? `${fmt(r.births)} born, ${fmt(r.deaths)} died` + (r.epidemic ? ' <b class="warn">(epidemic)</b>' : '') + (r.trickleOut > 0.5 ? `, ${fmt(r.trickleOut)} moved to town` : '') + (r.trickleIn > 0.5 ? `, ${fmt(r.trickleIn)} arrived from the countryside` : '') : '<span class="dim">no year-end yet</span>'],
     ['Harvest', Math.abs(s.harvestFactor - 1) > 0.005 ? `${Math.round(100 * s.harvestFactor)} % of a normal year` : 'a normal year'],
     ['Granary', `${months.toFixed(1)} months <span class="dim">(${fmt(s.food)} food · holds ${cap.toFixed(0)} mo · spoils ${(100 * g.spoilage).toFixed(1)} %/mo)</span>`],
-    ['Hands', `${fmt(plan.staffedHands)} in buildings · ${fmt(plan.fieldHands)} in the fields · <b>${fmt(plan.idleHands)} spare</b>` + (plan.constructionHands > 0.5 || plan.gatherHands > 0.5 ? ` <span class="dim">(${plan.constructionHands > 0.5 ? `${fmt(plan.constructionHands)} building` : ''}${plan.constructionHands > 0.5 && plan.gatherHands > 0.5 ? ', ' : ''}${plan.gatherHands > 0.5 ? `${fmt(plan.gatherHands)} gathering` : ''})</span>` : '') + (plan.vacancies > 0.5 ? ` · <b class="warn">${fmt(plan.vacancies)} hands short</b>` : '')],
+    ['Hands', `${fmt(plan.staffedHands)} in buildings · ${fmt(plan.fieldHands)} in the fields · <b>${fmt(plan.idleHands)} ${plan.privateHands > 0 ? 'private' : 'spare'}</b>` + (plan.constructionHands > 0.5 || plan.gatherHands > 0.5 ? ` <span class="dim">(${plan.constructionHands > 0.5 ? `${fmt(plan.constructionHands)} building` : ''}${plan.constructionHands > 0.5 && plan.gatherHands > 0.5 ? ', ' : ''}${plan.gatherHands > 0.5 ? `${fmt(plan.gatherHands)} gathering` : ''})</span>` : '') + (plan.vacancies > 0.5 ? ` · <b class="warn">${fmt(plan.vacancies)} hands short</b>` : '')],
+    ...(plan.privateHands > 0 ? [['Tax base', `${fmt(plan.taxableHands)} private hands → <b>${fmt(plan.taxPerYear)} coins</b> and ${fmt(plan.goodsPerYear)} goods a year` + (plan.taxLostPerYear > 0.5 ? ` <span class="warn">· −${fmt(plan.taxLostPerYear)} coins/yr while ${fmt(plan.privateHands - plan.taxableHands)} build or gather</span>` : '') + (plan.adminQuality < 0.999 ? ` <span class="dim">· administration ${Math.round(100 * plan.adminQuality)} % (hall understaffed)</span>` : '') + (plan.salesSharePerYear > 0 ? ` <span class="dim">· sells ${Math.round(100 * plan.salesSharePerYear)} % of the cluster's goods a year</span>` : '')] as [string, string]] : []),
     ['Land', `${worked.length} hexes worked · feeds ${fmt(plan.plannedPerYear)} / yr now, ${fmt(plan.landCapacity)} at full labour`],
     ['Subordinate to', parent ? `<a href="#" data-focus="${parent.id}">${esc(parent.name)}</a> (${tierName(parent)})` : TIERS[s.tier].rank < 2 ? '<span class="dim">nobody in range</span>' : '<span class="dim">— (independent)</span>'],
     ['Dependants', children.length ? children.map((c) => `<a href="#" data-focus="${c.id}">${esc(c.name)}</a>`).join(', ') : '<span class="dim">none</span>'],
     ['Cluster', (() => { const c = clusterLine(state, s); return c ? `<a href="#" data-cluster="${c.root}">${esc(c.text)}</a>` : '<span class="dim">—</span>'; })()],
     ['Buildings', plan.buildings.map((b) => `<span title="${esc(buildingDef(b.id).blurb ?? '')}">${esc(buildingDef(b.id).name)}</span> <span class="dim">${Math.round(100 * b.fraction)} %</span>`).join(' · ') + (s.build ? `<div class="project">⚒ ${esc(projectText(s)!)} <span class="dim">(${fmt(plan.constructionHands)} of ${fmt(buildingDef(s.build.building).buildHands ?? 0)} hands)</span> <button id="sp-cancel" class="small">Cancel</button></div>` : '')],
-    ['Materials', `own ${materialsText(s.stock)} <span class="dim">· cluster ${materialsText(pool)}</span>` + (r.timber + r.stone + r.goods > 0.5 ? ` <span class="dim">· last month +${materialsText({ timber: r.timber, stone: r.stone, goods: r.goods })}${r.sold > 0.5 ? `, sold goods for ${fmt(r.sold)}` : ''}</span>` : '')],
+    ['Materials', `own ${materialsText(s.stock)} <span class="dim">· cluster ${materialsText(pool)}</span>` + (r.timber + r.stone + r.goods > 0.5 ? ` <span class="dim">· last month +${materialsText({ timber: r.timber, stone: r.stone, goods: r.goods })}${r.sold > 0.5 ? `, sold goods for ${fmt(r.sold)}` : ''}${r.tax > 0.5 ? `, ${fmt(r.tax)} coins in tax` : ''}</span>` : '')],
     ['Last month', `${r.produced ? `+${fmt(r.produced)} grown` : 'nothing grown'}, ${fmt(r.consumed)} eaten` + (r.titheIn > 0.5 ? `, +${fmt(r.titheIn)} tithe` : '') + (r.received ? `, +${fmt(r.received)} received` : '') + (r.titheOut > 0.5 ? `, ${fmt(r.titheOut)} tithed` : '') + (r.sent ? `, ${fmt(r.sent)} sent up` : '') + (r.hungerDeaths > 0.5 ? `, <b class="warn">${fmt(r.hungerDeaths)} starved</b>` : '') + (r.migrantsOut > 0.5 ? `, ${fmt(r.migrantsOut)} left` : '') + (r.migrantsIn > 0.5 ? `, ${fmt(r.migrantsIn)} arrived` : '')],
     ['Founded', `${founded.monthName}, year ${founded.year} · hex (${s.col}, ${s.row})`],
   ];
@@ -139,7 +148,7 @@ export function renderPanel(root: HTMLElement, state: GameState, s: Settlement, 
     </div>
     <table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>
     ${options.length ? `<div class="build-row">
-      <label>Build <select id="sp-build">${options.map((o) => `<option value="${o.def.id}" ${o.check.ok ? '' : 'class="dim"'}>${esc(o.def.name)} — ${materialsText(o.def.cost ?? {})}, ${o.def.buildMonths} mo${o.check.ok ? '' : ` (${esc(o.check.reason ?? '')})`}</option>`).join('')}</select></label>
+      <label>Build <select id="sp-build">${options.map((o) => `<option value="${o.def.id}" ${o.check.ok ? '' : 'class="dim"'}>${esc(o.def.name)} — ${costText(o.def)}, ${o.def.buildMonths} mo${o.check.ok ? '' : ` (${esc(o.check.reason ?? '')})`}</option>`).join('')}</select></label>
       <button id="sp-build-go" ${s.build ? 'disabled title="one project at a time"' : ''}>Start</button>
       <div id="sp-build-blurb" class="dim blurb"></div>
     </div>` : ''}
@@ -163,7 +172,7 @@ export function renderPanel(root: HTMLElement, state: GameState, s: Settlement, 
     const update = () => {
       const o = options.find((x) => x.def.id === sel.value);
       if (!o) return;
-      blurb.textContent = (o.def.blurb ?? '') + (o.def.hands ? ` Needs ${o.def.hands} hands to run.` : '') + (o.check.ok ? '' : ` — ${o.check.reason}`);
+      blurb.textContent = (o.def.blurb ?? '') + (o.def.hands ? ` Needs ${o.def.hands} hands to run.` : '') + (o.def.buildHands ? ` ${o.def.buildHands} hands build it${plan.privateHands > 0 ? ` (−${fmt(o.def.buildHands * (plan.taxableHands > 0 ? plan.taxPerYear / plan.taxableHands : 0))} coins/yr of tax while they do)` : ''}.` : '') + (o.check.ok ? '' : ` — ${o.check.reason}`);
       go.disabled = !!s.build || !o.check.ok;
     };
     sel.addEventListener('change', update);

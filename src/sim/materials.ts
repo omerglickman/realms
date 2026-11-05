@@ -1,14 +1,16 @@
 // Materials (DESIGN §4.2, DECIDED by Omer 2026-11-05, Session 11): timber,
 // stone and goods. Every settlement holds its own stock; the CLUSTER's stockpile
 // is the sum over its members, and that is what building projects draw from —
-// a grassland town builds with its woodland villages' timber. Each December a
-// cluster keeps a reserve and sends a share of the rest to the faction
-// stockpile, which the player ships to any cluster (instantly for now —
+// a grassland town builds with its woodland villages' timber. A cluster's
+// stockpile has a CAP per material (Session 11b, DESIGN §4.2: low by default,
+// raised by Warehouses); what it gathers above the cap flows each month to the
+// faction (realm) stockpile, which has its own cap — above that it is lost. The
+// player ships from the realm stockpile to any cluster (instantly for now —
 // PLACEHOLDER until roads and caravans carry it). Numbers in data/economy.json.
 
 import economyData from '../../data/economy.json';
 import type { GameState } from './state';
-import type { Settlement } from './settlements';
+import { type Settlement, buildingDef } from './settlements';
 import { clusterMembers } from './clusters';
 
 export const MATERIAL_IDS = ['timber', 'stone', 'goods'] as const;
@@ -20,17 +22,18 @@ export const MATERIAL_NAMES: Record<MaterialId, string> = { timber: 'Timber', st
 type MaterialsData = {
   timber: { perYearByTimber: number[]; hands: number };
   stone: { perYearOnStoneHex: number; hands: number };
-  reserve: Materials;
-  surplusShare: number;
+  cap: { base: Materials; perSettlement: Materials };
+  realmCap: Materials;
 };
 export const MATERIALS: MaterialsData = (economyData as unknown as { materials: MaterialsData }).materials;
 
-/** Faction surplus share (read live so the runner and tests can change it). */
-export function surplusShare(): number {
-  return MATERIALS.surplusShare ?? 0;
+/** Are the stockpile caps on? (tests and the headless runner can switch them off: every cap infinite) */
+let capsOn = true;
+export function stockCapsOn(): boolean {
+  return capsOn;
 }
-export function setSurplusShare(x: number): void {
-  MATERIALS.surplusShare = x;
+export function setStockCaps(on: boolean): void {
+  capsOn = on;
 }
 
 export function emptyMaterials(): Materials {
@@ -53,6 +56,35 @@ export function isEmptyMaterials(m: Partial<Materials>): boolean {
 /** Clamp a stock at zero (floating-point dust after proportional takes). */
 export function tidyMaterials(m: Materials): void {
   for (const k of MATERIAL_IDS) if (m[k] < 1e-9) m[k] = 0;
+}
+
+/**
+ * The cap of a cluster's stockpile per material (DESIGN §4.2, Session 11b):
+ * base + perSettlement × members + every member's Warehouses (buildings with a
+ * `stockCap`, scaled by nothing — a warehouse holds whether staffed or not).
+ */
+export function clusterCap(state: GameState, id: string): Materials {
+  const out = emptyMaterials();
+  if (!capsOn) { for (const k of MATERIAL_IDS) out[k] = Infinity; return out; }
+  const members = clusterMembers(state, id);
+  addMaterials(out, MATERIALS.cap.base);
+  addMaterials(out, MATERIALS.cap.perSettlement, members.length);
+  for (const mid of members) {
+    const s = state.settlements[mid];
+    if (!s) continue;
+    for (const b of s.buildings) {
+      const def = buildingDef(b);
+      if (def.stockCap) addMaterials(out, def.stockCap);
+    }
+  }
+  return out;
+}
+
+/** The realm stockpile's cap (a flat draft until administration quality exists — DESIGN §4.3). */
+export function realmCap(): Materials {
+  const out = emptyMaterials();
+  if (!capsOn) { for (const k of MATERIAL_IDS) out[k] = Infinity; return out; }
+  return addMaterials(out, MATERIALS.realmCap);
 }
 
 /** Sum of the stocks of a cluster's members (the cluster `id` belongs to). */

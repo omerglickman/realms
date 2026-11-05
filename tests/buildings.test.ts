@@ -1,6 +1,7 @@
-// Session 11: buildings with effects, materials (cluster stockpiles, faction
-// surplus), the build queue and the pull factor (DESIGN §3.3, §4.1, §4.2 —
-// DECIDED by Omer 2026-11-05).
+// Session 11: buildings with effects, materials (cluster stockpiles), the build
+// queue and the pull factor (DESIGN §3.3, §4.1, §4.2 — DECIDED by Omer 2026-11-05).
+// Session 12: money costs, stockpile caps with overflow to the realm, the pull
+// on prosperity (DESIGN §4.2, §4.1 — Session 11b decisions).
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { createMap } from '../src/sim/map';
@@ -11,7 +12,7 @@ import { endTurn } from '../src/sim/turn';
 import { applyCommand, factionStockKey } from '../src/sim/commands';
 import { resolveAllParents, workedCellsBySettlement, BUILDINGS, TIERS, tierIndex, buildingDef, setAbandonBelow, type Settlement } from '../src/sim/settlements';
 import { buildableFor, canBuild, sumEffects, monthsLeft } from '../src/sim/buildings';
-import { MATERIALS, clusterStock, payFromCluster, surplusShare, setSurplusShare } from '../src/sim/materials';
+import { MATERIALS, clusterStock, payFromCluster, clusterCap, realmCap, setStockCaps } from '../src/sim/materials';
 import { planLabour, granaryTerms } from '../src/sim/economy';
 import { totalPopulation, workingHands } from '../src/sim/demography';
 import { setNoise, NO_NOISE } from '../src/sim/noise';
@@ -24,8 +25,7 @@ const F = terrainIndex('forest');
 const H = terrainIndex('hills');
 const R = terrainIndex('river');
 const STONE = resourceIndex('stone');
-const DEFAULT_SHARE = surplusShare();
-afterEach(() => { setSurplusShare(DEFAULT_SHARE); setNoise(NO_NOISE); });
+afterEach(() => { setStockCaps(true); setNoise(NO_NOISE); });
 
 function found(state: GameState, name: string, tier: string, col: number, row: number, population: number): Settlement {
   applyCommand(state, { type: 'foundSettlement', settlement: { name, tier, col, row, population } });
@@ -45,6 +45,7 @@ function pair(): { state: GameState; town: Settlement; village: Settlement } {
   state.map.resource[cell(state, 18, 15)] = STONE;
   const village = found(state, 'Village', 'village', 18, 15, 1800);
   resolveAllParents(state);
+  state.factions[state.playerFaction].treasury = 10_000; // the Session 11 cases are about materials; money is tested on its own
   return { state, town, village };
 }
 
@@ -59,6 +60,7 @@ describe('buildings data', () => {
       expect(b.minTier).toBeDefined();
       expect(() => tierIndex(b.minTier!)).not.toThrow();
       expect(b.cost).toBeDefined();
+      expect(b.cost!.money!).toBeGreaterThan(0); // every building costs money (Session 11b)
       expect(b.buildMonths!).toBeGreaterThan(0);
       expect(b.buildHands!).toBeGreaterThan(0);
     }
@@ -68,7 +70,12 @@ describe('buildings data', () => {
     expect(villageList).toContain('stables');
     expect(villageList).not.toContain('workshop');
     expect(buildableFor(tierIndex('town')).map((b) => b.id)).toContain('workshop');
+    expect(buildableFor(tierIndex('town')).map((b) => b.id)).toContain('warehouse');
     expect(buildableFor(tierIndex('city')).map((b) => b.id)).toContain('citadel');
+    // Workshop and Market are multipliers, not employers (Omer, Session 11b)
+    expect(buildingDef('workshop').hands).toBeLessThanOrEqual(60);
+    expect(buildingDef('market').hands).toBeLessThanOrEqual(60);
+    expect(buildingDef('warehouse').stockCap!.timber).toBeGreaterThan(0);
   });
 });
 
@@ -167,6 +174,7 @@ describe('build queue', () => {
     s2.map.terrain[cell(s2, 10, 10)] = G;
     const hamlet = found(s2, 'Hamlet', 'village', 10, 10, 450);
     hamlet.stock.timber = 500; hamlet.stock.stone = 500;
+    s2.factions[s2.playerFaction].treasury = 1000;
     // make sure the hamlet has a few spare hands but far fewer than 60
     const spare0 = planLabour(s2.map, hamlet, workedCellsBySettlement(s2).get(hamlet.id)!).idleHands;
     expect(spare0).toBeGreaterThan(0);
@@ -186,8 +194,8 @@ describe('effects', () => {
     expect(e.farmingMult).toBeCloseTo(1.075, 9);
     expect(e.granaryExtraMonths).toBe(12);
     expect(e.granarySpoilageMult).toBe(0.5);
-    expect(e.goodsPerYear).toBe(600);
-    expect(e.sellsGoodsPerYear).toBe(600);
+    expect(e.goodsMult).toBe(1.5);
+    expect(e.salesShareBonus).toBeCloseTo(0.4, 9);
     expect(granaryTerms(1, e).capacityMonths).toBe(36);
     expect(granaryTerms(1, e).spoilage).toBeCloseTo(0.0025, 9);
   });
@@ -207,36 +215,154 @@ describe('effects', () => {
     expect(b).toBeLessThan(a * 1.15 + 1e-6);
   });
 
-  it('a workshop makes goods into the stock and a market sells the cluster\'s goods into the treasury; goods are conserved', () => {
-    const { state, town, village } = pair();
-    town.buildings.push('workshop', 'market');
-    const f = state.factions[state.playerFaction];
-    run(state, 12);
-    expect(town.lastYear!.goods).toBeCloseTo(600, 3);
-    expect(town.lastYear!.sold).toBeCloseTo(600, 3);
-    expect(f.treasury).toBeCloseTo(600, 3);
-    expect(town.stock.goods + village.stock.goods + f.stock.goods).toBeCloseTo(600 - 600 + 0, 3);
+  it('a town\'s private hands make goods on their own; a workshop makes +50 % more; a market sells more of them; goods are conserved', () => {
+    const a = pair();
+    run(a.state, 12);
+    const plain = a.town.lastYear!.goods;
+    expect(plain).toBeGreaterThan(0);
+    expect(a.village.lastYear!.goods).toBe(0); // villages have spare hands, not private hands
+    const b = pair();
+    b.town.buildings.push('workshop');
+    run(b.state, 12);
+    // +50 % per private hand; the workshop's own 30 clerks are no longer private, so a hair under 1.5×
+    expect(b.town.lastYear!.goods).toBeGreaterThan(plain * 1.45);
+    expect(b.town.lastYear!.goods).toBeLessThanOrEqual(plain * 1.5 + 1e-6);
+    const c = pair();
+    c.town.buildings.push('market');
+    run(c.state, 12);
+    expect(c.town.lastYear!.sold).toBeGreaterThan(a.town.lastYear!.sold * 2);
+    // goods made = goods sold + goods still in the cluster + goods that overflowed to the realm
+    for (const x of [a, b, c]) {
+      const f = x.state.factions[x.state.playerFaction];
+      const made = x.town.lastYear!.goods + x.village.lastYear!.goods;
+      expect(x.town.lastYear!.sold + clusterStock(x.state, x.town.id).goods + f.stock.goods + f.lastYear!.lost.goods).toBeCloseTo(made, 3);
+    }
   });
 });
 
-describe('faction surplus', () => {
-  it('each December a cluster keeps its reserve and sends surplusShare of the rest to the faction, in proportion to who holds it', () => {
+describe('the private economy (DESIGN §4.2b)', () => {
+  it('private hands are the spare hands of a town; they pay tax into the treasury scaled by the hall\'s staffing; a village pays none', () => {
     const { state, town, village } = pair();
-    setSurplusShare(0.1);
-    // stop gathering from muddying the arithmetic: no woodland, no stone
-    for (let c = 18; c <= 20; c++) for (let r = 14; r <= 16; r++) state.map.terrain[cell(state, c, r)] = G;
-    state.map.resource[cell(state, 18, 15)] = -1;
-    village.stock.timber = 900; town.stock.timber = 300; // pool 1200, reserve 300 → excess 900 → 90 to the faction
-    village.stock.stone = 100; // under the 150 reserve → nothing
-    run(state, 12);
     const f = state.factions[state.playerFaction];
-    expect(f.stock.timber).toBeCloseTo(90, 6);
-    expect(f.stock.stone).toBe(0);
-    expect(village.stock.timber).toBeCloseTo(900 - 90 * 0.75, 6);
-    expect(town.stock.timber).toBeCloseTo(300 - 90 * 0.25, 6);
-    expect(town.lastYear!.surplusOut).toBeCloseTo(90, 6);
+    f.treasury = 0;
+    const plan = planLabour(state.map, town, workedCellsBySettlement(state).get(town.id)!);
+    expect(plan.privateHands).toBe(plan.idleHands);
+    expect(plan.privateHands).toBeGreaterThan(1000);
+    expect(plan.taxableHands).toBeCloseTo(plan.privateHands - plan.constructionHands - plan.gatherHands, 9);
+    expect(plan.adminQuality).toBe(1);
+    expect(plan.taxPerYear).toBeCloseTo(plan.taxableHands * 0.2, 6);
+    const vplan = planLabour(state.map, village, workedCellsBySettlement(state).get(village.id)!);
+    expect(vplan.privateHands).toBe(0);
+    expect(vplan.taxPerYear).toBe(0);
+    run(state, 1);
+    expect(town.report.tax).toBeCloseTo(plan.taxPerYear / 12, 3);
+    expect(village.report.tax).toBe(0);
+    expect(f.treasury).toBeCloseTo(town.report.tax + town.report.sold, 6);
+    expect(f.year.tax).toBeCloseTo(town.report.tax, 9);
+    // an understaffed hall collects less: a town of 200 people (≈116 hands) cannot fill its 150-hand hall
+    const s2 = createGameState('h', createMap(20, 20, G));
+    const small = found(s2, 'Smalltown', 'town', 10, 10, 200);
+    const p2 = planLabour(s2.map, small, workedCellsBySettlement(s2).get(small.id)!);
+    expect(p2.adminQuality).toBeLessThan(1);
+    expect(p2.adminQuality).toBeGreaterThan(0);
   });
 
+  it('hands on the building site pay no tax: the dent is the cost of building', () => {
+    const { state, town, village } = pair();
+    village.stock.timber = 1000; village.stock.stone = 1000;
+    const before = planLabour(state.map, town, workedCellsBySettlement(state).get(town.id)!);
+    applyCommand(state, { type: 'queueBuilding', id: town.id, building: 'walls' }); // 180 hands on the site
+    const during = planLabour(state.map, town, workedCellsBySettlement(state).get(town.id)!);
+    expect(during.constructionHands).toBe(180);
+    expect(during.privateHands).toBe(before.privateHands);
+    expect(during.taxableHands).toBeCloseTo(before.taxableHands - 180, 9);
+    expect(during.taxLostPerYear).toBeCloseTo(180 * 0.2, 9);
+    expect(before.taxPerYear - during.taxPerYear).toBeCloseTo(180 * 0.2, 9);
+  });
+
+  it('money: queuing pays the treasury, cancel refunds it, undo takes it back; a poor treasury refuses', () => {
+    const { state, town, village } = pair();
+    village.stock.timber = 1000; village.stock.stone = 1000;
+    const f = state.factions[state.playerFaction];
+    f.treasury = 1000;
+    const cost = buildingDef('market').cost!.money!;
+    const inv = applyCommand(state, { type: 'queueBuilding', id: town.id, building: 'market' });
+    expect(f.treasury).toBeCloseTo(1000 - cost, 9);
+    expect(town.build!.paidMoney).toBe(cost);
+    expect(f.year.spent).toBe(cost);
+    const restore = applyCommand(state, inv);
+    expect(f.treasury).toBeCloseTo(1000, 9);
+    expect(f.year.spent).toBe(0);
+    applyCommand(state, restore);
+    expect(f.treasury).toBeCloseTo(1000 - cost, 9);
+    expect(town.build!.paidMoney).toBe(cost);
+    town.build = null;
+    f.treasury = 100;
+    const check = canBuild(state, town, 'market');
+    expect(check.ok).toBe(false);
+    expect(check.reason).toMatch(/treasury lacks 500 coins/);
+    expect(() => applyCommand(state, { type: 'queueBuilding', id: town.id, building: 'market' })).toThrow(/treasury/);
+  });
+});
+
+describe('stockpile caps (DESIGN §4.2, Session 11b)', () => {
+  it('a cluster\'s cap is base + per settlement + its warehouses; the realm cap is flat; caps can be switched off', () => {
+    const { state, town } = pair();
+    const cap = clusterCap(state, town.id);
+    expect(cap.timber).toBe(MATERIALS.cap.base.timber + 2 * MATERIALS.cap.perSettlement.timber);
+    expect(cap.stone).toBe(MATERIALS.cap.base.stone + 2 * MATERIALS.cap.perSettlement.stone);
+    town.buildings.push('warehouse');
+    expect(clusterCap(state, town.id).timber).toBe(cap.timber + buildingDef('warehouse').stockCap!.timber!);
+    expect(realmCap()).toEqual(MATERIALS.realmCap);
+    setStockCaps(false);
+    expect(clusterCap(state, town.id).timber).toBe(Infinity);
+    expect(realmCap().stone).toBe(Infinity);
+  });
+
+  it('what a cluster gathers above its cap flows to the realm each month, proportionally to who holds it; above the realm cap it is lost', () => {
+    const { state, town, village } = pair();
+    // no gathering, so the arithmetic is exact
+    for (let c = 18; c <= 20; c++) for (let r = 14; r <= 16; r++) state.map.terrain[cell(state, c, r)] = G;
+    state.map.resource[cell(state, 18, 15)] = -1;
+    const cap = clusterCap(state, town.id); // 420 timber / 210 stone
+    village.stock.timber = 900; town.stock.timber = 300; // pool 1200 → 780 over
+    village.stock.stone = 100; // under the cap
+    const f = state.factions[state.playerFaction];
+    run(state, 1);
+    const over = 1200 - cap.timber;
+    expect(clusterStock(state, town.id).timber).toBeCloseTo(cap.timber, 6);
+    expect(village.stock.timber).toBeCloseTo(900 - over * 0.75, 6);
+    expect(town.stock.timber).toBeCloseTo(300 - over * 0.25, 6);
+    expect(village.stock.stone).toBe(100);
+    expect(f.stock.timber).toBeCloseTo(over, 6);
+    expect(f.year.overflowIn.timber).toBeCloseTo(over, 6);
+    expect(town.report.overflow).toBeCloseTo(over, 6);
+    expect(town.year.surplusOut).toBeCloseTo(over, 6);
+    // the realm cap
+    f.stock.timber = MATERIALS.realmCap.timber + 500;
+    run(state, 1);
+    expect(f.stock.timber).toBe(MATERIALS.realmCap.timber);
+    expect(f.year.lost.timber).toBeCloseTo(500, 6);
+    // December closes the faction's year
+    run(state, 10);
+    expect(f.lastYear).not.toBeNull();
+    expect(f.lastYear!.lost.timber).toBeCloseTo(500, 6);
+    expect(f.year.months).toBe(0);
+  });
+
+  it('a warehouse lets the cluster keep what would have overflowed', () => {
+    const { state, town, village } = pair();
+    for (let c = 18; c <= 20; c++) for (let r = 14; r <= 16; r++) state.map.terrain[cell(state, c, r)] = G;
+    state.map.resource[cell(state, 18, 15)] = -1;
+    town.buildings.push('warehouse');
+    village.stock.timber = 900; town.stock.timber = 300;
+    run(state, 1);
+    expect(clusterStock(state, town.id).timber).toBeCloseTo(1200, 6);
+    expect(state.factions[state.playerFaction].stock.timber).toBe(0);
+  });
+});
+
+describe('faction stockpile', () => {
   it('transferMaterials ships from the faction stockpile to a settlement, capped at what it holds, and inverts exactly', () => {
     const { state, town } = pair();
     const f = state.factions[state.playerFaction];
@@ -251,46 +377,45 @@ describe('faction surplus', () => {
   });
 });
 
-describe('pull factor', () => {
-  function withPull(vacancies: boolean) {
-    setNoise({ ...NO_NOISE, trickleShare: 0.04, trickleMinIdle: 0.15, trickleSpread: 0, trickleRequireFedParent: true, trickleRequireVacancies: vacancies });
+describe('pull factor (on prosperity — Omer, Session 11b)', () => {
+  function withPull(prosperous: boolean) {
+    setNoise({ ...NO_NOISE, trickleShare: 0.04, trickleMinIdle: 0.15, trickleSpread: 0, trickleRequireFedParent: true, trickleRequireProsperous: prosperous, trickleProsperousSpare: 4 });
   }
 
-  it('a town with no vacancies pulls nobody; a hands-short town pulls at most its vacancies', () => {
+  it('a fed town with margin pulls 4 % of the village\'s idle hands with dependants; a town with a thin granary pulls nobody', () => {
     withPull(true);
-    // rich town: 9,000 people on 19 grassland hexes → thousands idle, no vacancies
+    // rich town: 9,000 people on 19 grassland hexes, a full granary after the harvest → prosperous
     const a = pair();
     run(a.state, 12);
-    expect(a.town.report.vacancies).toBe(0);
-    expect(a.village.report.trickleOut).toBe(0);
+    expect(a.town.report.vacancies).toBe(0); // no vacancies — and that no longer matters
+    expect(a.town.food / totalPopulation(a.town.pop) - 9).toBeGreaterThanOrEqual(4);
+    expect(a.village.report.trickleOut).toBeGreaterThan(0);
+    expect(a.town.report.trickleIn).toBeCloseTo(a.village.report.trickleOut, 6);
+    const idle = a.village.report.idleHands, hands = a.village.report.hands;
+    const expected = (0.04 * idle / hands) * (totalPopulation(a.village.pop) + a.village.report.trickleOut);
+    expect(a.village.report.trickleOut).toBeCloseTo(expected, 3);
 
-    // poor town: 1,800 people (≈1,040 hands) with 19 hexes wanting 1,710 field hands → vacancies
-    const b = createGameState('p', createMap(30, 30, G));
-    const town = found(b, 'Smalltown', 'town', 15, 15, 1800);
-    const village = found(b, 'Bigvillage', 'village', 18, 15, 2100);
-    resolveAllParents(b);
-    run(b, 12);
-    expect(town.report.vacancies).toBeGreaterThan(0);
-    const idle = village.report.idleHands, hands = village.report.hands;
-    expect(idle / hands).toBeGreaterThan(0.15);
-    expect(village.report.trickleOut).toBeGreaterThan(0);
-    // the people who moved are 4 % of idle hands with dependants, and no more than the vacancies as hands
-    const movedHands = village.report.trickleOut * (hands / totalPopulation(village.pop) );
-    expect(movedHands).toBeLessThanOrEqual(town.report.vacancies + 1);
-    expect(town.report.trickleIn).toBeCloseTo(village.report.trickleOut, 6);
+    // the same town with its granary emptied in November: fed all year (sufficiency 1) but no margin → nobody moves
+    const b = pair();
+    run(b.state, 11);
+    b.town.food = 9 * totalPopulation(b.town.pop); // exactly enough to reach the harvest: spare 0
+    run(b.state, 1);
+    expect(b.town.report.sufficiency).toBeGreaterThanOrEqual(0.999);
+    expect(b.village.report.trickleOut).toBe(0);
   });
 
-  it('without the vacancies condition the old trickle moves people into a town that has no work for them', () => {
+  it('without the prosperity condition the old trickle moves people into any fed town', () => {
     withPull(false);
-    const { state, town, village } = pair();
-    run(state, 12);
-    expect(town.report.vacancies).toBe(0);
-    expect(village.report.trickleOut).toBeGreaterThan(0);
+    const b = pair();
+    run(b.state, 11);
+    b.town.food = 9 * totalPopulation(b.town.pop);
+    run(b.state, 1);
+    expect(b.village.report.trickleOut).toBeGreaterThan(0);
   });
 });
 
 describe('saves', () => {
-  it('a version-3 save gains stocks and projects; a round trip keeps them', () => {
+  it('a version-3 save gains stocks, projects and faction flows; a round trip keeps them', () => {
     const { state, town, village } = pair();
     village.stock.timber = 1000; village.stock.stone = 500;
     applyCommand(state, { type: 'queueBuilding', id: town.id, building: 'workshop' });
@@ -298,16 +423,20 @@ describe('saves', () => {
     expect(json.version).toBe(STATE_VERSION);
     const back = deserializeState(JSON.stringify(json));
     expect(back.settlements[town.id].build!.building).toBe('workshop');
+    expect(back.settlements[town.id].build!.paidMoney).toBe(buildingDef('workshop').cost!.money);
     expect(back.settlements[village.id].stock.timber).toBe(820);
+    expect(back.factions[back.playerFaction].year.spent).toBe(buildingDef('workshop').cost!.money);
     // an old save (v3): strip the new fields
     json.version = 3;
     for (const s of Object.values(json.settlements) as { stock?: unknown; build?: unknown }[]) { delete s.stock; delete s.build; }
-    for (const f of Object.values(json.factions) as { stock?: unknown }[]) delete f.stock;
+    for (const f of Object.values(json.factions) as { stock?: unknown; year?: unknown; lastYear?: unknown }[]) { delete f.stock; delete f.year; delete f.lastYear; }
     const old = deserializeState(JSON.stringify(json));
     expect(old.version).toBe(STATE_VERSION);
     expect(old.settlements[town.id].stock).toEqual({ timber: 0, stone: 0, goods: 0 });
     expect(old.settlements[town.id].build).toBeNull();
     expect(old.factions[old.playerFaction].stock).toEqual({ timber: 0, stone: 0, goods: 0 });
+    expect(old.factions[old.playerFaction].year.tax).toBe(0);
+    expect(old.factions[old.playerFaction].lastYear).toBeNull();
   });
 
   it('a 20-year run with building and materials is deterministic and conserves people', () => {
@@ -316,12 +445,13 @@ describe('saves', () => {
       village.stock.timber = 5000; village.stock.stone = 5000;
       applyCommand(state, { type: 'queueBuilding', id: town.id, building: 'workshop' });
       run(state, 240);
-      return { pop: totalPopulation(town.pop) + totalPopulation(village.pop), stock: clusterStock(state, town.id), buildings: town.buildings.slice() };
+      return { pop: totalPopulation(town.pop) + totalPopulation(village.pop), stock: clusterStock(state, town.id), buildings: town.buildings.slice(), treasury: state.factions[state.playerFaction].treasury };
     };
     const a = go(), b = go();
     expect(a).toEqual(b);
     expect(a.buildings).toContain('workshop');
     expect(a.pop).toBeGreaterThan(0);
+    expect(a.treasury).toBeGreaterThan(10_000); // twenty years of a town's tax
   });
 });
 

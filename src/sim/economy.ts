@@ -1,10 +1,13 @@
 // Economy, Phase 1: the food loop (DESIGN §4.2), materials and buildings
-// (Session 11) and migration (DESIGN §4.1).
+// (Session 11), the private economy (DESIGN §4.2b, Session 12) and migration (DESIGN §4.1).
 // Runs once per month for every settlement, in this order:
 //   plan labour (buildings first, then fields best-per-hand first; the rest are
-//   SPARE hands, who build the current project and then gather timber and stone)
+//   SPARE hands in a village — PRIVATE hands in a town or above — who build the
+//   current project and then gather timber and stone; the private hands left
+//   over pay tax and make goods by themselves)
 //   → produce food (harvest timing, building effects) → tithe up → consume (+ hunger)
-//   → gather materials, make and sell goods, advance construction → spoil & cap
+//   → gather materials, tax, make and sell goods, advance construction → spoil & cap
+//   → clusters overflow their stockpile caps to the realm (which overflows to loss)
 //   → share surplus up to the parent (villages first, then towns)
 //   → migrate idle hands from a hungry settlement to its parent.
 // Every number comes from data/economy.json, data/buildings.json and data/demography.json.
@@ -20,9 +23,10 @@ import {
 } from './settlements';
 import { logEvent } from './state';
 import { isFishable, isShore } from './water';
-import { MATERIALS, surplusShare, clusterStock, takeFromCluster, emptyMaterials, type Materials } from './materials';
+import { MATERIALS, MATERIAL_IDS, clusterStock, clusterCap, realmCap, takeFromCluster, emptyMaterials, type Materials } from './materials';
 import { sumEffects, hasStone, type BuildingEffects } from './buildings';
 import { clustersOf } from './clusters';
+import { emptyFactionYear } from './factions';
 export { isShore };
 import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate, granaryBrakeFactor } from './demography';
 import { seedRng, nextFloat, nextGaussian, nextU32 } from './rng';
@@ -36,6 +40,19 @@ export function titheShare(): number {
 }
 export function setTitheShare(x: number): void {
   (ECONOMY.sharing as { titheShare?: number }).titheShare = x;
+}
+
+/** The private economy (DESIGN §4.2b, DECIDED 2026-11-05) — data/economy.json `privateEconomy`, read live. */
+type PrivateEconomyData = { appliesTo: string[]; taxPerHandPerYear: number; goodsPerHandPerYear: number; salesSharePerYear: number; goodsPrice: number };
+export const PRIVATE: PrivateEconomyData = (economyData as unknown as { privateEconomy: PrivateEconomyData }).privateEconomy;
+export function hasPrivateEconomy(tierId: string): boolean {
+  return PRIVATE.appliesTo.includes(tierId);
+}
+export function taxRate(): number {
+  return PRIVATE.taxPerHandPerYear;
+}
+export function setTaxRate(x: number): void {
+  PRIVATE.taxPerHandPerYear = x;
 }
 
 const FISH_RES = RESOURCES.findIndex((r) => r.id === 'fish');
@@ -127,8 +144,21 @@ export interface LabourPlan {
   constructionFraction: number;
   gather: StaffedGatherJob[];
   gatherHands: number;
-  /** hands the buildings, fields and construction could use but the settlement does not have (the pull factor's "jobs") */
+  /** hands the buildings, fields and construction could use but the settlement does not have (shown in the panel) */
   vacancies: number;
+  /** Session 12 (DESIGN §4.2b): the private economy of a town, city or metropolis (all zero in a village) */
+  privateHands: number;
+  /** private hands actually paying tax and making goods this month (not on the site, not gathering) */
+  taxableHands: number;
+  /** administration quality 0–1: the hall's staffing (institutions, policy and order later) */
+  adminQuality: number;
+  /** coins and goods the private hands yield at this plan, per year */
+  taxPerYear: number;
+  goodsPerYear: number;
+  /** coins per year forgone because private hands are building or gathering */
+  taxLostPerYear: number;
+  /** share of the cluster's goods this settlement sells per year (0 in a village) */
+  salesSharePerYear: number;
 }
 
 /**
@@ -142,7 +172,7 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
   let left = hands;
   let vacancies = 0;
   const buildings: StaffedBuilding[] = [];
-  let granaryStaffing = 0;
+  let granaryStaffing = 0, hallStaffing = 1;
   for (const id of s.buildings) {
     const def = buildingDef(id);
     const got = Math.min(left, def.hands);
@@ -151,6 +181,7 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
     const fraction = def.hands > 0 ? got / def.hands : 1;
     buildings.push({ id, hands: got, fraction });
     if (def.family === 'granary') granaryStaffing = fraction;
+    if (def.family === 'hall') hallStaffing = fraction;
   }
   const staffedHands = hands - left;
   const effects = sumEffects(buildings);
@@ -193,14 +224,26 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
     gatherHands += got;
     gather.push({ ...g, fraction: g.hands > 0 ? got / g.hands : 0 });
   }
-  return { hands, buildings, staffedHands, jobs: staffed, fieldHands, idleHands, landCapacity, plannedPerYear, granaryStaffing, effects, constructionHands, constructionFraction, gather, gatherHands, vacancies };
+
+  // the private economy (DESIGN §4.2b): in a town or above the spare hands are private hands; those not drawn
+  // to the site or to gathering pay tax and make goods, scaled by administration quality (the hall's staffing)
+  const priv = hasPrivateEconomy(TIERS[s.tier].id);
+  const privateHands = priv ? idleHands : 0;
+  const taxableHands = priv ? Math.max(0, idleHands - constructionHands - gatherHands) : 0;
+  const adminQuality = hallStaffing;
+  const taxPerYear = taxableHands * PRIVATE.taxPerHandPerYear * adminQuality;
+  const taxLostPerYear = priv ? (privateHands - taxableHands) * PRIVATE.taxPerHandPerYear * adminQuality : 0;
+  const goodsPerYear = taxableHands * PRIVATE.goodsPerHandPerYear * adminQuality * effects.goodsMult;
+  const salesSharePerYear = priv ? PRIVATE.salesSharePerYear + effects.salesShareBonus : 0;
+  return { hands, buildings, staffedHands, jobs: staffed, fieldHands, idleHands, landCapacity, plannedPerYear, granaryStaffing, effects, constructionHands, constructionFraction, gather, gatherHands, vacancies,
+    privateHands, taxableHands, adminQuality, taxPerYear, goodsPerYear, taxLostPerYear, salesSharePerYear };
 }
 
-/** Materials gathered this month by a labour plan (units per year / 12). */
+/** Materials gathered and goods made this month by a labour plan (units per year / 12). */
 export function monthlyMaterials(plan: LabourPlan): Materials {
   const out = emptyMaterials();
   for (const g of plan.gather) out[g.kind] += (g.perYear * g.fraction) / 12;
-  out.goods += plan.effects.goodsPerYear / 12;
+  out.goods += plan.goodsPerYear / 12;
   return out;
 }
 
@@ -321,6 +364,8 @@ export function economyMonth(state: GameState, month: number): void {
     r.constructionHands = plan.constructionHands;
     r.gatherHands = plan.gatherHands;
     r.vacancies = plan.vacancies;
+    r.privateHands = plan.privateHands;
+    r.adminQuality = plan.adminQuality;
 
     r.produced = monthlyProduction(plan, month, s.harvestFactor);
     s.food += r.produced;
@@ -356,20 +401,25 @@ export function economyMonth(state: GameState, month: number): void {
     s.yearMonths += 1;
     s.yearSufficiency += 1 - r.shortfall;
 
-    // materials (Session 11): spare hands gather timber and stone; workshops make goods; markets sell them
+    // materials (Session 11): spare hands gather timber and stone; the private hands make goods (Session 12)
     const made = monthlyMaterials(plan);
     s.stock.timber += made.timber; s.stock.stone += made.stone; s.stock.goods += made.goods;
     r.timber = made.timber; r.stone = made.stone; r.goods = made.goods;
-    if (plan.effects.sellsGoodsPerYear > 0) {
-      const f = s.faction ? state.factions[s.faction] : undefined;
-      if (f) {
-        const want = plan.effects.sellsGoodsPerYear / 12;
+    // the private economy (DESIGN §4.2b): tax into the faction treasury; a share of the cluster's goods sold
+    const f = s.faction ? state.factions[s.faction] : undefined;
+    if (f && plan.privateHands > 0) {
+      r.tax = plan.taxPerYear / 12;
+      r.taxLost = plan.taxLostPerYear / 12;
+      f.treasury += r.tax;
+      f.year.tax += r.tax;
+      if (plan.salesSharePerYear > 0) {
         const have = clusterStock(state, s.id).goods;
-        const sell = Math.min(want, have);
-        if (sell > 0) {
+        const sell = Math.min(have, have * plan.salesSharePerYear / 12);
+        if (sell > 1e-9) {
           const taken = takeFromCluster(state, s.id, { goods: sell });
-          f.treasury += taken.goods * plan.effects.goodsPrice;
-          r.sold = taken.goods * plan.effects.goodsPrice;
+          r.sold = taken.goods * PRIVATE.goodsPrice;
+          f.treasury += r.sold;
+          f.year.sales += r.sold;
         }
       }
     }
@@ -393,6 +443,29 @@ export function economyMonth(state: GameState, month: number): void {
       s.food = r.capacity;
     }
     s.report = r;
+  }
+
+  // stockpile caps (DESIGN §4.2, Session 12): what a cluster holds above its cap flows to the realm stockpile
+  // (taken from the members in proportion to what each holds); what the realm holds above its cap is lost
+  for (const c of clustersOf(state)) {
+    const f = c.faction ? state.factions[c.faction] : undefined;
+    const pool = clusterStock(state, c.root);
+    const cap = clusterCap(state, c.root);
+    const want: Partial<Materials> = {};
+    let any = false;
+    for (const m of MATERIAL_IDS) if (pool[m] > cap[m] + 1e-9) { want[m] = pool[m] - cap[m]; any = true; }
+    if (!any) continue;
+    const taken = takeFromCluster(state, c.root, want);
+    const total = taken.timber + taken.stone + taken.goods;
+    if (total <= 0) continue;
+    state.settlements[c.root].report.overflow += total;
+    state.settlements[c.root].year.surplusOut += total;
+    if (f) { for (const m of MATERIAL_IDS) { f.stock[m] += taken[m]; f.year.overflowIn[m] += taken[m]; } }
+  }
+  const rcap = realmCap();
+  for (const f of Object.values(state.factions)) {
+    for (const m of MATERIAL_IDS) if (f.stock[m] > rcap[m]) { f.year.lost[m] += f.stock[m] - rcap[m]; f.stock[m] = rcap[m]; }
+    f.year.months += 1;
   }
 
   // share surplus up (villages first, then towns, so a chain works in one month)
@@ -438,6 +511,7 @@ export function economyMonth(state: GameState, month: number): void {
     y.sent += r.sent; y.received += r.received; y.titheOut += r.titheOut; y.titheIn += r.titheIn;
     y.migrantsOut += r.migrantsOut; y.migrantsIn += r.migrantsIn;
     y.timber += r.timber; y.stone += r.stone; y.goods += r.goods; y.sold += r.sold;
+    y.tax += r.tax; y.taxLost += r.taxLost;
     y.months += 1;
   }
 }
@@ -492,26 +566,28 @@ export function demographyYear(state: GameState): void {
     s.yearMonths = 0;
     s.yearSufficiency = 0;
   }
-  // the PULL FACTOR (DESIGN §4.1, Session 11; formerly the migration trickle): idle hands above the
-  // threshold drift to a fed parent that has WORK for them — never more than its vacancies — with dependants
+  // the PULL FACTOR (DESIGN §4.1, Session 11; condition revised Session 11b): idle hands above the threshold
+  // drift, with dependants, to a parent that is PROSPEROUS — fully fed this year and fed with margin (spare
+  // months at the next harvest ≥ the threshold, the granary brake's measure). Spare months are reckoned on the
+  // parent's stock before anyone moves, so every subordinate sees the same parent.
   for (const s of list) s.report.trickleOut = s.report.trickleIn = 0;
   if (k.trickleShare > 0) {
-    const vacanciesLeft = new Map<string, number>();
+    const prosperous = new Map<string, boolean>();
+    for (const p of list) {
+      const need = monthlyNeed(p);
+      const spare = (need > 0 ? p.food / need : 0) - monthsUntilHarvest(DEMOGRAPHY_YEAR_MONTH);
+      prosperous.set(p.id, spare >= k.trickleProsperousSpare);
+    }
     for (const s of settlementsByRank(state)) {
       if (!s.parent) continue;
       const p = state.settlements[s.parent];
       if (!p) continue;
       if (k.trickleRequireFedParent && p.report.sufficiency < 0.999) continue;
+      if (k.trickleRequireProsperous && !prosperous.get(p.id)) continue;
       const hands = s.report.hands, idle = s.report.idleHands;
       if (hands <= 0 || idle / hands <= k.trickleMinIdle) continue;
       const jitter = k.trickleSpread > 0 ? 1 + k.trickleSpread * (2 * nextFloat(state.rng) - 1) : 1;
-      let movingHands = Math.min(idle, idle * k.trickleShare * jitter);
-      if (k.trickleRequireVacancies) {
-        const room = vacanciesLeft.get(p.id) ?? p.report.vacancies;
-        movingHands = Math.min(movingHands, room);
-        if (movingHands <= 0) continue;
-        vacanciesLeft.set(p.id, room - movingHands);
-      }
+      const movingHands = Math.min(idle, idle * k.trickleShare * jitter);
       const slice = takeSlice(s.pop, movingHands / hands);
       const n = totalPopulation(slice);
       addPopulation(p.pop, slice);
@@ -519,26 +595,10 @@ export function demographyYear(state: GameState): void {
       p.report.trickleIn += n;
     }
   }
-  // materials surplus (DESIGN §4.2, Session 11): each cluster keeps its reserve and sends a share of the
-  // rest to the faction stockpile, taken from the members in proportion to what each holds
-  const share = surplusShare();
-  if (share > 0) {
-    for (const c of clustersOf(state)) {
-      const f = c.faction ? state.factions[c.faction] : undefined;
-      if (!f) continue;
-      const pool = clusterStock(state, c.root);
-      const want: Partial<Materials> = {};
-      for (const m of ['timber', 'stone', 'goods'] as const) {
-        const excess = pool[m] - (MATERIALS.reserve[m] ?? 0);
-        if (excess > 0) want[m] = excess * share;
-      }
-      const taken = takeFromCluster(state, c.root, want);
-      const total = taken.timber + taken.stone + taken.goods;
-      if (total > 0) {
-        f.stock.timber += taken.timber; f.stock.stone += taken.stone; f.stock.goods += taken.goods;
-        state.settlements[c.root].year.surplusOut += total;
-      }
-    }
+  // close the factions' calendar year (Session 12): tax, sales, spending, overflow, losses
+  for (const f of Object.values(state.factions)) {
+    f.lastYear = f.year;
+    f.year = emptyFactionYear();
   }
   for (const s of list) {
     s.popHistory.push(totalPopulation(s.pop));

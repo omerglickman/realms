@@ -10,7 +10,7 @@ import { TIERS, type Settlement, type YearTotals } from '../../sim/settlements';
 import { totalPopulation } from '../../sim/demography';
 import { type Cluster, type ClusterNode, clustersOf, realmReport } from '../../sim/clusters';
 import { foodMonths, materialsText, projectText } from './settlementPanel';
-import { clusterStock, MATERIALS, surplusShare, type Materials } from '../../sim/materials';
+import { clusterStock, clusterCap, realmCap, MATERIAL_IDS, type Materials } from '../../sim/materials';
 
 const fmt = (n: number): string => Math.round(n).toLocaleString('en-US');
 const esc = (x: string) => x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -59,6 +59,11 @@ function yearText(y: YearTotals, population: number, partial: boolean): string {
   return bits.join(', ') + (partial ? ` <span class="dim">· ${y.months} month${y.months === 1 ? '' : 's'} so far</span>` : '');
 }
 
+/** "1,200 / 5,220 timber · 0 / 2,610 stone · 480 / 2,610 goods" */
+function stockVsCap(stock: Materials, cap: Materials): string {
+  return MATERIAL_IDS.map((k) => `${fmt(stock[k])}<span class="dim"> / ${Number.isFinite(cap[k]) ? fmt(cap[k]) : '∞'}</span> ${k}`).join(' · ');
+}
+
 function memberRow(state: GameState, node: ClusterNode, depth: number): string {
   const s = state.settlements[node.id];
   const pop = totalPopulation(s.pop);
@@ -68,6 +73,10 @@ function memberRow(state: GameState, node: ClusterNode, depth: number): string {
   const proj = s.build ? ` <span class="dim" title="${esc(projectText(s) ?? '')}">⚒</span>` : '';
   const row = `<div class="member d${depth}"><a href="#" data-focus="${s.id}">${esc(s.name)}</a> <span class="dim">${TIERS[s.tier].name.toLowerCase()} · ${fmt(pop)} · ${months.toFixed(1)} mo${extra}</span>${proj}${warn}</div>`;
   return row + node.children.map((c) => memberRow(state, c, depth + 1)).join('');
+}
+
+function privateHandsOf(state: GameState, members: Settlement[]): number {
+  return members.reduce((t, m) => t + m.report.privateHands, 0);
 }
 
 /** Fill the panel with a cluster. */
@@ -82,7 +91,8 @@ export function renderClusterPanel(root: HTMLElement, state: GameState, c: Clust
     ['Granaries', `${months.toFixed(1)} months of food in all <span class="dim">(${fmt(t.food)})</span>`],
     ['Last year', t.lastYear ? yearText(t.lastYear, t.population, false) : '<span class="dim">no year-end yet</span>'],
     ['This year', t.year.months > 0 ? yearText(t.year, t.population, true) : '<span class="dim">nothing yet</span>'],
-    ['Stockpile', `${materialsText(clusterStock(state, c.root), true)}` + (t.year.timber + t.year.stone + t.year.goods > 0.5 ? ` <span class="dim">· gathered this year +${materialsText({ timber: t.year.timber, stone: t.year.stone, goods: t.year.goods })}${t.year.sold > 0.5 ? `, sold goods for ${fmt(t.year.sold)}` : ''}</span>` : '') + (t.lastYear && t.lastYear.surplusOut > 0.5 ? ` <span class="dim">· ${fmt(t.lastYear.surplusOut)} sent to the realm last December</span>` : '')],
+    ['Stockpile', `${stockVsCap(clusterStock(state, c.root), clusterCap(state, c.root))}` + (t.year.timber + t.year.stone + t.year.goods > 0.5 ? ` <span class="dim">· this year +${materialsText({ timber: t.year.timber, stone: t.year.stone, goods: t.year.goods })}${t.year.sold > 0.5 ? `, sold goods for ${fmt(t.year.sold)}` : ''}</span>` : '') + (t.year.surplusOut > 0.5 ? ` <span class="dim">· ${fmt(t.year.surplusOut)} overflowed to the realm this year</span>` : '')],
+    ...(t.year.tax > 0.5 || (t.lastYear && t.lastYear.tax > 0.5) ? [['Tax', `${fmt(privateHandsOf(state, members))} private hands · ${fmt(t.year.tax)} coins this year` + (t.lastYear ? ` <span class="dim">· ${fmt(t.lastYear.tax)} last year</span>` : '') + (t.year.taxLost > 0.5 ? ` <span class="dim">· ${fmt(t.year.taxLost)} forgone to building and gathering</span>` : '')] as [string, string]] : []),
   ];
   if (t.hungerDeathsLastMonth > 0.5) rows.push(['Last month', `<b class="warn">${fmt(t.hungerDeathsLastMonth)} starved</b>`]);
   root.innerHTML = `
@@ -113,8 +123,9 @@ export function renderRealmPanel(root: HTMLElement, state: GameState, host: Clus
     ['Granaries', `${months.toFixed(1)} months of food in all <span class="dim">(${fmt(r.food)})</span>`],
     ['Last year', r.lastYear ? yearText(r.lastYear, r.population, false) : '<span class="dim">no year-end yet</span>'],
     ['This year', r.year.months > 0 ? yearText(r.year, r.population, true) : '<span class="dim">nothing yet</span>'],
-    ['Realm stockpile', faction ? `${materialsText(faction.stock, true)} <span class="dim">· ${Math.round(100 * surplusShare())} % of every cluster's surplus above ${MATERIALS.reserve.timber} timber / ${MATERIALS.reserve.stone} stone arrives each December</span>` : '—'],
-    ['Treasury', faction ? `${fmt(faction.treasury)} coins <span class="dim">(from markets; nothing to spend them on yet)</span>` : '—'],
+    ['Realm stockpile', faction ? `${stockVsCap(faction.stock, realmCap())} <span class="dim">· what the clusters hold above their caps flows here; above the realm's cap it is lost</span>` + (() => { const y = faction.year, ly = faction.lastYear; const inY = y.overflowIn.timber + y.overflowIn.stone + y.overflowIn.goods; const lostY = y.lost.timber + y.lost.stone + y.lost.goods; const lostL = ly ? ly.lost.timber + ly.lost.stone + ly.lost.goods : 0; return (inY > 0.5 ? ` <span class="dim">· +${fmt(inY)} arrived this year</span>` : '') + (lostY > 0.5 ? ` <span class="warn">· ${fmt(lostY)} lost this year</span>` : '') + (lostL > 0.5 ? ` <span class="dim">· ${fmt(lostL)} lost last year</span>` : ''); })() : '—'],
+    ['Treasury', faction ? `<b>${fmt(faction.treasury)} coins</b> <span class="dim">· this year +${fmt(faction.year.tax)} tax, +${fmt(faction.year.sales)} sales, −${fmt(faction.year.spent)} on buildings</span>` + (faction.lastYear ? ` <span class="dim">· last year +${fmt(faction.lastYear.tax)} tax, +${fmt(faction.lastYear.sales)} sales, −${fmt(faction.lastYear.spent)} spent</span>` : '') : '—'],
+    ['Tax base', `${fmt(privateHandsOf(state, members))} private hands in towns and cities <span class="dim">· the private economy (DESIGN §4.2b): artisans, labourers and traders the crown taxes; building, levies and settlers draw on them</span>`],
   ];
   const clusterRows = r.clusters.map((c) => {
     const rs = state.settlements[c.root];

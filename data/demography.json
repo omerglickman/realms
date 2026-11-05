@@ -36,12 +36,13 @@
     "idleHandsSharePerMonth": 0.10,
     "triggerSafetyMonths": 0,
     "trickle": {
-      "_comment": "The PULL FACTOR (DESIGN §4.1, DECIDED by Omer 2026-11-05, Session 11; turned back on at 0.04 with the vacancies condition). The countryside feeds the town people as well as grain. Once a year (December) a settlement whose idle hands exceed minIdleShare of its hands sends sharePerYear of its idle hands, with dependants, to its parent — but only if the parent was fully fed that year (requireFedParent) AND has work for them (requireVacancies): the parent's VACANCIES are the hands its buildings, fields and construction could use but it does not have (gathering is what spare hands do, so it creates no vacancy); never more people move than the vacancies can absorb. spread randomizes the share by ±spread (0.5 → 50 %–150 % of sharePerYear). sharePerYear 0 turns it off.",
+      "_comment": "The PULL FACTOR (DESIGN §4.1, DECIDED by Omer 2026-11-05, Session 11; condition REVISED by Omer in Session 11b). The countryside feeds the town people as well as grain. Once a year (December) a settlement whose idle hands exceed minIdleShare of its hands sends sharePerYear of its idle hands, with dependants, to its parent — but only if the parent is PROSPEROUS: fully fed that year (requireFedParent) and fed with margin (requireProsperous: its spare months at the next harvest — December stock in months minus the 9 months to September, the granary brake's measure — are at least prosperousSpareMonths). People moved to towns because towns were prosperous, not because the crown had a job open (the Session 11 'vacancies' condition never fired and was dropped). spread randomizes the share by ±spread (0.5 → 50 %–150 % of sharePerYear). sharePerYear 0 turns it off.",
       "sharePerYear": 0.04,
       "minIdleShare": 0.15,
       "spread": 0.5,
       "requireFedParent": true,
-      "requireVacancies": true
+      "requireProsperous": true,
+      "prosperousSpareMonths": 4
     }
   },
   "noise": {

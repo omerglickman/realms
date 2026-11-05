@@ -39,12 +39,20 @@ export interface BuildCheck {
   reason?: string;
   /** what the cluster lacks (zeros when affordable) */
   lacking?: Materials;
+  /** coins the treasury lacks (Session 11b) */
+  lackingMoney?: number;
+}
+
+/** The money a building costs (0 when free). */
+export function moneyCost(def: BuildingDef): number {
+  return def.cost?.money ?? 0;
 }
 
 /**
  * May `s` queue `buildingId` now? Checks tier, duplicates, a project already
- * running, the required hex among the worked cells, and the cluster's stock.
- * `worked` may be passed to avoid recomputing the work assignment.
+ * running, the required hex among the worked cells, the cluster's stock and the
+ * faction's treasury (Session 11b). `worked` may be passed to avoid recomputing
+ * the work assignment.
  */
 export function canBuild(state: GameState, s: Settlement, buildingId: string, worked?: number[]): BuildCheck {
   const def = buildingDef(buildingId);
@@ -64,6 +72,12 @@ export function canBuild(state: GameState, s: Settlement, buildingId: string, wo
     const lack = shortfall(pool, def.cost);
     return { ok: false, reason: `the cluster lacks ${(['timber', 'stone', 'goods'] as const).filter((k) => lack[k] > 0).map((k) => `${Math.ceil(lack[k])} ${k}`).join(', ')}`, lacking: lack };
   }
+  const money = moneyCost(def);
+  if (money > 0) {
+    const f = s.faction ? state.factions[s.faction] : undefined;
+    const have = f?.treasury ?? 0;
+    if (have + 1e-9 < money) return { ok: false, reason: `the treasury lacks ${Math.ceil(money - have)} coins`, lackingMoney: money - have };
+  }
   return { ok: true };
 }
 
@@ -73,14 +87,14 @@ export interface BuildingEffects {
   fishingMult: number;
   granaryExtraMonths: number;
   granarySpoilageMult: number;
-  goodsPerYear: number;
-  sellsGoodsPerYear: number;
-  goodsPrice: number;
+  /** Session 11b: multiplier on the goods the private hands make (Workshop) and the extra share of the cluster's goods sold a year (Market) */
+  goodsMult: number;
+  salesShareBonus: number;
   order: number;
 }
 
 export function sumEffects(staffed: { id: string; fraction: number }[]): BuildingEffects {
-  const e: BuildingEffects = { farmingMult: 1, fishingMult: 1, granaryExtraMonths: 0, granarySpoilageMult: 1, goodsPerYear: 0, sellsGoodsPerYear: 0, goodsPrice: 1, order: 0 };
+  const e: BuildingEffects = { farmingMult: 1, fishingMult: 1, granaryExtraMonths: 0, granarySpoilageMult: 1, goodsMult: 1, salesShareBonus: 0, order: 0 };
   for (const b of staffed) {
     const def = buildingDef(b.id);
     const f = b.fraction;
@@ -89,8 +103,8 @@ export function sumEffects(staffed: { id: string; fraction: number }[]): Buildin
     if (x.fishingBonus) e.fishingMult += x.fishingBonus * f;
     if (x.granaryCapacityMonths) e.granaryExtraMonths += x.granaryCapacityMonths * f;
     if (x.granarySpoilageMult !== undefined) e.granarySpoilageMult *= 1 - (1 - x.granarySpoilageMult) * f;
-    if (x.goodsPerYear) e.goodsPerYear += x.goodsPerYear * f;
-    if (x.sellsGoodsPerYear) { e.sellsGoodsPerYear += x.sellsGoodsPerYear * f; if (x.goodsPrice) e.goodsPrice = x.goodsPrice; }
+    if (x.goodsMult) e.goodsMult += x.goodsMult * f;
+    if (x.salesShareBonus) e.salesShareBonus += x.salesShareBonus * f;
     if (x.order) e.order += x.order * f;
   }
   return e;

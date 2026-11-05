@@ -205,11 +205,12 @@ describe('with every knob on', () => {
     const d = JSON.parse(JSON.stringify(require('../data/demography.json')));
     const e = JSON.parse(JSON.stringify(require('../data/economy.json')));
     // Omer's decisions of 2026-11-05: sampling on, epidemics 1 %, harvest sd 0.125; the trickle is back on
-    // at 0.04 as the PULL FACTOR (Session 11) and only moves people into vacancies
+    // at 0.04 as the PULL FACTOR (Session 11) and only moves people to a prosperous parent (Session 11b)
     expect(d.noise.vitalSampling).toBe(1);
     expect(d.noise.epidemic.chancePerYear).toBe(0.01);
     expect(d.migration.trickle.sharePerYear).toBe(0.04);
-    expect(d.migration.trickle.requireVacancies).toBe(true);
+    expect(d.migration.trickle.requireProsperous).toBe(true);
+    expect(d.migration.trickle.prosperousSpareMonths).toBe(4);
     expect(e.farming.harvest.variance.sd).toBe(0.125);
     expect(noise().vitalSampling).toBe(0); // the test override is in force
   });

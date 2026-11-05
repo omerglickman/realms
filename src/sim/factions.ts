@@ -14,6 +14,25 @@ export interface FactionDef {
   player: boolean;
 }
 
+/** The faction's money and materials flows over a calendar year (Session 11b; reset each December into lastYear). */
+export interface FactionYear {
+  /** coins from private hands (DESIGN §4.2b) */
+  tax: number;
+  /** coins from goods sold */
+  sales: number;
+  /** coins paid for buildings (net of refunds) */
+  spent: number;
+  /** materials that overflowed cluster caps into the realm stockpile */
+  overflowIn: Materials;
+  /** materials lost above the realm cap */
+  lost: Materials;
+  months: number;
+}
+
+export function emptyFactionYear(): FactionYear {
+  return { tax: 0, sales: 0, spent: 0, overflowIn: emptyMaterials(), lost: emptyMaterials(), months: 0 };
+}
+
 /** Live faction state (plain JSON in GameState). */
 export interface Faction {
   id: string;
@@ -21,10 +40,13 @@ export interface Faction {
   color: string;
   culture: string | null;
   player: boolean;
-  /** money (DESIGN §4.2); filled by markets (Session 11), nothing to spend it on yet */
+  /** money (DESIGN §4.2): tax on private hands and goods sold (Session 11b); pays for buildings */
   treasury: number;
-  /** the faction's central materials stockpile (DESIGN §4.2, Session 11): the clusters' yearly surplus, shipped by the player */
+  /** the faction's central materials stockpile (DESIGN §4.2): what overflows the clusters' caps, shipped by the player */
   stock: Materials;
+  /** this calendar year's flows and the last finished year's (Session 11b) */
+  year: FactionYear;
+  lastYear: FactionYear | null;
 }
 
 export const FACTION_DEFS: readonly FactionDef[] = factionData.factions as FactionDef[];
@@ -39,7 +61,7 @@ export function factionDef(id: string): FactionDef {
 /** The starting faction record for a new game: every faction in the data file. */
 export function initialFactions(): Record<string, Faction> {
   const out: Record<string, Faction> = {};
-  for (const d of FACTION_DEFS) out[d.id] = { ...d, treasury: 0, stock: emptyMaterials() };
+  for (const d of FACTION_DEFS) out[d.id] = { ...d, treasury: 0, stock: emptyMaterials(), year: emptyFactionYear(), lastYear: null };
   return out;
 }
 

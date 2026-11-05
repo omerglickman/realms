@@ -19,11 +19,12 @@ export interface NoiseKnobs {
   trickleMinIdle: number;
   trickleSpread: number;
   trickleRequireFedParent: boolean;
-  /** Session 11: the parent must have vacancies (work) and takes no more people than it can employ */
-  trickleRequireVacancies: boolean;
+  /** Session 11b: the parent must be PROSPEROUS — fed with margin: spare months at the next harvest ≥ trickleProsperousSpare */
+  trickleRequireProsperous: boolean;
+  trickleProsperousSpare: number;
 }
 
-type D = { noise?: { vitalSampling?: number; epidemic?: { chancePerYear: number; deathMultiplier: number } }; migration: { trickle?: { sharePerYear: number; minIdleShare: number; spread: number; requireFedParent: boolean; requireVacancies?: boolean } } };
+type D = { noise?: { vitalSampling?: number; epidemic?: { chancePerYear: number; deathMultiplier: number } }; migration: { trickle?: { sharePerYear: number; minIdleShare: number; spread: number; requireFedParent: boolean; requireProsperous?: boolean; prosperousSpareMonths?: number } } };
 type E = { farming: { harvest: { variance?: { sd: number; regionalShare: number; regionSize: number; minFactor: number } } } };
 
 const d = demographyData as unknown as D;
@@ -45,7 +46,8 @@ export function noise(): NoiseKnobs {
     trickleMinIdle: t?.minIdleShare ?? 0,
     trickleSpread: t?.spread ?? 0,
     trickleRequireFedParent: t?.requireFedParent ?? true,
-    trickleRequireVacancies: t?.requireVacancies ?? false,
+    trickleRequireProsperous: t?.requireProsperous ?? false,
+    trickleProsperousSpare: t?.prosperousSpareMonths ?? 4,
   };
 }
 
@@ -67,7 +69,8 @@ export function setNoise(k: Partial<NoiseKnobs>): NoiseKnobs {
   if (k.trickleMinIdle !== undefined) d.migration.trickle.minIdleShare = k.trickleMinIdle;
   if (k.trickleSpread !== undefined) d.migration.trickle.spread = k.trickleSpread;
   if (k.trickleRequireFedParent !== undefined) d.migration.trickle.requireFedParent = k.trickleRequireFedParent;
-  if (k.trickleRequireVacancies !== undefined) d.migration.trickle.requireVacancies = k.trickleRequireVacancies;
+  if (k.trickleRequireProsperous !== undefined) d.migration.trickle.requireProsperous = k.trickleRequireProsperous;
+  if (k.trickleProsperousSpare !== undefined) d.migration.trickle.prosperousSpareMonths = k.trickleProsperousSpare;
   return prev;
 }
 
@@ -75,5 +78,5 @@ export function setNoise(k: Partial<NoiseKnobs>): NoiseKnobs {
 export const NO_NOISE: NoiseKnobs = {
   vitalSampling: 0, epidemicChance: 0, epidemicDeathMultiplier: 1,
   harvestSd: 0, harvestRegionalShare: 0, harvestRegionSize: 1, harvestMinFactor: 0.3,
-  trickleShare: 0, trickleMinIdle: 0, trickleSpread: 0, trickleRequireFedParent: true, trickleRequireVacancies: false,
+  trickleShare: 0, trickleMinIdle: 0, trickleSpread: 0, trickleRequireFedParent: true, trickleRequireProsperous: false, trickleProsperousSpare: 4,
 };
