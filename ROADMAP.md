@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.4b — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–3 done)**
+**Version 0.4c — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–4 done)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -152,7 +152,7 @@ A chat devoted to DESIGN §4.3: government forms, the institution list and prere
 
 Goal: a living economy with no enemies.
 
-Progress: **Session 5 (2026-11-04)** — design decisions (zones, tiers incl. metropolis, contested hexes, water hexes, staffed buildings, migration) recorded in DESIGN v0.3; `demography.ts`, `economy.ts`, `settlements.ts`, four data files, `foundSettlement` command, headless scenario `npm run sim -- --scenario phase1`, 20 new tests. Remaining: factions data, settlements on the map + editor placement + zones drawn, panels, end-turn in the UI, buildings with effects, tuning. **Session 6 (2026-11-04)** — model scale ×3 applied (DESIGN §5.8) with a scale-invariance test. **Session 7 (2026-11-05)** — settlements placeable in the editor, zones drawn, hover + panel, end turn / run years, scenario files; player faction only (Omer's decision, DESIGN §4.8).
+Progress: **Session 5 (2026-11-04)** — design decisions (zones, tiers incl. metropolis, contested hexes, water hexes, staffed buildings, migration) recorded in DESIGN v0.3; `demography.ts`, `economy.ts`, `settlements.ts`, four data files, `foundSettlement` command, headless scenario `npm run sim -- --scenario phase1`, 20 new tests. Remaining: factions data, settlements on the map + editor placement + zones drawn, panels, end-turn in the UI, buildings with effects, tuning. **Session 6 (2026-11-04)** — model scale ×3 applied (DESIGN §5.8) with a scale-invariance test. **Session 7 (2026-11-05)** — settlements placeable in the editor, zones drawn, hover + panel, end turn / run years, scenario files; player faction only (Omer's decision, DESIGN §4.8). **Session 8 (2026-11-05)** — UI pass: top bar, tabbed editor with Place/Pick, hover card, dotted influence edges, hatched worked hexes, population editing.
 
 Suggested order (each session ends with a build): (1) numbers first — propose the demographic and food model constants to Omer, build `demography.ts` + `economy.ts` in `src/sim` with a headless 20-year village/town/city scenario and a results table, *before any map UI*; (2) settlements and factions as data + on the map, editor placement, influence/work zones drawn; (3) buildings, build queue, panels, end-turn; (4) tuning with Omer against the headless curves.
 
@@ -228,6 +228,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.4c (2026-11-05): Session 8 noted.
 - 0.4b (2026-11-05): Session 7 progress; Phase 1 checklist updated.
 - 0.4a (2026-11-04): Session 6 (×3 scale) noted.
 - 0.4 (2026-11-04): Phase 1 marked in progress with a checklist; Session 5 progress noted.
