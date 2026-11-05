@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3b — 2026-11-04 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3c — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -302,6 +302,14 @@ PROPOSED: a relations value per pair of factions, treaty types (peace, non-aggre
 
 The player controls one faction; the computer controls all others. **The test map starts with 6 factions (DECIDED 2026-11-04)**; until the AI exists only the player's faction acts. PROPOSED: each faction has a *persona* (expansionist, trader, raider, defensive) that weights a utility-based AI. The AI uses the same rules and information as the player as far as practical; any cheat is documented.
 
+**Decisions of 2026-11-05 (Omer):**
+- **Phases 1–3 are built with the player's faction alone.** The other five are added once the mechanics work — same rules, different naming scheme, AI-controlled. Every settlement and unit still carries a faction id from the start so that adding factions later is data, not a rewrite.
+- The six factions are **hand-designed** (names, start positions, starting settlements and their sizes), not generated. Generation may come with the real map generator later.
+- The world has **several culture groups**; factions may share a culture. Culture flavour and naming schemes are to be settled later — not needed for a working game.
+- **Start positions are placed by Omer in the map editor**: the editor must allow placing a settlement, choosing its tier and setting its population (and name). After placing, the engine may be **run forward a few years and the result saved** as the game's starting state, so the opening position is organic rather than freshly founded. *(Implementation note: the map file stays terrain + resources; the start position becomes a separate scenario file — the game state itself, which is already the save format.)*
+- The **player faction is fixed** for now (a start screen can come later).
+- **AI personas** are a Phase 5 question.
+
 ### 4.9 Events — PROPOSED (optional flavour)
 
 A small random-event system: plague, bumper harvest, failed harvest, bandits, a comet, a gifted child born to a character. Cheap to build once the state exists; strong return in flavour.
@@ -316,13 +324,14 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 
 1. **Desert** terrain: yes/no.
 2. Draft yield rows in the terrain table (§3.1) — confirm or change.
-3. Whether the 6 factions are hand-designed (names, start positions) or generated — needed in Phase 1 session 2.
+3. ~~Whether the 6 factions are hand-designed or generated~~ — RESOLVED 2026-11-05: hand-designed; player faction alone until the mechanics work (§4.8). Still OPEN: the culture groups and naming schemes (later).
 4. **Government & Institutions** detailed design — scheduled as a dedicated design session before Phase 2 (§4.3 is a sketch only).
 5. Name of the village hall (placeholder *Moot Hall*; alternatives *Reeve's House*, *Manor*) and of the metropolis hall.
 6. Whether River keeps both farming (600) and fishing (225) — currently yes (§3.1).
 7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
 8. **Tier upgrade thresholds — RESOLVED 2026-11-04 (Omer, late evening); IMPLEMENTED in Session 6 (2026-11-04), proven scale-invariant by `tests/scale.test.ts` and by a row-by-row comparison of the 20-year scenario tables before and after.** The model is linear in population, so **everything scales ×3**: hex yields (people fed per year) and the hands to work them, building hands, settler/scenario populations — curves stay identical with labels ×3. The **town gate stays 1,500 and the city gate stays 6,000**; at ×3 a village plateaus ~2,100 (crosses 1,500 by growth, ~30 years after founding), a town alone levels at ~10,000 and with villages ~18,000 (crosses 6,000 in 25–40 years). The **metropolis gate scales to 36,000** (it was calibrated to the orbit's ceiling: a good site reaches ~31,000 without roads). Tier population ranges in §3.3 become typical sizes, not gates. All later unit/settler sizes are written at the ×3 scale; `data/economy.json` carries `modelScale: 3`.
 
+Resolved 2026-11-05: factions hand-designed; build with the player faction alone through Phase 3; start positions placed in the editor with tier and population, optionally pre-run for a few years and saved as the starting state; player faction fixed; culture groups exist but are defined later; personas in Phase 5.
 Resolved 2026-11-04 (Phase 1 design, evening): city influence 5 rings, metropolis from 12,000 with 6 rings (A/B tested); crowding birth penalty 1.0 for villages; migration trigger = forecast of running out before the next harvest.
 Resolved 2026-11-04 (Phase 1 design): work vs influence zones per tier (1/1, 2/3, 2/4 → 2/5 in the evening, metropolis 2/5 → 2/6); contested hexes → higher tier wins; subordination to the parent by influence; metropolis tier; water hexes workable (shore = sea touching land); buildings need hands, every settlement has a hall and a granary; cohort demographic model with the §4.1 starting numbers; food model with the §4.2 starting numbers; migration of 10 % of idle hands/month with dependants to the parent when the settlement forecasts running out before the next harvest; settlers are a player action, never automatic.
 Resolved 2026-11-04: 6 factions on the test map; game = food, furs = trade (both kept); horses via pasture access; offshore fish for ports; terrain yields instead of soil/pasture/timber resources.
@@ -351,6 +360,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3c (2026-11-05): §4.8 — factions hand-designed, player faction alone until mechanics work, start positions via editor + optional pre-run, fixed player faction; §5.3 resolved.
 - 0.3b (2026-11-04, Session 6): model scale ×3 implemented — §3.1 fishing, §3.2 unit sizes, §3.3 gates vs typical sizes and building hands, §4.2 yields, §5.8, glossary.
 - 0.3a (2026-11-04, evening): city 5 rings / metropolis 12,000 @ 6 rings after A/B test; crowding birth penalty for villages; migration trigger by forecast.
 - 0.3 (2026-11-04, Phase 1 design): §3.3 rewritten — work vs influence zones, four tiers incl. metropolis, contested hexes, subordination, staffed buildings (hall + granary); §3.1 water hexes workable; §4.1 cohort model and starting rates, migration; §4.2 food model starting numbers; §5 and glossary updated.

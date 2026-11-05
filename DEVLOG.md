@@ -19,10 +19,10 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 - **Phase 1 scenario results (×3 scale, 2026-11-04):** lone village 900 → 1,244 in 20 y (+1.6 %/y, never hungry); lone town 9,000 → ≈10,070 = its land; city 24,000 alone → ≈10,000 (hunger); city 24,000 + 10 villages of 1,800 → 16,462 (villages 18,000 → 19,007); town 9,000 + 6 villages → 12,437; city 24,000 + 24 villages (G) → 24,945 stable; real map: best site 33,164 at year 20, median site 18,059. (Exactly 3× the Session 5–5c figures.)
 - **Next steps (in order):**
   1. Whenever Omer attaches a newly exported map `.json`: `npm run mapdiff -- <file>`, set `name` "vinral", bump `meta.revision`, commit, rebuild, deliver.
-  2. **Phase 1, session 3 (factions):** `data/factions.json` (6 factions — ask Omer: hand-designed names/positions or generated), faction entity in `GameState`, editor tool to place settlements and assign factions on the test map, influence and work zones drawn, settlement hover/panel showing hands (staffed/field/idle), granary months, parent.
+  2. **Phase 1, session 3 (settlements in the editor, player faction only — Omer 2026-11-05):** `data/factions.json` with just the player faction for now (id, name placeholder, colour) and a minimal faction entity in `GameState`; editor tool to **place a settlement** (tier, population, name) and remove/move it; influence and work zones drawn on the map; settlement hover/panel showing population, hands (staffed/field/idle), granary months, land capacity, parent; **end-turn button** so Omer can watch the economy run; **"run N years" + export the state as a scenario file** (the organic starting position Omer asked for). Deliver and let Omer place his first settlements.
   3. Session 4: end-turn button + yearly reports in the UI; starter buildings with effects; tuning against the headless curves.
 - **Scheduled design sessions:** "Government & Institutions" (DESIGN §4.3) before Phase 2.
-- **Open questions for Omer:** DESIGN.md §5 (desert; draft yield rows; factions hand-designed or generated — being discussed; village/metropolis hall names; river 600+225; metropolis prerequisites).
+- **Open questions for Omer:** DESIGN.md §5 (desert; draft yield rows; culture groups and naming schemes — later; village/metropolis hall names; river 600+225; metropolis prerequisites).
 
 ---
 
@@ -348,3 +348,7 @@ Villages never starve on any site; migration is negligible. The spread between b
 **Next session should:**
 1. Record Omer's faction decisions (names, personas, start regions, hand-designed vs generated) in DESIGN §4.8 and `data/factions.json`.
 2. Faction entity in `GameState`; editor tool to place settlements and assign factions; zones drawn; settlement hover/panel.
+
+## 2026-11-05 — Session 6b — Faction decisions
+
+**Omer's decisions (DESIGN v0.3c §4.8):** factions hand-designed; several culture groups, defined later; start positions placed by Omer in the editor (tier + population), with the option to run the engine forward a few years and save the result as the starting state; sizes shaped by Omer; AI personas deferred to Phase 5; player faction fixed. **Change of plan:** build Phases 1–3 with the player's faction alone; add the other five once the mechanics work. Settlements keep a faction id throughout so the addition is data-only. No code this entry; docs mirrored.
