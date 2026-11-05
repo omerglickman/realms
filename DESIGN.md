@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3d — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3e — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -198,6 +198,12 @@ The world contains a fixed, countable population: the sum of everyone in every s
 
 - **Raids and sieges** kill or carry off people, skewed toward the vulnerable or the able-bodied depending on the attacker's intent; the demographic shape of the loss shapes the recovery.
 - **Migration (DECIDED 2026-11-04, Phase 1; trigger revised by Omer the same day):** when a settlement **forecasts that it will run out of food before the next harvest** (granary + expected monthly income − consumption until the harvest month < 0) and it has **idle hands** (hands not needed by buildings or fields), **10 % of the idle hands per month leave with their dependants** — a proportional slice of all cohorts — for the **parent settlement** (§3.3). A settlement with no parent sends nobody. Migration outpaces hunger deaths on purpose: people flee famine faster than it kills them. The two famines are thus distinguished automatically: overpopulation (idle hands exist → people leave) vs. a shortage of hands after a levy or raid (no idle hands → nobody leaves; they recover or die).
+- **Demographic realism (PROPOSED, Session 9 — draft values in the data files, every one zero-able; awaiting Omer's verdict):**
+  - *Vital sampling* — births and deaths are drawn as Poisson counts around the expected value instead of exact fractions, so variance = mean: a village of 900 jitters by a few percent a year, a city of 24,000 barely moves. (`demography.json` `noise.vitalSampling`, 1 = on.)
+  - *Harvest variance* — each January every settlement draws a harvest factor for the year, 1 ± 15 % (draft), half of the variance shared by all settlements in the same 12×12-hex block so bad years are regional; floored at 30 %. Forecasts assume an average year, so a bad harvest surprises a settlement. (`economy.json` `farming.harvest.variance`.)
+  - *Epidemics* — 1 % chance per settlement per year (draft) of a year with double deaths. (`demography.json` `noise.epidemic`.)
+  - *Migration trickle* — the countryside feeds the town people as well as grain: each December a settlement whose idle hands exceed 15 % of its hands sends 4 % of them (±50 %, random), with dependants, to its parent — only if the parent was fully fed that year. (`demography.json` `migration.trickle`; `sharePerYear` 0 turns it off.) Finding from the start position: with no work in towns and cities yet (hall and granary only), the trickle piles people into cities that cannot feed them; a *jobs* condition at the destination is the natural fix once workshops exist.
+  - All draws come from the seeded game RNG, so a game still replays identically; the headless runner and the tests can switch every knob off (`src/sim/noise.ts`).
 - **Settlers from idle hands (DECIDED direction, Phase 2):** raising a settlers unit is the *player's* lever, never automatic — any settlement with idle hands can raise settlers from them (cost: the people); the panel flags "overcrowded". Later a starving city may use the same exit.
 
 ### 4.2 Economy (DECIDED concept; food model starting numbers approved 2026-11-04)
@@ -307,7 +313,7 @@ The player controls one faction; the computer controls all others. **The test ma
 - **Phases 1–3 are built with the player's faction alone.** The other five are added once the mechanics work — same rules, different naming scheme, AI-controlled. Every settlement and unit still carries a faction id from the start so that adding factions later is data, not a rewrite.
 - The six factions are **hand-designed** (names, start positions, starting settlements and their sizes), not generated. Generation may come with the real map generator later.
 - The world has **several culture groups**; factions may share a culture. Culture flavour and naming schemes are to be settled later — not needed for a working game.
-- **Start positions are placed by Omer in the map editor**: the editor must allow placing a settlement, choosing its tier and setting its population (and name). After placing, the engine may be **run forward a few years and the result saved** as the game's starting state, so the opening position is organic rather than freshly founded. *(Implementation note: the map file stays terrain + resources; the start position becomes a separate scenario file — the game state itself, which is already the save format.)*
+- **Start positions are placed by Omer in the map editor**: the editor must allow placing a settlement, choosing its tier and setting its population (and name). After placing, the engine may be **run forward a few years and the result saved** as the game's starting state, so the opening position is organic rather than freshly founded. *(Implementation note: the map file stays terrain + resources; the start position becomes a separate scenario file — the game state itself, which is already the save format.)* **The first starting position exists (Omer, 2026-11-05): `scenarios/start.json` — 1 metropolis (Hugeopolis), 2 cities (Omerburg, Hillside), 7 towns, 50 villages (11 independent), ≈248,000 people on the south-west of the western continent; the game opens on it.**
 - The **player faction is fixed** for now (a start screen can come later).
 - **AI personas** are a Phase 5 question.
 
@@ -361,6 +367,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3e (2026-11-05, Session 9): §4.1 demographic realism knobs (PROPOSED); §4.8 the first starting position.
 - 0.3d (2026-11-05, Session 7): §3.3 placement rule (PROPOSED placeholder).
 - 0.3c (2026-11-05): §4.8 — factions hand-designed, player faction alone until mechanics work, start positions via editor + optional pre-run, fixed player faction; §5.3 resolved.
 - 0.3b (2026-11-04, Session 6): model scale ×3 implemented — §3.1 fishing, §3.2 unit sizes, §3.3 gates vs typical sizes and building hands, §4.2 yields, §5.8, glossary.
