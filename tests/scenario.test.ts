@@ -14,6 +14,8 @@ import { saveMapFile } from '../src/sim/mapfile';
 import { FACTION_DEFS, PLAYER_FACTION, factionColor } from '../src/sim/factions';
 
 const G = terrainIndex('grassland'), SEA = terrainIndex('sea'), MTN = terrainIndex('mountains');
+import { setNoise, NO_NOISE } from '../src/sim/noise';
+setNoise(NO_NOISE); // these suites test the deterministic model (Session 9 knobs off)
 
 function found(state: GameState, name: string, tier: string, col: number, row: number, population: number, faction?: string | null): Settlement {
   applyCommand(state, { type: 'foundSettlement', settlement: { name, tier, col, row, population, ...(faction === undefined ? {} : { faction }) } });

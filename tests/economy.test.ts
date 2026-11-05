@@ -15,6 +15,8 @@ import {
 } from '../src/sim/economy';
 
 const G = terrainIndex('grassland'), P = terrainIndex('plains'), SEA = terrainIndex('sea'), RIVER = terrainIndex('river');
+import { setNoise, NO_NOISE } from '../src/sim/noise';
+setNoise(NO_NOISE); // these suites test the deterministic model (Session 9 knobs off)
 
 function found(state: GameState, name: string, tier: string, col: number, row: number, population: number, faction = 'A'): Settlement {
   applyCommand(state, { type: 'foundSettlement', settlement: { name, tier, col, row, population, faction } });

@@ -71,6 +71,13 @@ export interface SettlementReport {
   /** last yearly update */
   births: number;
   deaths: number;
+  /** last December: people who left / arrived by the yearly migration trickle (PROPOSED, Session 9) */
+  trickleOut: number;
+  trickleIn: number;
+  /** last yearly update was an epidemic year */
+  epidemic: boolean;
+  /** the year's average food sufficiency at the last December (0–1) */
+  sufficiency: number;
 }
 
 export interface Settlement {
@@ -98,6 +105,8 @@ export interface Settlement {
   popHistory: number[];
   /** the turn the settlement was founded (or placed in the editor) */
   foundedTurn: number;
+  /** this year's farming multiplier, drawn in January (PROPOSED harvest variance, Session 9); 1 = average year */
+  harvestFactor: number;
 }
 
 /** How many year-end totals a settlement remembers. */
@@ -107,7 +116,7 @@ export function emptyReport(): SettlementReport {
   return {
     hands: 0, staffedHands: 0, fieldHands: 0, idleHands: 0, produced: 0, landCapacity: 0, consumed: 0,
     shortfall: 0, hungerDeaths: 0, spoiled: 0, sent: 0, received: 0, migrantsOut: 0, migrantsIn: 0,
-    capacity: 0, births: 0, deaths: 0,
+    capacity: 0, births: 0, deaths: 0, trickleOut: 0, trickleIn: 0, epidemic: false, sufficiency: 1,
   };
 }
 
@@ -156,6 +165,7 @@ export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
     report: emptyReport(),
     popHistory: [],
     foundedTurn: state.turn,
+    harvestFactor: 1,
   };
 }
 

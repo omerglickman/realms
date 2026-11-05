@@ -27,7 +27,19 @@
   "migration": {
     "_comment": "DESIGN §4.1: when a settlement forecasts that stock + monthly income − consumption will fall below triggerSafetyMonths of consumption before the next harvest arrives, and it has idle hands, this share of idle hands leaves each month, with dependants (proportional slice of all cohorts), for the parent settlement. Omer 2026-11-04: forecast trigger replaces the flat 3-month trigger.",
     "idleHandsSharePerMonth": 0.10,
-    "triggerSafetyMonths": 0
+    "triggerSafetyMonths": 0,
+    "trickle": {
+      "_comment": "PROPOSED (Session 9, draft for Omer): the countryside feeds the town people as well as grain. Once a year (December) a settlement whose idle hands exceed minIdleShare of its hands sends sharePerYear of its idle hands, with dependants, to its parent — but only if the parent was fully fed that year (requireFedParent). spread randomizes the share by ±spread (0.5 → 50 %–150 % of sharePerYear). sharePerYear 0 turns it off.",
+      "sharePerYear": 0.04,
+      "minIdleShare": 0.15,
+      "spread": 0.5,
+      "requireFedParent": true
+    }
+  },
+  "noise": {
+    "_comment": "PROPOSED (Session 9, draft for Omer). vitalSampling 1 = births and deaths are drawn as Poisson counts around the expected value (variance = mean, so villages jitter and cities barely move); 0 = exact fractions (the deterministic model). epidemic: each settlement each year has chancePerYear of an epidemic year in which deaths are multiplied by deathMultiplier; chance 0 turns it off. All draws come from the seeded game RNG, so a game still replays identically.",
+    "vitalSampling": 1,
+    "epidemic": { "chancePerYear": 0.01, "deathMultiplier": 2.0 }
   },
   "startingDistribution": {
     "_comment": "Shares used to create a settlement of N people; roughly stationary for the rates above. Men/women split 50/50 within each band.",

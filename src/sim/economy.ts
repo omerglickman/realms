@@ -17,6 +17,8 @@ import {
   type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, POP_HISTORY_YEARS,
 } from './settlements';
 import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate } from './demography';
+import { seedRng, nextFloat, nextGaussian, nextU32 } from './rng';
+import { noise } from './noise';
 
 export const ECONOMY = economyData;
 
@@ -131,16 +133,41 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
 /**
  * Food arriving this month from a labour plan (month 0 = January).
  * A job's fedPerYear is PEOPLE fed for a year; in food units that is
- * fedPerYear × 12 (1 food = one person for one month).
+ * fedPerYear × 12 (1 food = one person for one month). `harvestFactor`
+ * multiplies the farming part only (PROPOSED harvest variance, Session 9).
  */
-export function monthlyProduction(plan: LabourPlan, month: number): number {
+export function monthlyProduction(plan: LabourPlan, month: number, harvestFactor = 1): number {
   let food = 0;
   const harvestShare = ECONOMY.farming.harvest.shares[month] ?? 0;
   for (const j of plan.jobs) {
     const yearlyFood = j.fedPerYear * j.fraction * 12 * ECONOMY.foodPerPersonPerMonth;
-    food += j.kind === 'farm' ? yearlyFood * harvestShare : yearlyFood / 12;
+    food += j.kind === 'farm' ? yearlyFood * harvestShare * harvestFactor : yearlyFood / 12;
   }
   return food;
+}
+
+/**
+ * January: draw this year's harvest factor for every settlement (PROPOSED, Session 9).
+ * factor = 1 + sd × (√share × regional + √(1 − share) × local), floored at minFactor.
+ * The regional part is one gaussian per block of regionSize×regionSize hexes per year,
+ * so neighbours share good and bad years; the local part is per settlement.
+ * Deterministic: everything derives from state.rng in id order.
+ */
+export function rollHarvestFactors(state: GameState): void {
+  const k = noise();
+  const list = Object.values(state.settlements).sort((a, b) => (a.id < b.id ? -1 : 1));
+  if (!(k.harvestSd > 0)) { for (const s of list) s.harvestFactor = 1; return; }
+  const yearSeed = nextU32(state.rng);
+  const regional = new Map<string, number>();
+  const wr = Math.sqrt(Math.max(0, Math.min(1, k.harvestRegionalShare)));
+  const wl = Math.sqrt(1 - wr * wr);
+  for (const s of list) {
+    const key = `${Math.floor(s.col / k.harvestRegionSize)}:${Math.floor(s.row / k.harvestRegionSize)}`;
+    let r = regional.get(key);
+    if (r === undefined) { r = nextGaussian(seedRng(`${yearSeed}:${key}`)); regional.set(key, r); }
+    const local = nextGaussian(state.rng);
+    s.harvestFactor = Math.max(k.harvestMinFactor, 1 + k.harvestSd * (wr * r + wl * local));
+  }
 }
 
 export function granaryTerms(staffing: number): { capacityMonths: number; spoilage: number } {
@@ -189,6 +216,7 @@ export function forecastBeforeHarvest(s: Settlement, plan: LabourPlan, month: nu
 /** One month of the food economy for every settlement in the state. */
 export function economyMonth(state: GameState, month: number): void {
   resolveAllParents(state);
+  if (month === 0) rollHarvestFactors(state);
   const worked = workedCellsBySettlement(state);
   const plans = new Map<string, LabourPlan>();
   const order = settlementsByRank(state);
@@ -198,15 +226,20 @@ export function economyMonth(state: GameState, month: number): void {
     const plan = planLabour(state.map, s, worked.get(s.id) ?? []);
     plans.set(s.id, plan);
     const r = emptyReport();
+    // yearly figures survive the monthly reset until the next December overwrites them
     r.births = s.report.births;
     r.deaths = s.report.deaths;
+    r.trickleOut = s.report.trickleOut;
+    r.trickleIn = s.report.trickleIn;
+    r.epidemic = s.report.epidemic;
+    r.sufficiency = s.report.sufficiency;
     r.hands = plan.hands;
     r.staffedHands = plan.staffedHands;
     r.fieldHands = plan.fieldHands;
     r.idleHands = plan.idleHands;
     r.landCapacity = plan.landCapacity;
 
-    r.produced = monthlyProduction(plan, month);
+    r.produced = monthlyProduction(plan, month, s.harvestFactor);
     s.food += r.produced;
 
     const need = monthlyNeed(s);
@@ -270,18 +303,50 @@ export function economyMonth(state: GameState, month: number): void {
   }
 }
 
-/** The yearly demographic update for every settlement (run in December). */
+/**
+ * The yearly demographic update for every settlement (run in December):
+ * epidemic roll, births/deaths/aging, year-end bookkeeping, then the
+ * migration trickle to parents (PROPOSED, Session 9). Settlements are
+ * processed in id order so the RNG draws are reproducible.
+ */
 export function demographyYear(state: GameState): void {
-  for (const s of Object.values(state.settlements)) {
-    const suff = s.yearMonths > 0 ? s.yearSufficiency / s.yearMonths : 1;
+  const k = noise();
+  const list = Object.values(state.settlements).sort((a, b) => (a.id < b.id ? -1 : 1));
+  // the year's sufficiency per settlement, before anything is reset (the trickle checks the parent's)
+  for (const s of list) s.report.sufficiency = s.yearMonths > 0 ? s.yearSufficiency / s.yearMonths : 1;
+  for (const s of list) {
+    const suff = s.report.sufficiency;
     const plenty = s.food > 12 * monthlyNeed(s);
     const crowdable = (DEMOGRAPHY as { crowdingAppliesTo: string[] }).crowdingAppliesTo.includes(TIERS[s.tier].id);
     const idleShare = crowdable && s.report.hands > 0 ? s.report.idleHands / s.report.hands : 0;
-    const res = yearlyUpdate(s.pop, suff, plenty, idleShare);
+    const epidemic = k.epidemicChance > 0 && nextFloat(state.rng) < k.epidemicChance;
+    const res = yearlyUpdate(s.pop, suff, plenty, idleShare, { rng: state.rng, deathMultiplier: epidemic ? k.epidemicDeathMultiplier : 1 });
     s.report.births = res.births;
     s.report.deaths = res.deaths;
+    s.report.epidemic = epidemic;
     s.yearMonths = 0;
     s.yearSufficiency = 0;
+  }
+  // migration trickle: idle hands above the threshold drift to a fed parent, with dependants
+  for (const s of list) s.report.trickleOut = s.report.trickleIn = 0;
+  if (k.trickleShare > 0) {
+    for (const s of settlementsByRank(state)) {
+      if (!s.parent) continue;
+      const p = state.settlements[s.parent];
+      if (!p) continue;
+      if (k.trickleRequireFedParent && p.report.sufficiency < 0.999) continue;
+      const hands = s.report.hands, idle = s.report.idleHands;
+      if (hands <= 0 || idle / hands <= k.trickleMinIdle) continue;
+      const jitter = k.trickleSpread > 0 ? 1 + k.trickleSpread * (2 * nextFloat(state.rng) - 1) : 1;
+      const movingHands = Math.min(idle, idle * k.trickleShare * jitter);
+      const slice = takeSlice(s.pop, movingHands / hands);
+      const n = totalPopulation(slice);
+      addPopulation(p.pop, slice);
+      s.report.trickleOut += n;
+      p.report.trickleIn += n;
+    }
+  }
+  for (const s of list) {
     s.popHistory.push(totalPopulation(s.pop));
     if (s.popHistory.length > POP_HISTORY_YEARS) s.popHistory.splice(0, s.popHistory.length - POP_HISTORY_YEARS);
   }

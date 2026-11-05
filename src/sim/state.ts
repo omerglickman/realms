@@ -6,7 +6,7 @@
 
 import type { MapData } from './map';
 import { type RngState, seedRng } from './rng';
-import type { Settlement } from './settlements';
+import { type Settlement, emptyReport } from './settlements';
 import { type Faction, initialFactions, PLAYER_FACTION } from './factions';
 
 /** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. */
@@ -88,5 +88,10 @@ export function deserializeState(json: string): GameState {
   if (!s.playerFaction) s.playerFaction = PLAYER_FACTION;
   if (typeof s.nextId !== 'number') s.nextId = 1;
   if (!Array.isArray(s.map.resource)) s.map.resource = new Array<number>(s.map.terrain.length).fill(-1);
+  for (const st of Object.values(s.settlements)) {
+    // fields added within v3 (Session 9): harvest factor, trickle/epidemic/sufficiency in the report
+    if (typeof st.harvestFactor !== 'number') st.harvestFactor = 1;
+    st.report = { ...emptyReport(), ...(st.report ?? {}) };
+  }
   return s;
 }

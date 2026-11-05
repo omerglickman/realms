@@ -57,6 +57,8 @@ export function renderPopover(root: HTMLElement, state: GameState, s: Settlement
     ${row('Growth', t === null ? '— (new)' : `${pct(t)} / yr`)}
     ${row('Food', `${months.toFixed(1)} months <span class="dim">(${fmt(s.food)})</span>`)}
     ${row('Subordinate to', parent ? `${esc(parent.name)} <span class="dim">(${tierName(parent)})</span>` : TIERS[s.tier].rank < 2 ? '<span class="dim">none in range</span>' : '<span class="dim">independent</span>')}
+    ${Math.abs(s.harvestFactor - 1) > 0.005 ? row('Harvest this year', `${Math.round(100 * s.harvestFactor)} % of normal`) : ''}
+    ${s.report.epidemic ? '<div class="warn">⚠ epidemic this year</div>' : ''}
     ${s.report.hungerDeaths > 0.5 ? `<div class="warn">⚠ ${fmt(s.report.hungerDeaths)} starved last month</div>` : ''}
     <div class="pop-hint">click for details</div>
   `;
@@ -90,7 +92,8 @@ export function renderPanel(root: HTMLElement, state: GameState, s: Settlement, 
   const rows: [string, string][] = [
     ['People', `${fmt(pop)} <span class="dim">(${fmt(hands)} hands)</span>`],
     ['Growth', trend === null ? '<span class="dim">— (needs two year-ends)</span>' : `${pct(trend)} per year` + (sinceFounding !== null && s.popHistory.length > 1 ? ` <span class="dim">· ${pct(sinceFounding)} since founding</span>` : '')],
-    ['Last year', r.births || r.deaths ? `${fmt(r.births)} born, ${fmt(r.deaths)} died` : '<span class="dim">no year-end yet</span>'],
+    ['Last year', r.births || r.deaths ? `${fmt(r.births)} born, ${fmt(r.deaths)} died` + (r.epidemic ? ' <b class="warn">(epidemic)</b>' : '') + (r.trickleOut > 0.5 ? `, ${fmt(r.trickleOut)} moved to town` : '') + (r.trickleIn > 0.5 ? `, ${fmt(r.trickleIn)} arrived from the countryside` : '') : '<span class="dim">no year-end yet</span>'],
+    ['Harvest', Math.abs(s.harvestFactor - 1) > 0.005 ? `${Math.round(100 * s.harvestFactor)} % of a normal year` : 'a normal year'],
     ['Granary', `${months.toFixed(1)} months <span class="dim">(${fmt(s.food)} food · holds ${cap.toFixed(0)} mo · spoils ${(100 * g.spoilage).toFixed(1)} %/mo)</span>`],
     ['Hands', `${fmt(plan.staffedHands)} in buildings · ${fmt(plan.fieldHands)} in the fields · <b>${fmt(plan.idleHands)} idle</b>`],
     ['Land', `${worked.length} hexes worked · feeds ${fmt(plan.plannedPerYear)} / yr now, ${fmt(plan.landCapacity)} at full labour`],

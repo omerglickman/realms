@@ -62,3 +62,25 @@ export function chance(s: RngState, p: number): boolean {
 export function pick<T>(s: RngState, arr: readonly T[]): T {
   return arr[nextInt(s, 0, arr.length - 1)];
 }
+
+/** Standard normal deviate (Box–Muller). */
+export function nextGaussian(s: RngState): number {
+  let u = 0;
+  while (u === 0) u = nextFloat(s);
+  const v = nextFloat(s);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+/**
+ * A Poisson-distributed count with mean `lambda` (Knuth for small means, a
+ * normal approximation above 50). Variance = mean, so small populations are
+ * lumpier than large ones — the law of large numbers for free.
+ */
+export function nextPoisson(s: RngState, lambda: number): number {
+  if (lambda <= 0) return 0;
+  if (lambda > 50) return Math.max(0, Math.round(lambda + Math.sqrt(lambda) * nextGaussian(s)));
+  const L = Math.exp(-lambda);
+  let k = 0, p = 1;
+  do { k++; p *= nextFloat(s); } while (p > L);
+  return k - 1;
+}

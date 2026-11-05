@@ -17,6 +17,8 @@ import { axialRing, axialToOffset, offsetToAxial } from '../src/sim/hex';
 import { totalPopulation, workingHands } from '../src/sim/demography';
 import { BUILDINGS, type Settlement } from '../src/sim/settlements';
 import { ECONOMY } from '../src/sim/economy';
+import { setNoise, NO_NOISE } from '../src/sim/noise';
+setNoise(NO_NOISE); // these suites test the deterministic model (Session 9 knobs off)
 
 const MIX = ['grassland', 'plains', 'grassland', 'hills', 'plains', 'woodland'].map(terrainIndex);
 const SEA = terrainIndex('sea');

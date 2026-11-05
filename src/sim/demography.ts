@@ -6,6 +6,8 @@
 // update is a deterministic function of the population and the year's food.
 
 import demographyData from '../../data/demography.json';
+import { type RngState, nextPoisson } from './rng';
+import { noise } from './noise';
 
 export const DEMOGRAPHY = demographyData;
 
@@ -101,12 +103,27 @@ export interface YearlyResult {
  * (0–1); `plenty` is true when the granary holds more than a year's need;
  * `idleShare` is the share of working hands that had no work (crowding).
  */
-export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boolean, idleShare = 0): YearlyResult {
+export interface YearlyOptions {
+  /** seeded game RNG; with data noise.vitalSampling on, births and deaths are Poisson draws (PROPOSED, Session 9) */
+  rng?: RngState;
+  /** multiplies this year's death rates (epidemic year); 1 = normal */
+  deathMultiplier?: number;
+}
+
+/** Expected count → realized count: exact when sampling is off or no rng is given, Poisson otherwise. */
+function realize(expected: number, rng: RngState | undefined, cap: number): number {
+  if (!rng || noise().vitalSampling <= 0 || expected <= 0) return Math.min(cap, expected);
+  return Math.min(cap, nextPoisson(rng, expected));
+}
+
+export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boolean, idleShare = 0, opts: YearlyOptions = {}): YearlyResult {
+  const rng = opts.rng;
+  const dmul = opts.deathMultiplier ?? 1;
   // 1. deaths by band
   let deaths = 0;
   for (let b = 0; b < BANDS; b++) {
-    const dm = p.m[b] * DEATH_RATE[b];
-    const df = p.f[b] * DEATH_RATE[b];
+    const dm = realize(p.m[b] * DEATH_RATE[b] * dmul, rng, p.m[b]);
+    const df = realize(p.f[b] * DEATH_RATE[b] * dmul, rng, p.f[b]);
     p.m[b] -= dm;
     p.f[b] -= df;
     deaths += dm + df;
@@ -117,7 +134,7 @@ export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boo
   if (plenty && suff >= 1) mult *= DEMOGRAPHY.plentyBirthMultiplier;
   // Crowding lowers births in villages (DESIGN §4.1, DECIDED 2026-11-04); penalty 0 turns it off
   mult *= Math.max(0, 1 - DEMOGRAPHY.crowdingBirthPenalty * Math.max(0, Math.min(1, idleShare)));
-  const births = fertileWomen(p) * DEMOGRAPHY.birthsPerWomanPerYear * mult;
+  const births = realize(fertileWomen(p) * DEMOGRAPHY.birthsPerWomanPerYear * mult, rng, Infinity);
   // 3. aging: 1/width of each band moves up; the last band is terminal
   const share = 1 / DEMOGRAPHY.bandWidthYears;
   for (let b = BANDS - 2; b >= 0; b--) {
