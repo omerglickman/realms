@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createMap, idx } from '../src/sim/map';
 import { terrainIndex } from '../src/sim/terrain';
 import { resourceIndex } from '../src/sim/resources';
-import { createGameState, serializeState, deserializeState, type GameState } from '../src/sim/state';
+import { createGameState, serializeState, deserializeState, STATE_VERSION, type GameState } from '../src/sim/state';
 import { endTurn } from '../src/sim/turn';
 import { applyCommand } from '../src/sim/commands';
 import { axialRing, axialToOffset, offsetToAxial } from '../src/sim/hex';
@@ -215,7 +215,7 @@ describe('20-year scenarios (ROADMAP Phase 1 acceptance)', () => {
 
   it('loads a Phase 0 (version 1) save with no settlements', () => {
     const s = deserializeState(JSON.stringify({ version: 1, seed: 's', rng: { a: 1, b: 2, c: 3, d: 4 }, turn: 3, map: createMap(5, 5) }));
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(STATE_VERSION);
     expect(s.settlements).toEqual({});
     expect(s.factions.player).toBeDefined();
     expect(s.playerFaction).toBe('player');

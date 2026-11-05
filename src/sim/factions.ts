@@ -3,6 +3,7 @@
 // come from data/factions.json; the live record lives in GameState.factions.
 
 import factionData from '../../data/factions.json';
+import { type Materials, emptyMaterials } from './materials';
 
 export interface FactionDef {
   id: string;
@@ -20,8 +21,10 @@ export interface Faction {
   color: string;
   culture: string | null;
   player: boolean;
-  /** money (DESIGN §4.2); unused until trade and tax exist */
+  /** money (DESIGN §4.2); filled by markets (Session 11), nothing to spend it on yet */
   treasury: number;
+  /** the faction's central materials stockpile (DESIGN §4.2, Session 11): the clusters' yearly surplus, shipped by the player */
+  stock: Materials;
 }
 
 export const FACTION_DEFS: readonly FactionDef[] = factionData.factions as FactionDef[];
@@ -36,7 +39,7 @@ export function factionDef(id: string): FactionDef {
 /** The starting faction record for a new game: every faction in the data file. */
 export function initialFactions(): Record<string, Faction> {
   const out: Record<string, Faction> = {};
-  for (const d of FACTION_DEFS) out[d.id] = { ...d, treasury: 0 };
+  for (const d of FACTION_DEFS) out[d.id] = { ...d, treasury: 0, stock: emptyMaterials() };
   return out;
 }
 

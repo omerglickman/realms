@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { createMap, idx } from '../src/sim/map';
 import { terrainIndex } from '../src/sim/terrain';
-import { createGameState, serializeState, deserializeState, type GameState } from '../src/sim/state';
+import { createGameState, serializeState, deserializeState, STATE_VERSION, type GameState } from '../src/sim/state';
 import { endTurn } from '../src/sim/turn';
 import { applyCommand } from '../src/sim/commands';
 import { growthTrend, canSettleAt, childrenOf, POP_HISTORY_YEARS, type Settlement } from '../src/sim/settlements';
@@ -49,7 +49,7 @@ describe('factions in the state', () => {
     delete raw.playerFaction;
     for (const st of Object.values(raw.settlements) as Record<string, unknown>[]) { delete st.popHistory; delete st.foundedTurn; }
     const s = deserializeState(JSON.stringify(raw));
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(STATE_VERSION);
     expect(s.playerFaction).toBe(PLAYER_FACTION);
     expect(s.factions[PLAYER_FACTION]).toBeDefined();
     const v = Object.values(s.settlements)[0];

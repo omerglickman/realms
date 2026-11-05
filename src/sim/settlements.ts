@@ -10,6 +10,7 @@ import { inBounds, idx } from './map';
 import { TERRAIN } from './terrain';
 import { axialRange, axialDistance, offsetToAxial, axialToOffset, type Axial } from './hex';
 import { createPopulation, type Population } from './demography';
+import { type Materials, emptyMaterials } from './materials';
 
 export interface TierDef {
   id: string;
@@ -27,15 +28,38 @@ export interface BuildingDef {
   id: string;
   name: string;
   family: string;
-  tier: string;
+  /** mandatory buildings: the one tier they belong to */
+  tier?: string;
+  /** buildable buildings: the lowest tier that may build it */
+  minTier?: string;
   hands: number;
   mandatory: boolean;
+  /** materials paid from the cluster stockpile when queued (Session 11) */
+  cost?: Partial<Materials>;
+  /** months of construction at full labour */
+  buildMonths?: number;
+  /** spare hands needed for full construction speed */
+  buildHands?: number;
+  /** a hex the settlement must work: river / shore / pasture */
+  requires?: 'river' | 'shore' | 'pasture';
   effects: Record<string, number>;
+  /** unit types this building will unlock (Phase 4; recorded only) */
+  unlocks?: string[];
+  blurb?: string;
 }
 
 export const TIERS: readonly TierDef[] = settlementData.tiers as TierDef[];
 export const BUILDINGS: readonly BuildingDef[] = buildingData.buildings as unknown as BuildingDef[];
 export const BUILDING_INDEX: Readonly<Record<string, BuildingDef>> = Object.fromEntries(BUILDINGS.map((b) => [b.id, b]));
+
+/** A building under construction (Session 11): progress 0–1 advances by (spare hands given / buildHands) / buildMonths each month. */
+export interface BuildProject {
+  building: string;
+  progress: number;
+  /** who paid what when the project was queued (for cancel / undo) */
+  paid: { id: string; amount: Materials }[];
+  startedTurn: number;
+}
 
 export function tierIndex(id: string): number {
   const i = TIERS.findIndex((t) => t.id === id);
@@ -71,6 +95,15 @@ export interface SettlementReport {
   migrantsOut: number;
   migrantsIn: number;
   capacity: number;
+  /** Session 11: spare hands on construction / gathering this month; hands the settlement could use but lacks */
+  constructionHands: number;
+  gatherHands: number;
+  vacancies: number;
+  /** materials gathered / goods made / goods sold (money) this month */
+  timber: number;
+  stone: number;
+  goods: number;
+  sold: number;
   /** last yearly update */
   births: number;
   deaths: number;
@@ -94,18 +127,25 @@ export interface YearTotals {
   titheIn: number;
   migrantsOut: number;
   migrantsIn: number;
+  /** Session 11: materials gathered, goods made, money from sales, materials sent to the faction in December */
+  timber: number;
+  stone: number;
+  goods: number;
+  sold: number;
+  surplusOut: number;
   /** months accumulated so far (12 for a finished year) */
   months: number;
 }
 
 export function emptyYearTotals(): YearTotals {
-  return { produced: 0, consumed: 0, hungerDeaths: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0, months: 0 };
+  return { produced: 0, consumed: 0, hungerDeaths: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0, timber: 0, stone: 0, goods: 0, sold: 0, surplusOut: 0, months: 0 };
 }
 
 export function addYearTotals(into: YearTotals, from: YearTotals): void {
   into.produced += from.produced; into.consumed += from.consumed; into.hungerDeaths += from.hungerDeaths;
   into.sent += from.sent; into.received += from.received; into.titheOut += from.titheOut; into.titheIn += from.titheIn;
   into.migrantsOut += from.migrantsOut; into.migrantsIn += from.migrantsIn;
+  into.timber += from.timber; into.stone += from.stone; into.goods += from.goods; into.sold += from.sold; into.surplusOut += from.surplusOut;
   into.months = Math.max(into.months, from.months);
 }
 
@@ -122,6 +162,10 @@ export interface Settlement {
   food: number;
   /** building ids present */
   buildings: string[];
+  /** this settlement's own materials (the cluster pools them — src/sim/materials.ts) */
+  stock: Materials;
+  /** the building under construction, if any (one project at a time) */
+  build: BuildProject | null;
   /** explicit parent chosen by the player; null = automatic (DESIGN §3.3) */
   parentOverride: string | null;
   /** resolved parent for this turn (automatic or override); null = none */
@@ -158,7 +202,8 @@ export function emptyReport(): SettlementReport {
   return {
     hands: 0, staffedHands: 0, fieldHands: 0, idleHands: 0, produced: 0, landCapacity: 0, consumed: 0,
     shortfall: 0, hungerDeaths: 0, spoiled: 0, sent: 0, received: 0, titheOut: 0, titheIn: 0, migrantsOut: 0, migrantsIn: 0,
-    capacity: 0, births: 0, deaths: 0, trickleOut: 0, trickleIn: 0, epidemic: false, sufficiency: 1,
+    capacity: 0, constructionHands: 0, gatherHands: 0, vacancies: 0, timber: 0, stone: 0, goods: 0, sold: 0,
+    births: 0, deaths: 0, trickleOut: 0, trickleIn: 0, epidemic: false, sufficiency: 1,
   };
 }
 
@@ -200,6 +245,8 @@ export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
     pop: createPopulation(o.population),
     food: o.population * (o.foodMonths ?? 12),
     buildings: [def.hall, def.granary],
+    stock: emptyMaterials(),
+    build: null,
     parentOverride: null,
     parent: null,
     yearMonths: 0,

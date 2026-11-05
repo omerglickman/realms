@@ -9,7 +9,8 @@ import { calendar } from '../../sim/state';
 import { TIERS, type Settlement, type YearTotals } from '../../sim/settlements';
 import { totalPopulation } from '../../sim/demography';
 import { type Cluster, type ClusterNode, clustersOf, realmReport } from '../../sim/clusters';
-import { foodMonths } from './settlementPanel';
+import { foodMonths, materialsText, projectText } from './settlementPanel';
+import { clusterStock, MATERIALS, surplusShare, type Materials } from '../../sim/materials';
 
 const fmt = (n: number): string => Math.round(n).toLocaleString('en-US');
 const esc = (x: string) => x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -19,6 +20,8 @@ export interface ClusterHost {
   onCluster(root: string): void;
   onRealm(): void;
   onClose(): void;
+  /** ship materials from the realm stockpile to the cluster headed by `root` (Session 11) */
+  onSend?(root: string, amount: Partial<Materials>): void;
 }
 
 /** "1 metropolis · 3 towns · 18 villages" */
@@ -61,7 +64,9 @@ function memberRow(state: GameState, node: ClusterNode, depth: number): string {
   const pop = totalPopulation(s.pop);
   const months = foodMonths(s);
   const warn = s.report.hungerDeaths > 0.5 ? ' <span class="warn" title="starved last month">⚠</span>' : '';
-  const row = `<div class="member d${depth}"><a href="#" data-focus="${s.id}">${esc(s.name)}</a> <span class="dim">${TIERS[s.tier].name.toLowerCase()} · ${fmt(pop)} · ${months.toFixed(1)} mo</span>${warn}</div>`;
+  const extra = s.buildings.length > 2 ? ` · ${s.buildings.length - 2} built` : '';
+  const proj = s.build ? ` <span class="dim" title="${esc(projectText(s) ?? '')}">⚒</span>` : '';
+  const row = `<div class="member d${depth}"><a href="#" data-focus="${s.id}">${esc(s.name)}</a> <span class="dim">${TIERS[s.tier].name.toLowerCase()} · ${fmt(pop)} · ${months.toFixed(1)} mo${extra}</span>${proj}${warn}</div>`;
   return row + node.children.map((c) => memberRow(state, c, depth + 1)).join('');
 }
 
@@ -77,6 +82,7 @@ export function renderClusterPanel(root: HTMLElement, state: GameState, c: Clust
     ['Granaries', `${months.toFixed(1)} months of food in all <span class="dim">(${fmt(t.food)})</span>`],
     ['Last year', t.lastYear ? yearText(t.lastYear, t.population, false) : '<span class="dim">no year-end yet</span>'],
     ['This year', t.year.months > 0 ? yearText(t.year, t.population, true) : '<span class="dim">nothing yet</span>'],
+    ['Stockpile', `${materialsText(clusterStock(state, c.root), true)}` + (t.year.timber + t.year.stone + t.year.goods > 0.5 ? ` <span class="dim">· gathered this year +${materialsText({ timber: t.year.timber, stone: t.year.stone, goods: t.year.goods })}${t.year.sold > 0.5 ? `, sold goods for ${fmt(t.year.sold)}` : ''}</span>` : '') + (t.lastYear && t.lastYear.surplusOut > 0.5 ? ` <span class="dim">· ${fmt(t.lastYear.surplusOut)} sent to the realm last December</span>` : '')],
   ];
   if (t.hungerDeathsLastMonth > 0.5) rows.push(['Last month', `<b class="warn">${fmt(t.hungerDeathsLastMonth)} starved</b>`]);
   root.innerHTML = `
@@ -107,13 +113,24 @@ export function renderRealmPanel(root: HTMLElement, state: GameState, host: Clus
     ['Granaries', `${months.toFixed(1)} months of food in all <span class="dim">(${fmt(r.food)})</span>`],
     ['Last year', r.lastYear ? yearText(r.lastYear, r.population, false) : '<span class="dim">no year-end yet</span>'],
     ['This year', r.year.months > 0 ? yearText(r.year, r.population, true) : '<span class="dim">nothing yet</span>'],
+    ['Realm stockpile', faction ? `${materialsText(faction.stock, true)} <span class="dim">· ${Math.round(100 * surplusShare())} % of every cluster's surplus above ${MATERIALS.reserve.timber} timber / ${MATERIALS.reserve.stone} stone arrives each December</span>` : '—'],
+    ['Treasury', faction ? `${fmt(faction.treasury)} coins <span class="dim">(from markets; nothing to spend them on yet)</span>` : '—'],
   ];
   const clusterRows = r.clusters.map((c) => {
     const rs = state.settlements[c.root];
     const ly = c.totals.lastYear;
     const starved = ly && ly.hungerDeaths > 0.5 ? ` <span class="warn">⚠ ${fmt(ly.hungerDeaths)} starved</span>` : '';
-    return `<div class="member d0"><a href="#" data-cluster="${c.root}">${esc(rs.name)}</a> <span class="dim">${c.members.length === 1 ? 'lone village' : `${c.members.length} settlements`} · ${fmt(c.totals.population)}</span>${starved}</div>`;
+    const st = clusterStock(state, c.root);
+    return `<div class="member d0"><a href="#" data-cluster="${c.root}">${esc(rs.name)}</a> <span class="dim">${c.members.length === 1 ? 'lone village' : `${c.members.length} settlements`} · ${fmt(c.totals.population)} · ${materialsText(st)}</span>${starved}</div>`;
   }).join('');
+  const sendForm = faction && host.onSend ? `<div class="section">Send materials from the realm stockpile</div>
+    <div class="build-row send-row">
+      <select id="sp-send-to">${r.clusters.map((c) => `<option value="${c.root}">${esc(state.settlements[c.root].name)}${c.members.length > 1 ? ' cluster' : ''}</option>`).join('')}</select>
+      <label>timber <input id="sp-send-timber" type="number" min="0" step="30" value="0" /></label>
+      <label>stone <input id="sp-send-stone" type="number" min="0" step="30" value="0" /></label>
+      <button id="sp-send-go">Send</button>
+      <div class="dim blurb">Arrives at once — a placeholder until roads and caravans carry it.</div>
+    </div>` : '';
   root.innerHTML = `
     <div class="panel-head">
       <span class="pname">${esc(faction?.name ?? 'The realm')}</span>
@@ -123,8 +140,18 @@ export function renderRealmPanel(root: HTMLElement, state: GameState, host: Clus
     <table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>
     <div class="section">Clusters</div>
     <div class="members">${clusterRows}</div>
+    ${sendForm}
   `;
   wire(root, host);
+  const go = root.querySelector<HTMLButtonElement>('#sp-send-go');
+  if (go && host.onSend) {
+    go.addEventListener('click', () => {
+      const to = root.querySelector<HTMLSelectElement>('#sp-send-to')!.value;
+      const timber = Math.max(0, Number(root.querySelector<HTMLInputElement>('#sp-send-timber')!.value) || 0);
+      const stone = Math.max(0, Number(root.querySelector<HTMLInputElement>('#sp-send-stone')!.value) || 0);
+      if (timber + stone > 0) host.onSend!(to, { timber, stone });
+    });
+  }
 }
 
 function wire(root: HTMLElement, host: ClusterHost): void {

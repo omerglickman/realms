@@ -2,14 +2,17 @@
 // plain-data command applied through `applyCommand`, which returns the inverse
 // command so the UI can undo. The AI will issue the same commands as the player.
 //
-// Phase 0: map-editing commands. Phase 1: founding and removing settlements.
+// Phase 0: map-editing commands. Phase 1: founding and removing settlements;
+// Session 11: queueing and cancelling buildings, moving materials.
 
 import type { GameState } from './state';
 import type { MapData } from './map';
 import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
-import { makeSettlement, settlementIdAt, type FoundOptions, type Settlement } from './settlements';
+import { makeSettlement, settlementIdAt, buildingDef, type FoundOptions, type Settlement, type BuildProject } from './settlements';
 import { totalPopulation, createPopulation, type Population } from './demography';
+import { canBuild } from './buildings';
+import { payFromCluster, refund, addMaterials, MATERIAL_IDS, type Materials } from './materials';
 
 export interface CellEdit {
   /** flat index = row * width + col */
@@ -72,7 +75,44 @@ export interface EditSettlementCommand {
   food?: number;
 }
 
+/** Start building (DESIGN §3.3, Session 11): pays the cost from the cluster stockpile at once. Inverse: cancelBuilding. */
+export interface QueueBuildingCommand {
+  type: 'queueBuilding';
+  id: string;
+  building: string;
+}
+
+/** Cancel the running project and refund what was paid. Inverse: restoreProject. */
+export interface CancelBuildingCommand {
+  type: 'cancelBuilding';
+  id: string;
+}
+
+/** Inverse of cancelBuilding: put a project back exactly as it was, taking the refund back. */
+export interface RestoreProjectCommand {
+  type: 'restoreProject';
+  id: string;
+  project: BuildProject;
+}
+
+/**
+ * Move materials between the faction stockpile and a settlement (DESIGN §4.2;
+ * instant — PLACEHOLDER until roads and caravans). `from`/`to` are a settlement id
+ * or `faction:<id>`. Its own inverse with from/to swapped. Amounts are capped at
+ * what the source holds; the inverse carries what actually moved.
+ */
+export interface TransferMaterialsCommand {
+  type: 'transferMaterials';
+  from: string;
+  to: string;
+  amount: Partial<Materials>;
+}
+
 export type Command =
+  | QueueBuildingCommand
+  | CancelBuildingCommand
+  | RestoreProjectCommand
+  | TransferMaterialsCommand
   | SetTerrainCommand
   | SetResourceCommand
   | ReplaceMapCommand
@@ -157,11 +197,67 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       }
       return inverse;
     }
+    case 'queueBuilding': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      const check = canBuild(state, s, cmd.building);
+      if (!check.ok) throw new Error(`${s.name} cannot build ${buildingDef(cmd.building).name}: ${check.reason}`);
+      const paid = payFromCluster(state, s, buildingDef(cmd.building).cost ?? {});
+      s.build = { building: cmd.building, progress: 0, paid, startedTurn: state.turn };
+      return { type: 'cancelBuilding', id: cmd.id };
+    }
+    case 'cancelBuilding': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      if (!s.build) throw new Error(`${s.name} is not building anything`);
+      const project = s.build;
+      refund(state, project.paid, s.id);
+      s.build = null;
+      return { type: 'restoreProject', id: cmd.id, project };
+    }
+    case 'restoreProject': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      // take the refund back from whoever got it (stocks may go slightly negative if spent since; clamp)
+      for (const p of cmd.project.paid) {
+        const m = state.settlements[p.id] ?? s;
+        addMaterials(m.stock, p.amount, -1);
+        for (const k of MATERIAL_IDS) if (m.stock[k] < 0) m.stock[k] = 0;
+      }
+      s.build = cmd.project;
+      return { type: 'cancelBuilding', id: cmd.id };
+    }
+    case 'transferMaterials': {
+      const src = stockOf(state, cmd.from), dst = stockOf(state, cmd.to);
+      const moved: Partial<Materials> = {};
+      for (const k of MATERIAL_IDS) {
+        const x = Math.max(0, Math.min(cmd.amount[k] ?? 0, src[k]));
+        if (x > 0) { src[k] -= x; dst[k] += x; moved[k] = x; }
+      }
+      return { type: 'transferMaterials', from: cmd.to, to: cmd.from, amount: moved };
+    }
   }
+}
+
+/** The faction key for transferMaterials. */
+export function factionStockKey(factionId: string): string {
+  return `faction:${factionId}`;
+}
+
+function stockOf(state: GameState, key: string): Materials {
+  if (key.startsWith('faction:')) {
+    const f = state.factions[key.slice('faction:'.length)];
+    if (!f) throw new Error(`No faction "${key}"`);
+    return f.stock;
+  }
+  const s = state.settlements[key];
+  if (!s) throw new Error(`No settlement "${key}"`);
+  return s.stock;
 }
 
 /** Does this command change anything? (used to skip empty undo entries) */
 export function isNoop(cmd: Command): boolean {
+  if (cmd.type === 'transferMaterials') return MATERIAL_IDS.every((k) => !(cmd.amount[k] && cmd.amount[k]! > 0));
   return (cmd.type === 'setTerrain' || cmd.type === 'setResource') && cmd.cells.length === 0;
 }
 

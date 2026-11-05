@@ -8,9 +8,10 @@ import type { MapData } from './map';
 import { type RngState, seedRng } from './rng';
 import { type Settlement, emptyReport, emptyYearTotals } from './settlements';
 import { type Faction, initialFactions, PLAYER_FACTION } from './factions';
+import { emptyMaterials } from './materials';
 
-/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. */
-export const STATE_VERSION = 3;
+/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). */
+export const STATE_VERSION = 4;
 
 export interface GameState {
   version: number;
@@ -96,6 +97,15 @@ export function deserializeState(json: string): GameState {
     }
     s.version = 3;
   }
+  if (s.version === 3) {
+    // Session 11: materials stocks on settlements and factions, build projects
+    for (const st of Object.values(s.settlements)) {
+      if (!st.stock) st.stock = emptyMaterials();
+      if (st.build === undefined) st.build = null;
+    }
+    for (const f of Object.values(s.factions ?? {})) if (!f.stock) f.stock = emptyMaterials();
+    s.version = 4;
+  }
   if (s.version !== STATE_VERSION) {
     throw new Error(`Save version ${s.version} not supported (expected ${STATE_VERSION})`);
   }
@@ -105,9 +115,13 @@ export function deserializeState(json: string): GameState {
   if (typeof s.nextId !== 'number') s.nextId = 1;
   if (!Array.isArray(s.events)) s.events = [];
   if (!Array.isArray(s.map.resource)) s.map.resource = new Array<number>(s.map.terrain.length).fill(-1);
+  for (const f of Object.values(s.factions)) { if (!f.stock) f.stock = emptyMaterials(); if (typeof f.treasury !== 'number') f.treasury = 0; }
   for (const st of Object.values(s.settlements)) {
     // fields added within v3 (Session 9): harvest factor, trickle/epidemic/sufficiency in the report
     if (typeof st.harvestFactor !== 'number') st.harvestFactor = 1;
+    if (!st.stock) st.stock = emptyMaterials();
+    else st.stock = { ...emptyMaterials(), ...st.stock };
+    if (!st.build) st.build = null;
     st.report = { ...emptyReport(), ...(st.report ?? {}) };
     // Session 10: yearly running totals
     st.year = { ...emptyYearTotals(), ...(st.year ?? {}) };

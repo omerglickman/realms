@@ -104,6 +104,18 @@ export function clusterRootOf(state: GameState, id: string): string {
   return cur ? cur.id : id;
 }
 
+/**
+ * Ids of every settlement in the cluster `id` belongs to (root first, then the
+ * rest in id order). Cheap — walks the parent links only, no totals.
+ */
+export function clusterMembers(state: GameState, id: string): string[] {
+  const root = clusterRootOf(state, id);
+  const out = [root];
+  const all = Object.values(state.settlements).sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const s of all) if (s.id !== root && clusterRootOf(state, s.id) === root) out.push(s.id);
+  return out;
+}
+
 /** The cluster containing settlement `id`. */
 export function clusterOf(state: GameState, id: string): Cluster | null {
   const root = clusterRootOf(state, id);

@@ -291,3 +291,18 @@ body.editing #map { cursor: crosshair; }
 #settlement .edit-pop button:hover { background: #3a4458; }
 #settlement button.danger { background: #4a2020; color: #f0c0b0; border: 1px solid #8a4040; margin-left: auto; }
 #settlement button.danger:hover { background: #6a2a2a; }
+
+/* Session 11: building and materials */
+#settlement .project { margin-top: 3px; color: #e8d8a8; }
+#settlement button.small { font: inherit; font-size: 11px; background: #2a3240; color: #e8e0cc; border: 1px solid #5a4a2e; border-radius: 3px; padding: 0 6px; cursor: pointer; margin-left: 6px; }
+#settlement button.small:hover { background: #3a4458; }
+#settlement .build-row { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#settlement .build-row label { display: flex; gap: 6px; align-items: center; color: #c9b98a; font-size: 12px; }
+#settlement .build-row select, #settlement .build-row input { font: inherit; font-size: 12px; background: #2a3240; color: #e8e0cc; border: 1px solid #5a4a2e; border-radius: 3px; padding: 2px 6px; max-width: 320px; }
+#settlement .build-row input { width: 5em; }
+#settlement .build-row option.dim { color: #8a8478; }
+#settlement .build-row button { font: inherit; font-size: 12px; background: #3a4a2e; color: #e8f0cc; border: 1px solid #6a7a4e; border-radius: 3px; padding: 2px 10px; cursor: pointer; }
+#settlement .build-row button:hover { background: #4a5e38; }
+#settlement .build-row button:disabled { background: #2a3240; color: #777; border-color: #444; cursor: default; }
+#settlement .blurb { flex-basis: 100%; font-size: 12px; line-height: 1.35; }
+#settlement .dim { color: #9a9484; }

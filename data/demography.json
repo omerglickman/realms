@@ -36,11 +36,12 @@
     "idleHandsSharePerMonth": 0.10,
     "triggerSafetyMonths": 0,
     "trickle": {
-      "_comment": "DECIDED OFF by Omer 2026-11-05 (sharePerYear 0) until towns have work; the rule stays for later. The countryside feeds the town people as well as grain. Once a year (December) a settlement whose idle hands exceed minIdleShare of its hands sends sharePerYear of its idle hands, with dependants, to its parent — but only if the parent was fully fed that year (requireFedParent). spread randomizes the share by ±spread (0.5 → 50 %–150 % of sharePerYear). sharePerYear 0 turns it off.",
-      "sharePerYear": 0,
+      "_comment": "The PULL FACTOR (DESIGN §4.1, DECIDED by Omer 2026-11-05, Session 11; turned back on at 0.04 with the vacancies condition). The countryside feeds the town people as well as grain. Once a year (December) a settlement whose idle hands exceed minIdleShare of its hands sends sharePerYear of its idle hands, with dependants, to its parent — but only if the parent was fully fed that year (requireFedParent) AND has work for them (requireVacancies): the parent's VACANCIES are the hands its buildings, fields and construction could use but it does not have (gathering is what spare hands do, so it creates no vacancy); never more people move than the vacancies can absorb. spread randomizes the share by ±spread (0.5 → 50 %–150 % of sharePerYear). sharePerYear 0 turns it off.",
+      "sharePerYear": 0.04,
       "minIdleShare": 0.15,
       "spread": 0.5,
-      "requireFedParent": true
+      "requireFedParent": true,
+      "requireVacancies": true
     }
   },
   "noise": {

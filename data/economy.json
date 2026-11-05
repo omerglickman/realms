@@ -47,5 +47,15 @@
     "_titheComment": "DECIDED 2026-11-05 (DESIGN §4.2): the parent takes this share of every subordinate's food production in kind, the moment it is produced, before the subordinate reckons its own needs. 0.10 = customary tithe (draft). Must become a player policy (light / customary / heavy) with DESIGN §4.3.",
     "titheShare": 0.10
   },
-  "staffingOrder": ["buildings", "fields"]
+  "staffingOrder": ["buildings", "fields", "construction", "gathering"],
+  "materials": {
+    "_comment": "DECIDED by Omer 2026-11-05 (Session 11; numbers DRAFT, ×3 scale): timber and stone are gathered by the SPARE hands — the hands the food jobs do not need — so gathering never costs food; spare hands still count as spare for the crowding rule. Timber comes from the terrain's timber yield (0–4) of worked hexes, stone from worked Stone hexes (quarries and lumber camps multiply this in Phase 2). Units are abstract (a Mill costs 90 timber). Every settlement gathers into its own stock; the CLUSTER's stockpile is the sum over its members and building projects draw from it (DESIGN §4.2). Each December a cluster keeps 'reserve' of each material and sends 'surplusShare' of the rest to the faction stockpile, which the player ships anywhere (instantly for now — PLACEHOLDER until roads and caravans). surplusShare is to grow with administration quality (DESIGN §4.3).",
+    "timber": { "perYearByTimber": [0, 60, 120, 180, 240], "hands": 30 },
+    "stone": { "perYearOnStoneHex": 90, "hands": 30 },
+    "reserve": { "timber": 300, "stone": 150, "goods": 0 },
+    "surplusShare": 0.10,
+    "construction": {
+      "_comment": "A project advances by (spare hands given / buildHands) / buildMonths each month, capped at full speed. Spare hands go to construction before gathering."
+    }
+  }
 }

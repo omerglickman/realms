@@ -10,6 +10,8 @@ import { Editor } from './editor/editor';
 import { renderPanel, renderPopover } from './panels/settlementPanel';
 import { renderClusterPanel, renderRealmPanel } from './panels/clusterPanel';
 import { clusterOf } from '../sim/clusters';
+import { factionStockKey, type Command } from '../sim/commands';
+import type { Materials } from '../sim/materials';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
 import { endTurn } from '../sim/turn';
@@ -267,7 +269,10 @@ export async function startApp(): Promise<void> {
     camera.centerOn(p.x, p.y);
   }
   function refreshPanel(): void {
-    const clusterHost = { onFocus: focusSettlement, onCluster: showCluster, onRealm: showRealm, onClose: () => select(null) };
+    const clusterHost = {
+      onFocus: focusSettlement, onCluster: showCluster, onRealm: showRealm, onClose: () => select(null),
+      onSend: (root: string, amount: Partial<Materials>) => act({ type: 'transferMaterials', from: factionStockKey(state.playerFaction), to: root, amount }),
+    };
     if (panelMode === 'realm') {
       panel.classList.remove('hidden');
       renderRealmPanel(panel, state, clusterHost);
@@ -288,7 +293,20 @@ export async function startApp(): Promise<void> {
       onFocus: focusSettlement,
       onCluster: showCluster,
       onClose: () => select(null),
+      onBuild: (id, building) => act({ type: 'queueBuilding', id, building }),
+      onCancelBuild: (id) => act({ type: 'cancelBuilding', id }),
     }, editor.active);
+  }
+  /** A player action (Session 11): goes through the command layer via the editor so it is undoable and autosaved. */
+  function act(cmd: Command): void {
+    try {
+      editor.execute(cmd);
+    } catch (e) {
+      el('info-event').textContent = (e as Error).message;
+      return;
+    }
+    updateMapInfo();
+    refreshPanel();
   }
   el<HTMLButtonElement>('realm-btn').addEventListener('click', showRealm);
 

@@ -1,22 +1,29 @@
-// Economy, Phase 1: the food loop (DESIGN §4.2) and migration (DESIGN §4.1).
+// Economy, Phase 1: the food loop (DESIGN §4.2), materials and buildings
+// (Session 11) and migration (DESIGN §4.1).
 // Runs once per month for every settlement, in this order:
-//   plan labour (buildings first, then fields best-per-hand first; rest = idle)
-//   → produce (harvest timing) → consume (+ hunger) → spoil & cap
+//   plan labour (buildings first, then fields best-per-hand first; the rest are
+//   SPARE hands, who build the current project and then gather timber and stone)
+//   → produce food (harvest timing, building effects) → tithe up → consume (+ hunger)
+//   → gather materials, make and sell goods, advance construction → spoil & cap
 //   → share surplus up to the parent (villages first, then towns)
 //   → migrate idle hands from a hungry settlement to its parent.
-// Every number comes from data/economy.json and data/demography.json.
-// Deterministic; no randomness yet.
+// Every number comes from data/economy.json, data/buildings.json and data/demography.json.
+// Deterministic apart from the seeded noise knobs (src/sim/noise.ts).
 
 import economyData from '../../data/economy.json';
 import type { GameState } from './state';
 import type { MapData } from './map';
-import { neighborsOffset } from './map';
-import { TERRAIN, terrainIndex } from './terrain';
+import { TERRAIN } from './terrain';
 import { RESOURCES } from './resources';
 import {
   type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, emptyYearTotals, POP_HISTORY_YEARS, abandonBelow,
 } from './settlements';
 import { logEvent } from './state';
+import { isFishable, isShore } from './water';
+import { MATERIALS, surplusShare, clusterStock, takeFromCluster, emptyMaterials, type Materials } from './materials';
+import { sumEffects, hasStone, type BuildingEffects } from './buildings';
+import { clustersOf } from './clusters';
+export { isShore };
 import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate, granaryBrakeFactor } from './demography';
 import { seedRng, nextFloat, nextGaussian, nextU32 } from './rng';
 import { noise } from './noise';
@@ -31,13 +38,11 @@ export function setTitheShare(x: number): void {
   (ECONOMY.sharing as { titheShare?: number }).titheShare = x;
 }
 
-const WATER = new Set(ECONOMY.fishing.waterTerrains.map(terrainIndex));
-const SEA = terrainIndex('sea');
-const LAKE = terrainIndex('lake');
 const FISH_RES = RESOURCES.findIndex((r) => r.id === 'fish');
 const GAME_RES = RESOURCES.findIndex((r) => r.id === 'game');
 
 export type JobKind = 'farm' | 'herd' | 'fish' | 'hunt';
+export type GatherKind = 'timber' | 'stone';
 
 export interface Job {
   kind: JobKind;
@@ -48,20 +53,10 @@ export interface Job {
   hands: number;
 }
 
-/** Is this sea hex a shore (touches land)? Lakes and rivers are always workable. */
-export function isShore(map: MapData, col: number, row: number): boolean {
-  for (const n of neighborsOffset(map, col, row)) {
-    const t = map.terrain[n.row * map.width + n.col];
-    if (t !== SEA && t !== LAKE) return true;
-  }
-  return false;
-}
-
 /** The food jobs a single hex offers (DESIGN §3.1, §4.2). */
 export function hexJobs(map: MapData, cell: number): Job[] {
   const t = TERRAIN[map.terrain[cell]];
   const res = map.resource[cell];
-  const col = cell % map.width, row = Math.floor(cell / map.width);
   const jobs: Job[] = [];
   if (t.fertility > 0) {
     jobs.push({ kind: 'farm', cell, fedPerYear: ECONOMY.farming.fedPerYearByFertility[t.fertility], hands: ECONOMY.farming.hands });
@@ -69,8 +64,7 @@ export function hexJobs(map: MapData, cell: number): Job[] {
   if (t.pasture > 0) {
     jobs.push({ kind: 'herd', cell, fedPerYear: ECONOMY.herding.fedPerYearByPasture[t.pasture], hands: ECONOMY.herding.hands });
   }
-  const ti = map.terrain[cell];
-  if (WATER.has(ti) && (ti !== SEA || !ECONOMY.fishing.seaNeedsLandNeighbour || isShore(map, col, row))) {
+  if (isFishable(map, cell)) {
     if (res === FISH_RES) jobs.push({ kind: 'fish', cell, fedPerYear: ECONOMY.fishing.withFish.fedPerYear, hands: ECONOMY.fishing.withFish.hands });
     else jobs.push({ kind: 'fish', cell, fedPerYear: ECONOMY.fishing.fedPerYear, hands: ECONOMY.fishing.hands });
   }
@@ -78,6 +72,27 @@ export function hexJobs(map: MapData, cell: number): Job[] {
     jobs.push({ kind: 'hunt', cell, fedPerYear: ECONOMY.hunting.fedPerYear, hands: ECONOMY.hunting.hands });
   }
   return jobs;
+}
+
+/** A materials job a hex offers (Session 11): timber by terrain yield, stone on a Stone hex. */
+export interface GatherJob {
+  kind: GatherKind;
+  cell: number;
+  /** units per year at full labour */
+  perYear: number;
+  hands: number;
+}
+
+export function hexGatherJobs(map: MapData, cell: number): GatherJob[] {
+  const t = TERRAIN[map.terrain[cell]];
+  const jobs: GatherJob[] = [];
+  if (t.timber > 0) jobs.push({ kind: 'timber', cell, perYear: MATERIALS.timber.perYearByTimber[t.timber] ?? 0, hands: MATERIALS.timber.hands });
+  if (hasStone(map, cell)) jobs.push({ kind: 'stone', cell, perYear: MATERIALS.stone.perYearOnStoneHex, hands: MATERIALS.stone.hands });
+  return jobs;
+}
+
+export interface StaffedGatherJob extends GatherJob {
+  fraction: number;
 }
 
 export interface StaffedBuilding {
@@ -97,6 +112,7 @@ export interface LabourPlan {
   staffedHands: number;
   jobs: StaffedJob[];
   fieldHands: number;
+  /** SPARE hands: not needed by buildings or fields (they build and gather, and are the crowding / migration pool) */
   idleHands: number;
   /** yearly food if every job were fully worked */
   landCapacity: number;
@@ -104,23 +120,40 @@ export interface LabourPlan {
   plannedPerYear: number;
   /** 0–1 staffing of the granary */
   granaryStaffing: number;
+  /** Session 11 */
+  effects: BuildingEffects;
+  /** spare hands on the current project and the share of full construction speed they give */
+  constructionHands: number;
+  constructionFraction: number;
+  gather: StaffedGatherJob[];
+  gatherHands: number;
+  /** hands the buildings, fields and construction could use but the settlement does not have (the pull factor's "jobs") */
+  vacancies: number;
 }
 
-/** Allocate a settlement's hands: buildings first, then jobs best-per-hand first (DESIGN §4.2). */
+/**
+ * Allocate a settlement's hands: buildings first, then food jobs best-per-hand
+ * first (DESIGN §4.2); the SPARE hands left over build the current project and
+ * then gather timber and stone (Session 11). Vacancies count the hands that
+ * buildings, fields and construction wanted but did not get.
+ */
 export function planLabour(map: MapData, s: Settlement, cells: number[]): LabourPlan {
   const hands = workingHands(s.pop);
   let left = hands;
+  let vacancies = 0;
   const buildings: StaffedBuilding[] = [];
   let granaryStaffing = 0;
   for (const id of s.buildings) {
     const def = buildingDef(id);
     const got = Math.min(left, def.hands);
     left -= got;
+    vacancies += def.hands - got;
     const fraction = def.hands > 0 ? got / def.hands : 1;
     buildings.push({ id, hands: got, fraction });
     if (def.family === 'granary') granaryStaffing = fraction;
   }
   const staffedHands = hands - left;
+  const effects = sumEffects(buildings);
 
   const jobs: Job[] = [];
   for (const c of cells) for (const j of hexJobs(map, c)) jobs.push(j);
@@ -132,11 +165,43 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
     const got = Math.min(left, j.hands);
     left -= got;
     fieldHands += got;
+    vacancies += j.hands - got;
     const fraction = got / j.hands;
     plannedPerYear += j.fedPerYear * fraction;
     staffed.push({ ...j, fraction });
   }
-  return { hands, buildings, staffedHands, jobs: staffed, fieldHands, idleHands: left, landCapacity, plannedPerYear, granaryStaffing };
+  const idleHands = left;
+
+  // spare hands: construction first, then gathering (best output per hand first)
+  let spare = left;
+  let constructionHands = 0, constructionFraction = 0;
+  if (s.build) {
+    const need = buildingDef(s.build.building).buildHands ?? 0;
+    constructionHands = Math.min(spare, need);
+    spare -= constructionHands;
+    vacancies += need - constructionHands;
+    constructionFraction = need > 0 ? constructionHands / need : 1;
+  }
+  const gjobs: GatherJob[] = [];
+  for (const c of cells) for (const g of hexGatherJobs(map, c)) gjobs.push(g);
+  gjobs.sort((a, b) => b.perYear / b.hands - a.perYear / a.hands || a.cell - b.cell);
+  const gather: StaffedGatherJob[] = [];
+  let gatherHands = 0;
+  for (const g of gjobs) {
+    const got = Math.min(spare, g.hands);
+    spare -= got;
+    gatherHands += got;
+    gather.push({ ...g, fraction: g.hands > 0 ? got / g.hands : 0 });
+  }
+  return { hands, buildings, staffedHands, jobs: staffed, fieldHands, idleHands, landCapacity, plannedPerYear, granaryStaffing, effects, constructionHands, constructionFraction, gather, gatherHands, vacancies };
+}
+
+/** Materials gathered this month by a labour plan (units per year / 12). */
+export function monthlyMaterials(plan: LabourPlan): Materials {
+  const out = emptyMaterials();
+  for (const g of plan.gather) out[g.kind] += (g.perYear * g.fraction) / 12;
+  out.goods += plan.effects.goodsPerYear / 12;
+  return out;
 }
 
 /**
@@ -150,7 +215,9 @@ export function monthlyProduction(plan: LabourPlan, month: number, harvestFactor
   const harvestShare = ECONOMY.farming.harvest.shares[month] ?? 0;
   for (const j of plan.jobs) {
     const yearlyFood = j.fedPerYear * j.fraction * 12 * ECONOMY.foodPerPersonPerMonth;
-    food += j.kind === 'farm' ? yearlyFood * harvestShare * harvestFactor : yearlyFood / 12;
+    if (j.kind === 'farm') food += yearlyFood * harvestShare * harvestFactor * plan.effects.farmingMult;
+    else if (j.kind === 'fish') food += (yearlyFood / 12) * plan.effects.fishingMult;
+    else food += yearlyFood / 12;
   }
   return food;
 }
@@ -179,12 +246,12 @@ export function rollHarvestFactors(state: GameState): void {
   }
 }
 
-export function granaryTerms(staffing: number): { capacityMonths: number; spoilage: number } {
+export function granaryTerms(staffing: number, effects?: BuildingEffects): { capacityMonths: number; spoilage: number } {
   const u = ECONOMY.granary.unstaffed, f = ECONOMY.granary.staffed;
   const k = Math.max(0, Math.min(1, staffing));
   return {
-    capacityMonths: u.capacityMonths + (f.capacityMonths - u.capacityMonths) * k,
-    spoilage: u.spoilagePerMonth + (f.spoilagePerMonth - u.spoilagePerMonth) * k,
+    capacityMonths: u.capacityMonths + (f.capacityMonths - u.capacityMonths) * k + (effects?.granaryExtraMonths ?? 0),
+    spoilage: (u.spoilagePerMonth + (f.spoilagePerMonth - u.spoilagePerMonth) * k) * (effects?.granarySpoilageMult ?? 1),
   };
 }
 
@@ -251,6 +318,9 @@ export function economyMonth(state: GameState, month: number): void {
     r.fieldHands = plan.fieldHands;
     r.idleHands = plan.idleHands;
     r.landCapacity = plan.landCapacity;
+    r.constructionHands = plan.constructionHands;
+    r.gatherHands = plan.gatherHands;
+    r.vacancies = plan.vacancies;
 
     r.produced = monthlyProduction(plan, month, s.harvestFactor);
     s.food += r.produced;
@@ -286,7 +356,35 @@ export function economyMonth(state: GameState, month: number): void {
     s.yearMonths += 1;
     s.yearSufficiency += 1 - r.shortfall;
 
-    const g = granaryTerms(plan.granaryStaffing);
+    // materials (Session 11): spare hands gather timber and stone; workshops make goods; markets sell them
+    const made = monthlyMaterials(plan);
+    s.stock.timber += made.timber; s.stock.stone += made.stone; s.stock.goods += made.goods;
+    r.timber = made.timber; r.stone = made.stone; r.goods = made.goods;
+    if (plan.effects.sellsGoodsPerYear > 0) {
+      const f = s.faction ? state.factions[s.faction] : undefined;
+      if (f) {
+        const want = plan.effects.sellsGoodsPerYear / 12;
+        const have = clusterStock(state, s.id).goods;
+        const sell = Math.min(want, have);
+        if (sell > 0) {
+          const taken = takeFromCluster(state, s.id, { goods: sell });
+          f.treasury += taken.goods * plan.effects.goodsPrice;
+          r.sold = taken.goods * plan.effects.goodsPrice;
+        }
+      }
+    }
+    // construction: the project advances by the share of full labour it got
+    if (s.build) {
+      const def = buildingDef(s.build.building);
+      s.build.progress += plan.constructionFraction / Math.max(1, def.buildMonths ?? 1);
+      if (s.build.progress >= 1 - 1e-9) {
+        s.buildings.push(s.build.building);
+        s.build = null;
+        logEvent(state, 'built', `${s.name} finished its ${def.name}.`);
+      }
+    }
+
+    const g = granaryTerms(plan.granaryStaffing, plan.effects);
     r.spoiled = s.food * g.spoilage;
     s.food -= r.spoiled;
     r.capacity = g.capacityMonths * monthlyNeed(s);
@@ -339,6 +437,7 @@ export function economyMonth(state: GameState, month: number): void {
     y.produced += r.produced; y.consumed += r.consumed; y.hungerDeaths += r.hungerDeaths;
     y.sent += r.sent; y.received += r.received; y.titheOut += r.titheOut; y.titheIn += r.titheIn;
     y.migrantsOut += r.migrantsOut; y.migrantsIn += r.migrantsIn;
+    y.timber += r.timber; y.stone += r.stone; y.goods += r.goods; y.sold += r.sold;
     y.months += 1;
   }
 }
@@ -393,9 +492,11 @@ export function demographyYear(state: GameState): void {
     s.yearMonths = 0;
     s.yearSufficiency = 0;
   }
-  // migration trickle: idle hands above the threshold drift to a fed parent, with dependants
+  // the PULL FACTOR (DESIGN §4.1, Session 11; formerly the migration trickle): idle hands above the
+  // threshold drift to a fed parent that has WORK for them — never more than its vacancies — with dependants
   for (const s of list) s.report.trickleOut = s.report.trickleIn = 0;
   if (k.trickleShare > 0) {
+    const vacanciesLeft = new Map<string, number>();
     for (const s of settlementsByRank(state)) {
       if (!s.parent) continue;
       const p = state.settlements[s.parent];
@@ -404,12 +505,39 @@ export function demographyYear(state: GameState): void {
       const hands = s.report.hands, idle = s.report.idleHands;
       if (hands <= 0 || idle / hands <= k.trickleMinIdle) continue;
       const jitter = k.trickleSpread > 0 ? 1 + k.trickleSpread * (2 * nextFloat(state.rng) - 1) : 1;
-      const movingHands = Math.min(idle, idle * k.trickleShare * jitter);
+      let movingHands = Math.min(idle, idle * k.trickleShare * jitter);
+      if (k.trickleRequireVacancies) {
+        const room = vacanciesLeft.get(p.id) ?? p.report.vacancies;
+        movingHands = Math.min(movingHands, room);
+        if (movingHands <= 0) continue;
+        vacanciesLeft.set(p.id, room - movingHands);
+      }
       const slice = takeSlice(s.pop, movingHands / hands);
       const n = totalPopulation(slice);
       addPopulation(p.pop, slice);
       s.report.trickleOut += n;
       p.report.trickleIn += n;
+    }
+  }
+  // materials surplus (DESIGN §4.2, Session 11): each cluster keeps its reserve and sends a share of the
+  // rest to the faction stockpile, taken from the members in proportion to what each holds
+  const share = surplusShare();
+  if (share > 0) {
+    for (const c of clustersOf(state)) {
+      const f = c.faction ? state.factions[c.faction] : undefined;
+      if (!f) continue;
+      const pool = clusterStock(state, c.root);
+      const want: Partial<Materials> = {};
+      for (const m of ['timber', 'stone', 'goods'] as const) {
+        const excess = pool[m] - (MATERIALS.reserve[m] ?? 0);
+        if (excess > 0) want[m] = excess * share;
+      }
+      const taken = takeFromCluster(state, c.root, want);
+      const total = taken.timber + taken.stone + taken.goods;
+      if (total > 0) {
+        f.stock.timber += taken.timber; f.stock.stone += taken.stone; f.stock.goods += taken.goods;
+        state.settlements[c.root].year.surplusOut += total;
+      }
     }
   }
   for (const s of list) {
