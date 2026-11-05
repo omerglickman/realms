@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "sim": "tsx src/headless/run.ts",
     "mapdiff": "tsx src/headless/mapdiff.ts",
-    "smoke": "python3 scripts/smoke.py"
+    "smoke": "python3 scripts/smoke.py",
+    "shots": "python3 scripts/shots.py"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"

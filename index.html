@@ -9,58 +9,59 @@
   <body>
     <div id="map"></div>
 
+    <!-- the ledger strip: the bottom lines, always visible -->
     <div id="topbar">
-      <div class="bar-row bar-main">
-        <span class="bar-title">Realms, Kings and Other Stuff <span class="bar-build">Phase 1</span></span>
-        <span id="info-date" class="bar-date">January, year 1</span>
-        <button id="end-turn" title="Advance one month (Space)">End turn</button>
-        <label class="bar-run">Run <input id="run-years" type="number" min="1" max="200" value="10" /> yrs</label>
-        <button id="run-years-btn" title="Run the simulation for that many years">Run</button>
-        <button id="realm-btn" title="The whole realm: people, food and the clusters (K)">Realm</button>
-        <span class="bar-sep"></span>
-        <button id="edit-toggle">Edit map</button>
-        <button id="start-position" title="Reload the shipped starting position (Omer's realm)">Start position</button>
-        <button id="testmap" title="Load the bare test map — terrain and resources only">Bare map</button>
-        <details id="gen">
-          <summary>New draft…</summary>
-          <div class="gen-body">
-            <div class="bar-row">
-              <label>Seed <input id="seed" type="text" value="vinral" size="10" /></label>
-              <button id="random" title="Pick a random seed and generate">Random</button>
-              <label>Size
-                <select id="size">
-                  <option value="160x100" selected>160 × 100</option>
-                  <option value="80x50">80 × 50</option>
-                  <option value="400x250">400 × 250</option>
-                </select>
-              </label>
-            </div>
-            <div class="bar-row">
-              <label>Continents
-                <select id="continents">
-                  <option value="1">1</option>
-                  <option value="2" selected>2</option>
-                  <option value="3">3</option>
-                </select>
-              </label>
-              <label>Islands <input id="islands" type="number" min="0" max="20" value="6" style="width:3em" /></label>
-              <label>Land <input id="land" type="range" min="25" max="70" value="45" style="width:6em" /> <span id="land-val">45%</span></label>
-              <button id="generate">Generate draft</button>
-            </div>
-          </div>
-        </details>
-        <span class="bar-spacer"></span>
-        <span id="info-hex" class="bar-info">Hover a hex</span>
-        <button id="bar-toggle" title="Show / hide details">▾</button>
+      <div class="brand">
+        <div class="title">Realms, Kings and Other Stuff</div>
+        <div class="date" id="info-date">January, year 1</div>
       </div>
-      <div class="bar-row bar-details" id="bar-details">
-        <span id="info-map" class="bar-info"></span>
-        <span class="bar-sep"></span>
-        <span id="info-run" class="bar-info bar-dim"></span>
-        <span id="info-event" class="bar-info event-line"></span>
-        <span id="info-perf" class="bar-info bar-dim"></span>
-        <span class="bar-spacer"></span>
-        <span class="bar-help bar-dim">Drag to pan · wheel to zoom · Home fits · Space ends the turn · click a settlement for details · K realm · G grid · R resources · Z zones &amp; clusters · E editor</span>
+      <div id="tiles"></div>
+      <div id="turn-controls">
+        <button id="end-turn" title="Advance one month (Space)">End month</button>
+        <label class="run">run <input id="run-years" type="number" min="1" max="200" value="3" /> yrs</label>
+        <button id="run-years-btn" title="Run the simulation for that many years">Go</button>
+        <button id="menu-btn" title="Menu">☰</button>
+      </div>
+    </div>
+
+    <div id="menu" class="hidden">
+      <div class="mi" id="menu-realm">Realm ledger <kbd>K</kbd></div>
+      <div class="mi" id="edit-toggle">Edit map <kbd>E</kbd></div>
+      <div class="msep"></div>
+      <div class="mi" id="start-position">Start position</div>
+      <div class="mi" id="testmap">Bare map</div>
+      <div class="mi" id="menu-draft">New draft…</div>
+      <div class="msep"></div>
+      <div class="mi" id="menu-settings">Settings…</div>
+      <div class="mi" id="menu-help">Keys &amp; help <kbd>?</kbd></div>
+    </div>
+
+    <div id="status">
+      <span class="hex" id="info-hex">Hover a hex</span>
+      <span class="ev" id="info-event"></span>
+      <span class="hint" id="info-run"></span>
+      <span class="perf" id="info-perf"></span>
+    </div>
+
+    <!-- the generator form lives here hidden and is moved into the New draft dialog when opened -->
+    <div id="holder" class="hidden">
+      <div id="gen-form">
+        <div class="gen-grid">
+          <label>Seed</label><div><input id="seed" type="text" value="vinral" size="12" /> <button id="random" class="btn small" title="Pick a random seed and generate">Random</button></div>
+          <label>Size</label><select id="size">
+            <option value="160x100" selected>160 × 100</option>
+            <option value="80x50">80 × 50</option>
+            <option value="400x250">400 × 250</option>
+          </select>
+          <label>Continents</label><select id="continents">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+          </select>
+          <label>Islands</label><input id="islands" type="number" min="0" max="20" value="6" style="width:4em" />
+          <label>Land</label><div><input id="land" type="range" min="25" max="70" value="45" style="width:10em" /> <span id="land-val">45%</span></div>
+        </div>
+        <div class="form-row"><button id="generate" class="btn primary">Generate draft</button><span class="dim">A crude noise canvas to edit by hand — the test map itself is a file and never changes.</span></div>
       </div>
     </div>
 
@@ -139,12 +140,13 @@
           <label>Name <input id="settle-name" type="text" size="14" placeholder="(automatic)" /></label>
         </div>
         <div class="row small"><span id="settle-count" class="dim"></span></div>
-        <div class="help dim">Place: hatched hexes are already worked; dotted lines are the influence edges of towns and cities (a new village inside one becomes its dependant); the pale solid lines are cluster outlines. Pick: opens a settlement so you can change its name and population or remove it.</div>
+        <div class="help dim">Place: hatched hexes are already worked; dotted lines are the influence edges of towns and cities (a new village inside one becomes its dependant); the pale solid lines are cluster outlines. Pick: opens a settlement's ledger so you can change its name and population or remove it.</div>
       </div>
     </div>
 
-    <div id="settlement" class="hidden"></div>
     <div id="popover" class="hidden"></div>
+    <div id="modal-backdrop" class="hidden"></div>
+    <div id="modal" class="hidden"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

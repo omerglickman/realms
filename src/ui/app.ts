@@ -1,22 +1,26 @@
-// The browser application: PixiJS stage, camera, input, HUD, editor wiring,
-// settlement layer and panel, turn controls. All game rules live in src/sim;
-// this file only displays and forwards input.
+// The browser application: PixiJS stage, camera, input, the ledger strip,
+// hover card, the ledgers (modals), editor wiring, turn controls. All game
+// rules live in src/sim; this file only displays and forwards input.
 
 import { Application, Graphics } from 'pixi.js';
 import { MapRenderer, HEX_SIZE } from './render/mapRenderer';
-import { SettlementLayer } from './render/settlementLayer';
+import { SettlementLayer, setLabelFont } from './render/settlementLayer';
 import { Camera } from './camera';
 import { Editor } from './editor/editor';
-import { renderPanel, renderPopover } from './panels/settlementPanel';
-import { renderClusterPanel, renderRealmPanel } from './panels/clusterPanel';
-import { clusterOf } from '../sim/clusters';
+import { renderHud } from './panels/hud';
+import { renderHoverCard } from './panels/hoverCard';
+import { ModalShell, wireLinks, type ModalSpec } from './panels/modal';
+import { settlementSpec, wireSettlement } from './panels/settlementModal';
+import { clusterSpec, wireSend } from './panels/clusterModal';
+import { realmSpec } from './panels/realmModal';
+import { clusterOf, clusterRootOf } from '../sim/clusters';
 import { factionStockKey, type Command } from '../sim/commands';
 import type { Materials } from '../sim/materials';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
 import { endTurn } from '../sim/turn';
 import { pixelToAxial, axialToOffset, offsetToPixel, hexCorners } from '../sim/hex';
-import { inBounds, getTerrain, getResource, countTerrain, idx } from '../sim/map';
+import { inBounds, getTerrain, getResource, idx } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
 import { resourceByIndex } from '../sim/resources';
 import { loadMapFile } from '../sim/mapfile';
@@ -25,6 +29,7 @@ import { SettlementLayer as SL } from './render/settlementLayer';
 import testmapJson from '../../maps/testmap.json';
 import startJson from '../../scenarios/start.json';
 import { loadScenarioFile } from '../sim/scenario';
+import { esc } from './panels/format';
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -32,18 +37,37 @@ function el<T extends HTMLElement>(id: string): T {
   return e as T;
 }
 
+/** The header-font choices (Settings). Lugrasimo is the default — the closest open font to a Carolingian book hand. */
+const FONTS: { id: string; cls: string; family: string; label: string }[] = [
+  { id: 'lugrasimo', cls: '', family: 'Lugrasimo', label: 'Lugrasimo — a round Carolingian-style book hand (default)' },
+  { id: 'almendra', cls: 'font-almendra', family: 'Almendra', label: 'Almendra — a lighter calligraphic hand' },
+  { id: 'uncial', cls: 'font-uncial', family: 'Uncial Antiqua', label: 'Uncial Antiqua — the older uncial' },
+];
+
 export async function startApp(): Promise<void> {
   const host = el<HTMLDivElement>('map');
   const app = new Application();
   await app.init({
     resizeTo: window,
-    background: 0x1b2430,
+    background: 0x221a12,
     antialias: true,
     resolution: Math.min(window.devicePixelRatio || 1, 2),
     autoDensity: true,
     preference: 'webgl',
   });
   host.appendChild(app.canvas);
+
+  // ---- settings: the header font (stored in the browser) ----
+  function applyFont(id: string): void {
+    const f = FONTS.find((x) => x.id === id) ?? FONTS[0];
+    for (const x of FONTS) if (x.cls) document.body.classList.toggle(x.cls, x.id === f.id);
+    setLabelFont(`${f.family}, Georgia, serif`);
+    try { localStorage.setItem('realms.font', f.id); } catch { /* ignore */ }
+  }
+  let fontId = 'lugrasimo';
+  try { fontId = localStorage.getItem('realms.font') || 'lugrasimo'; } catch { /* ignore */ }
+  try { await Promise.all(FONTS.map((f) => document.fonts.load(`14px "${f.family}"`))); } catch { /* fonts are bundled; a failure only means fallbacks */ }
+  applyFont(fontId);
 
   // ---- generator settings (also readable from the URL hash, e.g.
   //      realms.html#seed=orkney&w=160&h=100&continents=2&islands=6&land=45) ----
@@ -77,7 +101,7 @@ export async function startApp(): Promise<void> {
     };
   }
 
-  // ---- state: the shipped test map by default; a generated draft if the URL asks for one ----
+  // ---- state: the shipped starting position by default; a generated draft if the URL asks for one ----
   let state: GameState;
   let mapName = '';
   /** The shipped starting position (scenarios/start.json — Omer's placed and pre-run realm, DESIGN §4.8). */
@@ -92,14 +116,14 @@ export async function startApp(): Promise<void> {
     state = loadStart();
   }
 
-  // ---- selection / hover of settlements ----
+  // ---- selection / hover of settlements, and the open ledger ----
   let selectedId: string | null = null;
   let hoverId: string | null = null;
-  /** what the #settlement panel shows: a settlement, its cluster, or the whole realm */
-  type PanelMode = 'settlement' | 'cluster' | 'realm';
-  let panelMode: PanelMode = 'settlement';
+  type ViewKind = 'settlement' | 'cluster' | 'realm' | 'settings' | 'help' | 'draft';
+  let view: { kind: ViewKind; id: string; tab: string } | null = null;
   let workAssign = computeWorkAssignment(state);
-  const panel = el<HTMLDivElement>('settlement');
+  const modal = new ModalShell(el('modal'), el('modal-backdrop'));
+  const tiles = el<HTMLDivElement>('tiles');
   let mouseX = -1, mouseY = -1;
 
   const renderer = new MapRenderer(state.map);
@@ -109,31 +133,16 @@ export async function startApp(): Promise<void> {
   renderer.root.addChild(settlementLayer.root, hover);
   app.stage.addChild(renderer.root);
 
-  // ---- top bar collapse ----
-  const topbar = el<HTMLDivElement>('topbar');
-  const barToggle = el<HTMLButtonElement>('bar-toggle');
-  function syncBarHeight(): void {
-    document.documentElement.style.setProperty('--bar-h', `${topbar.offsetHeight}px`);
-  }
-  function setBarCollapsed(c: boolean): void {
-    topbar.classList.toggle('collapsed', c);
-    barToggle.textContent = c ? '▸' : '▾';
-    try { localStorage.setItem('realms.topbar.collapsed', c ? '1' : '0'); } catch { /* ignore */ }
-    syncBarHeight();
-  }
-  new ResizeObserver(syncBarHeight).observe(topbar);
-  barToggle.addEventListener('click', () => setBarCollapsed(!topbar.classList.contains('collapsed')));
-  try { setBarCollapsed(localStorage.getItem('realms.topbar.collapsed') === '1'); } catch { /* ignore */ }
-
-  // ---- hover popover: a small card to the right of the hovered settlement ----
+  // ---- hover card: a small card to the right of the hovered settlement ----
   const popover = el<HTMLDivElement>('popover');
+  const topbar = el<HTMLDivElement>('topbar');
   let popoverId: string | null = null;
   function showPopover(id: string | null): void {
     const s = id ? state.settlements[id] : null;
     if (!s) { popover.classList.add('hidden'); popoverId = null; return; }
     popoverId = id;
-    renderPopover(popover, state, s);
-    popover.style.borderLeftColor = state.factions[s.faction ?? '']?.color ?? '#9a9484';
+    renderHoverCard(popover, state, s);
+    popover.style.borderLeftColor = state.factions[s.faction ?? '']?.color ?? '#4a2f1a';
     popover.classList.remove('hidden');
     positionPopover();
   }
@@ -180,7 +189,7 @@ export async function startApp(): Promise<void> {
     setMapName: (n) => { mapName = n; updateMapInfo(); },
     setState: (s) => { replaceState(s, true); },
     onSelect: (id) => select(id),
-    onToolChanged: () => { refreshLayer(); refreshPanel(); if (mouseX >= 0) updateHover(mouseX, mouseY); },
+    onToolChanged: () => { refreshLayer(); renderView(); if (mouseX >= 0) updateHover(mouseX, mouseY); },
   });
 
   applyMap(true);
@@ -206,6 +215,7 @@ export async function startApp(): Promise<void> {
     state = s;
     selectedId = null;
     hoverId = null;
+    if (view && (view.kind === 'settlement' || view.kind === 'cluster')) closeView();
     applyMap(fit);
   }
 
@@ -216,7 +226,8 @@ export async function startApp(): Promise<void> {
     workAssign = computeWorkAssignment(state);
     updateMapInfo();
     refreshLayer();
-    refreshPanel();
+    renderHud(tiles, state, { onRealm: (tab) => openView('realm', '', tab) });
+    renderView();
     editor.refreshPanel();
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   }
@@ -227,39 +238,105 @@ export async function startApp(): Promise<void> {
   }
 
   function updateMapInfo(): void {
-    const counts = countTerrain(state.map);
-    const land = state.map.terrain.length - (counts[TERRAIN.findIndex((t) => t.id === 'sea')] ?? 0);
-    const cal = calendar(state.turn);
-    const label = mapName ? `map "${mapName}"` : `seed "${state.seed}"`;
-    const n = Object.keys(state.settlements).length;
-    el('info-map').textContent =
-      `${state.map.width}×${state.map.height} hexes · ${label} · land ${((100 * land) / state.map.terrain.length).toFixed(0)}%${n ? ` · ${n} settlement${n === 1 ? '' : 's'}` : ''}`;
-    el('info-date').textContent = `${cal.monthName}, year ${cal.year}`;
     const ev = state.events[state.events.length - 1];
     el('info-event').textContent = ev ? `${calendar(ev.turn).monthName} ${calendar(ev.turn).year}: ${ev.text}` : '';
   }
 
-  // ---- settlement selection and panel (settlement / cluster / realm views share #settlement) ----
+  // ---- the ledgers ----
+  const tabMemory: Record<string, string> = {};
+  function openView(kind: ViewKind, id = '', tab?: string): void {
+    const t = tab ?? tabMemory[kind] ?? 'overview';
+    view = { kind, id, tab: t };
+    tabMemory[kind] = t;
+    if (kind === 'settlement') selectedId = id;
+    else if (kind === 'cluster') selectedId = id;
+    refreshLayer();
+    renderView();
+  }
+  function closeView(): void {
+    view = null;
+    modal.hide();
+    refreshLayer();
+  }
+  const links = {
+    onFocus: focusSettlement,
+    onCluster: (root: string) => openView('cluster', root),
+    onOpen: (kind: string, id: string, tab?: string) => openView(kind as ViewKind, id, tab),
+  };
+  const modalHost = { onTab: (t: string) => { if (view) openView(view.kind, view.id, t); }, onClose: closeView };
+  function renderView(): void {
+    if (!view) return;
+    const genForm = el('gen-form');
+    if (view.kind !== 'draft' && genForm.parentElement !== el('holder')) el('holder').appendChild(genForm);
+    let spec: ModalSpec;
+    if (view.kind === 'settlement') {
+      const s = state.settlements[view.id];
+      if (!s) { closeView(); return; }
+      spec = settlementSpec(state, s, view.tab, editor.active);
+      const root = modal.show(`settlement:${s.id}:${view.tab}`, spec, modalHost);
+      wireSettlement(root, state, s, {
+        onRename: (id, name) => { editor.editSettlement(id, { name }); },
+        onSetPopulation: (id, population) => { editor.editSettlement(id, { population }); },
+        onRemove: (id) => { editor.removeSettlement(id); closeView(); },
+        onBuild: (id, building) => act({ type: 'queueBuilding', id, building }),
+        onCancelBuild: (id) => act({ type: 'cancelBuilding', id }),
+      }, editor.active);
+      wireLinks(root, links);
+    } else if (view.kind === 'cluster') {
+      const c = state.settlements[view.id] ? clusterOf(state, view.id) : null;
+      if (!c) { closeView(); return; }
+      spec = clusterSpec(state, c, view.tab, c.faction === state.playerFaction);
+      const root = modal.show(`cluster:${c.root}:${view.tab}`, spec, modalHost);
+      wireLinks(root, links);
+      wireSend(root, { onSend: (to, amount) => sendMaterials(to, amount) });
+    } else if (view.kind === 'realm') {
+      spec = realmSpec(state, view.tab);
+      const root = modal.show(`realm:${view.tab}`, spec, modalHost);
+      wireLinks(root, links);
+      wireSend(root, { onSend: (to, amount) => sendMaterials(to, amount) });
+    } else if (view.kind === 'settings') {
+      spec = settingsSpec();
+      const root = modal.show('settings', spec, modalHost);
+      root.querySelectorAll<HTMLInputElement>('input[name=font]').forEach((i) => i.addEventListener('change', () => { applyFont(i.value); renderView(); refreshLayer(); }));
+    } else if (view.kind === 'help') {
+      modal.show('help', helpSpec(), modalHost);
+    } else {
+      const root = modal.show('draft', { title: 'New draft map', badge: 'generator', body: '<div id="gen-slot"></div><p class="note">Generates a fresh canvas from noise and replaces the current map and settlements. The shipped test map and starting position are files and are not touched; reload them from the menu.</p>' }, modalHost);
+      root.querySelector('#gen-slot')!.appendChild(genForm);
+    }
+  }
+  function sendMaterials(to: string, amount: Partial<Materials>): void {
+    act({ type: 'transferMaterials', from: factionStockKey(state.playerFaction), to, amount });
+  }
+
+  function settingsSpec(): ModalSpec {
+    const cur = (() => { try { return localStorage.getItem('realms.font') || 'lugrasimo'; } catch { return 'lugrasimo'; } })();
+    return {
+      title: 'Settings', badge: 'this browser',
+      body: `<h3>Header hand</h3><p class="note">The script used for titles, headings and the names on the map. All three are bundled in the file.</p>
+        ${FONTS.map((f) => `<div class="form-row"><label><input type="radio" name="font" value="${f.id}" ${f.id === cur ? 'checked' : ''}> <span style="font-family:'${f.family}';font-size:20px">Hugeopolis · The Realm · Granary</span></label> <span class="dim">${esc(f.label)}</span></div>`).join('')}
+        <h3>Map</h3><p class="note">Keys on the map: <kbd>G</kbd> grid · <kbd>R</kbd> resource glyphs · <kbd>Z</kbd> zones and cluster outlines. The hex under the cursor is described in the strip at the bottom of the screen.</p>`,
+    };
+  }
+  function helpSpec(): ModalSpec {
+    const row = (k: string, v: string) => `<tr><th><kbd>${k}</kbd></th><td>${v}</td></tr>`;
+    return {
+      title: 'Keys & help', badge: 'phase 1',
+      body: `<div class="cols"><div><h3>Turns</h3><table class="kv">${row('Space', 'end the month')}${row('Go', 'run the years in the box')}</table>
+        <h3>Ledgers</h3><table class="kv">${row('click', 'a settlement opens its ledger; the tiles at the top open the realm\'s')}${row('K', 'the realm ledger')}${row('Esc', 'close')}</table></div>
+        <div><h3>Map</h3><table class="kv">${row('drag', 'pan')}${row('wheel', 'zoom')}${row('Home', 'fit the map')}${row('arrows', 'pan')}${row('G', 'hex grid')}${row('R', 'resource glyphs')}${row('Z', 'zones and cluster outlines')}${row('E', 'the map editor')}</table></div></div>
+        <h3>Reading the screen</h3>
+        <p>The strip at the top is the realm's bottom line: the crown's <b>treasury</b>, the <b>people</b>, <b>months of food</b> in all granaries, and the realm's <b>stockpile</b> of timber, stone and goods against its cap. Hover a tile for the figures behind it; click it for the full page.</p>
+        <p>Every settlement's ledger has five pages: <b>Overview</b>, <b>People</b> (who lives there and what limits growth), <b>Land & Food</b> (every worked hex, the harvest calendar, the granary), <b>Economy</b> (where the hands go, tax, the cluster's stockpile) and <b>Buildings</b>. A <b>cluster</b> is an independent settlement with everything subordinate to it — food flows only inside it. The <b>realm</b> is the sum over clusters.</p>
+        <p class="note">Hex colours: grassland and river are the richest farmland; plains feed herds; hills and woodland are middling; forest gives timber; mountains, lake and sea cannot be settled. Shore, lake and river hexes are fished.</p>`,
+    };
+  }
+
+  // ---- settlement selection ----
   function select(id: string | null): void {
-    selectedId = id && state.settlements[id] ? id : null;
-    panelMode = 'settlement';
-    refreshLayer();
-    refreshPanel();
-  }
-  /** Open the cluster panel of the cluster `root` heads; the root is selected so the outline lights up. */
-  function showCluster(root: string): void {
-    if (!state.settlements[root]) return;
-    selectedId = root;
-    panelMode = 'cluster';
-    refreshLayer();
-    refreshPanel();
-  }
-  function showRealm(): void {
-    if (panelMode === 'realm') { select(null); return; }
-    selectedId = null;
-    panelMode = 'realm';
-    refreshLayer();
-    refreshPanel();
+    if (!id || !state.settlements[id]) { if (view?.kind === 'settlement' || view?.kind === 'cluster') closeView(); selectedId = null; refreshLayer(); return; }
+    const keepTab = view?.kind === 'settlement' ? view.tab : undefined;
+    openView('settlement', id, keepTab);
   }
   function focusSettlement(id: string): void {
     const t = state.settlements[id];
@@ -268,36 +345,7 @@ export async function startApp(): Promise<void> {
     const p = offsetToPixel(t.col, t.row, HEX_SIZE);
     camera.centerOn(p.x, p.y);
   }
-  function refreshPanel(): void {
-    const clusterHost = {
-      onFocus: focusSettlement, onCluster: showCluster, onRealm: showRealm, onClose: () => select(null),
-      onSend: (root: string, amount: Partial<Materials>) => act({ type: 'transferMaterials', from: factionStockKey(state.playerFaction), to: root, amount }),
-    };
-    if (panelMode === 'realm') {
-      panel.classList.remove('hidden');
-      renderRealmPanel(panel, state, clusterHost);
-      return;
-    }
-    const s = selectedId ? state.settlements[selectedId] : null;
-    if (!s) { panel.classList.add('hidden'); panel.innerHTML = ''; panelMode = 'settlement'; return; }
-    panel.classList.remove('hidden');
-    if (panelMode === 'cluster') {
-      const c = clusterOf(state, s.id);
-      if (c) { renderClusterPanel(panel, state, c, clusterHost); return; }
-      panelMode = 'settlement';
-    }
-    renderPanel(panel, state, s, {
-      onRename: (id, name) => { editor.editSettlement(id, { name }); },
-      onSetPopulation: (id, population) => { editor.editSettlement(id, { population }); },
-      onRemove: (id) => { editor.removeSettlement(id); },
-      onFocus: focusSettlement,
-      onCluster: showCluster,
-      onClose: () => select(null),
-      onBuild: (id, building) => act({ type: 'queueBuilding', id, building }),
-      onCancelBuild: (id) => act({ type: 'cancelBuilding', id }),
-    }, editor.active);
-  }
-  /** A player action (Session 11): goes through the command layer via the editor so it is undoable and autosaved. */
+  /** A player action: goes through the command layer via the editor so it is undoable and autosaved. */
   function act(cmd: Command): void {
     try {
       editor.execute(cmd);
@@ -305,10 +353,20 @@ export async function startApp(): Promise<void> {
       el('info-event').textContent = (e as Error).message;
       return;
     }
-    updateMapInfo();
-    refreshPanel();
+    stateChanged();
   }
-  el<HTMLButtonElement>('realm-btn').addEventListener('click', showRealm);
+
+  // ---- menu ----
+  const menu = el<HTMLDivElement>('menu');
+  const menuBtn = el<HTMLButtonElement>('menu-btn');
+  function toggleMenu(open?: boolean): void { menu.classList.toggle('hidden', open === undefined ? !menu.classList.contains('hidden') : !open); }
+  menuBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(); });
+  window.addEventListener('pointerdown', (e) => { if (!menu.contains(e.target as Node) && e.target !== menuBtn) toggleMenu(false); });
+  menu.addEventListener('click', () => toggleMenu(false));
+  el('menu-realm').addEventListener('click', () => openView('realm'));
+  el('menu-draft').addEventListener('click', () => openView('draft'));
+  el('menu-settings').addEventListener('click', () => openView('settings'));
+  el('menu-help').addEventListener('click', () => openView('help'));
 
   // ---- turns ----
   function advance(months: number): void {
@@ -326,13 +384,12 @@ export async function startApp(): Promise<void> {
     advance(12 * years);
   });
 
-  // ---- HUD controls ----
+  // ---- map controls ----
   function regenerate(): void {
-    const t0 = performance.now();
     mapName = `draft ${seedInput.value.trim() || 'realms'}`;
     editor.resetHistory();
+    closeView();
     replaceState(newGameFrom(readParams()), true);
-    el('info-perf').textContent = `generated in ${(performance.now() - t0).toFixed(0)} ms`;
   }
   el<HTMLButtonElement>('generate').addEventListener('click', regenerate);
   el<HTMLButtonElement>('random').addEventListener('click', () => {
@@ -343,13 +400,13 @@ export async function startApp(): Promise<void> {
     seedInput.value = w;
     regenerate();
   });
-  el<HTMLButtonElement>('start-position').addEventListener('click', () => {
+  el('start-position').addEventListener('click', () => {
     if (editor.dirty && !confirm('Reload the shipped starting position? Unsaved changes will be lost (save a scenario first if you want to keep them).')) return;
     history.replaceState(null, '', location.pathname);
     editor.resetHistory();
     replaceState(loadStart(), true);
   });
-  el<HTMLButtonElement>('testmap').addEventListener('click', () => {
+  el('testmap').addEventListener('click', () => {
     if (Object.keys(state.settlements).length && !confirm('Load the bare test map (terrain and resources, no settlements)? Unsaved changes will be lost.')) return;
     const loaded = loadMapFile(testmapJson);
     mapName = loaded.name;
@@ -394,9 +451,12 @@ export async function startApp(): Promise<void> {
       painting = false;
       editor.pointerUp();
     } else if (wasPanning && e.button === 0 && !moved) {
-      // a plain click outside edit mode: select the settlement under the cursor (or deselect)
+      // a plain click outside edit mode: open the settlement under the cursor (or close the ledger)
       const h = hexAt(e.clientX, e.clientY);
-      select(inBounds(state.map, h.col, h.row) ? settlementIdAt(state, h.col, h.row) : null);
+      const id = inBounds(state.map, h.col, h.row) ? settlementIdAt(state, h.col, h.row) : null;
+      if (id) select(id);
+      else if (view) closeView();
+      else select(null);
     }
     canvas.releasePointerCapture(e.pointerId);
   });
@@ -426,6 +486,7 @@ export async function startApp(): Promise<void> {
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
       if (e.key === 'Enter' && (e.target as HTMLElement).id === 'seed') regenerate();
+      if (e.key === 'Escape') (e.target as HTMLElement).blur();
       return;
     }
     if (editor.key(e)) { e.preventDefault(); if (mouseX >= 0) updateHover(mouseX, mouseY); return; }
@@ -440,8 +501,10 @@ export async function startApp(): Promise<void> {
     else if (e.key === 'Home') camera.fit();
     else if (e.key === 'e' || e.key === 'E') { editor.setActive(!editor.active); }
     else if (e.key === ' ') { e.preventDefault(); advance(1); }
-    else if (e.key === 'k' || e.key === 'K') showRealm();
-    else if (e.key === 'Escape') select(null);
+    else if (e.key === 'k' || e.key === 'K') { if (view?.kind === 'realm') closeView(); else openView('realm'); }
+    else if (e.key === '?') openView('help');
+    else if (e.key === 'c' || e.key === 'C') { if (selectedId) openView('cluster', clusterRootOf(state, selectedId)); }
+    else if (e.key === 'Escape') { if (!menu.classList.contains('hidden')) toggleMenu(false); else if (view) closeView(); else select(null); }
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   });
 
@@ -462,11 +525,11 @@ export async function startApp(): Promise<void> {
     }
     const t = TERRAIN[getTerrain(state.map, h.col, h.row)];
     const r = resourceByIndex(getResource(state.map, h.col, h.row));
-    const y = [t.fertility ? `fertility ${t.fertility}` : '', t.pasture ? `pasture ${t.pasture}` : '', t.timber ? `timber ${t.timber}` : ''].filter(Boolean).join(' ');
+    const y = [t.fertility ? `fertility ${t.fertility}` : '', t.pasture ? `pasture ${t.pasture}` : '', t.timber ? `timber ${t.timber}` : ''].filter(Boolean).join(' · ');
     const workedBy = workAssign.get(idx(state.map, h.col, h.row));
-    const workedText = workedBy && state.settlements[workedBy] ? `  · worked by ${state.settlements[workedBy].name}` : '';
+    const workedText = workedBy && state.settlements[workedBy] ? ` · worked by ${state.settlements[workedBy].name}` : '';
     el('info-hex').textContent =
-      `hex (${h.col}, ${h.row})  ${t.name}${r ? ` · ${r.name}` : ''}  move ${t.passable ? t.moveCost : '—'}${y ? '  ' + y : ''}${workedText}`;
+      `${t.name}${r ? ` · ${r.name}` : ''} (${h.col}, ${h.row}) · move ${t.passable ? t.moveCost : '—'}${y ? ' · ' + y : ''}${workedText}`;
     hoverId = settlementIdAt(state, h.col, h.row);
     if (prevHover !== hoverId) { showPopover(hoverId); refreshLayer(); }
     else if (hoverId) renderPopoverIfStale();
@@ -486,7 +549,7 @@ export async function startApp(): Promise<void> {
 
   /** After turns ran the hovered settlement's numbers changed: redraw the card in place. */
   function renderPopoverIfStale(): void {
-    if (popoverId && popoverId === hoverId && state.settlements[popoverId]) renderPopover(popover, state, state.settlements[popoverId]);
+    if (popoverId && popoverId === hoverId && state.settlements[popoverId]) renderHoverCard(popover, state, state.settlements[popoverId]);
   }
 
   // ---- frame loop: culling + perf readout; redraw the settlement layer when the zoom changes ----
@@ -503,7 +566,7 @@ export async function startApp(): Promise<void> {
       frames = 0;
       lastFps = now;
       el('info-perf').textContent =
-        `${fps} fps · zoom ${camera.zoom.toFixed(2)} · ${visible}/${renderer.chunkCount} chunks visible · worst chunk build ${maxBuild.toFixed(0)} ms`;
+        `${state.map.width}×${state.map.height} · ${mapName || state.seed} · ${fps} fps · zoom ${camera.zoom.toFixed(2)} · ${visible}/${renderer.chunkCount} chunks · build ${maxBuild.toFixed(0)} ms`;
     }
   });
 }

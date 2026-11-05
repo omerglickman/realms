@@ -95,7 +95,7 @@ export class Editor {
   setActive(on: boolean): void {
     this.active = on;
     el('editor').classList.toggle('hidden', !on);
-    el<HTMLButtonElement>('edit-toggle').textContent = on ? 'Leave editor' : 'Edit map';
+    el('edit-toggle').innerHTML = `${on ? 'Leave the editor' : 'Edit map'} <kbd>E</kbd>`;
     document.body.classList.toggle('editing', on);
     this.host.onToolChanged();
   }

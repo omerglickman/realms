@@ -42,14 +42,20 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 
 | File | Job |
 |---|---|
-| `app.ts` | wiring: state, camera, renderer, HUD/top bar, hover card, panel modes (settlement / cluster / realm; K, Esc, Z, G, R, E), End turn / Run N years, scenario save/import, autosave, `act(cmd)` → `editor.execute` |
+| `app.ts` | wiring: state, camera, renderer, the ledger strip, hover card, the ledgers (`view` = settlement / cluster / realm / settings / help / draft; K, C, ?, Esc, Z, G, R, E), End month / Run N years, the ☰ menu, scenario save/import, autosave, `act(cmd)` → `editor.execute`, the header-font setting |
 | `camera.ts` | pan/zoom |
 | `render/mapRenderer.ts` | chunked, culled hex terrain + resource glyphs (PixiJS 8) |
-| `render/settlementLayer.ts` | influence zones, faction border, cluster outlines, worked-hex hatching, markers and labels |
-| `panels/settlementPanel.ts` | hover line/card and the settlement panel (people, hands/private, tax base, granary, land, cluster line, buildings + project, Build picker with `costText`, materials, last month); `PanelHost` callbacks |
-| `panels/clusterPanel.ts` | cluster panel (members tree, year balance, stockpile vs cap, tax) and realm panel (sum over clusters, realm stockpile vs cap, treasury ledger, Send form); `clusterLine` |
+| `render/settlementLayer.ts` | influence zones, faction border, cluster outlines, worked-hex hatching, markers and labels (`setLabelFont`) |
+| `panels/format.ts` | shared display helpers: `fmt`, `esc`, tier words, `foodMonths`, `clusterLine`, `costText`, `projectText`, gauges / bars / stacks / stat tiles / `kv` tables, the sparkline, the inline-SVG `ICON` set |
+| `panels/hud.ts` | the ledger strip (Session 13): date, treasury, people, food, realm stockpile tiles with hover tips; clicks open the realm ledger |
+| `panels/hoverCard.ts` | the settlement hover card |
+| `panels/modal.ts` | the modal shell (`ModalShell.show(key, spec, host)`, `wireLinks`) |
+| `panels/settlementModal.ts` | the settlement ledger: Overview · People (age pyramid, growth line, crowding / granary brake) · Land & Food (harvest calendar, every worked hex) · Economy (hands stack, tax, stockpile, gathering) · Buildings (cards, Start / Cancel); editor footer (rename / people / remove) |
+| `panels/clusterModal.ts` | the cluster ledger: Overview · Members · Food · Stockpile (+ the Send form helpers `sendForm` / `wireSend`, `stockBars`, `yearFoodText`) |
+| `panels/realmModal.ts` | the realm ledger: Overview · Clusters · People · Food · Treasury · Stockpile |
+| `fonts/` | bundled woff2 fonts (SIL OFL): Lugrasimo, Almendra, Uncial Antiqua (header hands), Alegreya (body) |
 | `editor/editor.ts` | undo/redo stack over commands, brushes, flood fill, resource tools, Settle tool, autosave |
-| `style.css` | all styling |
+| `style.css` | all styling: the medieval palette as CSS variables, `@font-face` for the bundled fonts, strip / menu / status / hover card / modal / editor rules |
 
 ## `src/headless/`
 
@@ -66,7 +72,8 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 
 | File | Command |
 |---|---|
-| `smoke.py` | `npm run smoke` — loads `dist/realms.html` in headless Chrome, runs years, opens realm → cluster → settlement, buys a building, sends materials; fails on any console error; screenshots to `/tmp/smoke_*.png` |
+| `smoke.py` | `npm run smoke` — loads `dist/realms.html` in headless Chrome, runs years, opens the realm → cluster → settlement ledgers, buys a building, sends materials; fails on any console error; screenshots to `/tmp/smoke_*.png` |
+| `shots.py` | `npm run shots` — screenshots every ledger page, the menu, editor, settings and help to `/tmp/ui_*.png` for a visual check |
 
 ## Data files
 

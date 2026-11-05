@@ -48,11 +48,16 @@ export interface LayerView {
 const MARKER_SCALE = [0.42, 0.6, 0.78, 0.95];
 
 const LABEL_STYLE = new TextStyle({
-  fontFamily: 'Georgia, serif',
-  fontSize: 12,
+  fontFamily: 'Lugrasimo, Georgia, serif',
+  fontSize: 13,
   fill: 0xffffff,
   stroke: { color: 0x000000, width: 3 },
 });
+
+/** Session 13: the map labels follow the header hand chosen in Settings (the style is shared by every label). */
+export function setLabelFont(family: string): void {
+  LABEL_STYLE.fontFamily = family;
+}
 
 type Segment = [number, number, number, number];
 
