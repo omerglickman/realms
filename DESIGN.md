@@ -71,7 +71,7 @@ A faction wins when every other faction has been **conquered**, **subjugated** o
 | Lake | impassable | 0 | Fish for adjacent settlements. |
 | Sea | impassable (naval later) | 0 | Fish and sea trade for coastal settlements. |
 
-OPEN: Should **Desert** exist? (Not in the brief. Only matters if the world has a hot south.)
+**Desert** does not exist for now (Omer, 2026-11-05); perhaps in a future iteration if the world gets a hot south.
 
 PROPOSED for later (not v1): river as an *overlay* on any terrain (so rivers can cross hills or woodland) instead of a terrain type. For v1, "River" is a terrain type exactly as in the brief.
 
