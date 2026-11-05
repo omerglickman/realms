@@ -308,3 +308,116 @@ Villages never starve on any site; migration is negligible. The spread between b
 ## 2026-11-05 — Session 6b — Faction decisions
 
 **Omer's decisions (DESIGN v0.3c §4.8):** factions hand-designed; several culture groups, defined later; start positions placed by Omer in the editor (tier + population), with the option to run the engine forward a few years and save the result as the starting state; sizes shaped by Omer; AI personas deferred to Phase 5; player faction fixed. **Change of plan:** build Phases 1–3 with the player's faction alone; add the other five once the mechanics work. Settlements keep a faction id throughout so the addition is data-only. No code this entry; docs mirrored.
+
+## 2026-11-05 — Session 7 — Settlements on the map
+
+**Phase:** 1 — **Goal of session:** settlements placeable in the editor (player faction only), zones drawn, hover + panel, end turn / run years, scenario export/import.
+
+**Done:**
+- `data/factions.json` + `src/sim/factions.ts`: the player faction (placeholder name "The Realm", colour `#c8323c`), `culture` reserved; `GameState` v3 adds `factions` and `playerFaction`; v1/v2 saves migrate.
+- `settlements.ts`: `popHistory` (year-end totals, capped at 30 — pushed by `demographyYear`), `foundedTurn`, `growthTrend` (last two Decembers), `childrenOf`, `canSettleAt` (passable land, not occupied); settlements founded without a faction belong to the player. `commands.ts`: `renameSettlement`.
+- `src/sim/scenario.ts`: scenario file = envelope around the serialized state with meta (settlements, people, date); `detectFile` tells map and scenario files apart.
+- `src/ui/render/settlementLayer.ts`: zone fill + outer border per faction (edge detection against the union of influence cells), worked-hex highlight of the hovered/selected settlement, markers by tier (circle / circle / diamond / star) never smaller than ~5 px, labels at constant screen size (cities always labelled; others from zoom 0.45). Z toggles zones.
+- `src/ui/panels/settlementPanel.ts`: hover line and detail panel as Omer specified (name, population, growth trend %, available food, parent) plus hands, land, granary, buildings, dependants, last month, founding.
+- Editor: Settle tool (T; tier / people / name; defaults 900 / 9,000 / 24,000 / 36,000); hover shows the tier's influence reach; placing selects; clicking an existing settlement selects it; rename and remove from the panel in edit mode; "Save scenario" button; Import takes map or scenario files; autosave is now the whole scenario and the editor opens itself when there is an autosave to restore.
+- HUD: date, End turn (Space), Run N years (10 default, ≤200; 5 years ≈ 15 ms on the test map with 4 settlements), click a settlement outside edit mode to open its panel, Esc closes, "Test map" asks before discarding settlements.
+- Tests: 8 new (68 total) — factions in state, default faction, v2 migration, popHistory/trend/cap, foundedTurn, canSettleAt, rename inverse + childrenOf, scenario round-trip and file detection.
+
+**How it was done / decisions of note:**
+- Scenario vs map: the map file stays the hand-edited canvas (committed to the repo); the scenario is the state. `maps/testmap.json` is unchanged this session.
+- Growth trend needs two year-ends; until then the panel says so rather than showing a misleading number. "Since founding" uses the first year-end as the base.
+- Placement rule implemented as PLACEHOLDER (DESIGN §3.3 says nothing about where a centre may stand): any passable land hex. Water and mountains refused.
+- Headless check in Chromium: placed a town and three villages, End turn, Run 5 years, hover line, undo/redo of placements, Save scenario → reload → autosave notice → Import scenario → same date and settlements. Zero console errors. Screenshots `session7.png`, `session7_zoom.png`.
+
+**Design decisions made by Omer this session (DESIGN v0.3c):** see Session 6b (factions; player faction alone; editor placement + pre-run; hover contents).
+
+**Broken / unfinished:** see Current state → limitations. Village hall name still the placeholder "Moot Hall".
+
+**Tests & build:** pass (68/68; `tsc` clean; build clean; headless browser run clean).
+
+**Commit(s):** `phase1: settlements on the map — …` (07b045b) + docs commit.
+
+**Build delivered:** `realms.html` (Session 7).
+
+**Next session should:**
+1. Read Omer's feedback; commit his scenario file if he sends one and make the build open on it.
+2. Yearly report / faction panel; buildings with effects; edit population/tier of a placed settlement.
+
+## 2026-11-05 — Session 8 — UI pass
+
+**Phase:** 1 — **Goal of session:** Omer's six UI requests after trying the Session 7 build.
+
+**Done (all six):**
+1. **Top bar** replaces the HUD box: one line across the top — title, date, End turn, Run N years, Edit map, Test map, New draft (drops down), hex readout, and a ▾/▸ toggle that collapses the second line (map info, perf, help). The collapsed state is remembered. Panels sit below the bar whatever its height (`--bar-h`).
+2. **Editor tabs** — Terrain (brush / fill / pick, sizes, palette), Resources (palette, spawn), Settlements (Place / Pick). Switching tabs drops the previous tool; keyboard shortcuts are per tab (Tab cycles tabs).
+3. **Pick mode** on the Settlements tab opens an existing settlement for editing without placing anything; the panel gets a *Set people* field (new `editSettlement` command: every cohort scaled, granary months kept, exact inverse) next to the rename box and Remove.
+4. **Hover card** (`#popover`): name, tier, people, growth %/yr, food months (+ amount), subordinate to, hunger warning; appears to the right of the marker (flips left at the screen edge, clamped vertically), follows pans/zooms, stays while the cursor is on the card, closes when the cursor leaves both the settlement and the card (also when it jumps onto another panel). Clicking the card opens the full panel. The old hover line in the HUD is gone.
+5. **Hover highlight**: worked hexes (as before) plus a **dotted line in the faction colour around the influence edge** for tiers whose influence exceeds their work zone (towns, cities, metropolis).
+6. **Settle mode** (Place): every worked hex on the map is **hatched** so free hexes are obvious; the **dotted influence edges of all towns and cities** are drawn so the player can see which parent a new village would get; the white preview now outlines the new settlement's *work* zone rather than its influence reach.
+
+**How it was done:** `settlementLayer.ts` gained an `outerEdges(set)` helper (edge detection against a hex set), a manual dash renderer (PixiJS has no dashed strokes) and a horizontal hatch per hex; `editor.ts` rewritten around tabs; `app.ts` owns the popover and the bar. Tests: 1 new (69). Headless Chromium: tabs, pick, set people 9,745 → 12,000 with the granary months unchanged, popover open/close incl. leaving for a panel, placement in settle mode, zero console errors; screenshots `s8_hover_town.png`, `s8_settle_mode.png`.
+
+**Design decisions made by Omer this session:** UI only (recorded above); no DESIGN change.
+
+**Broken / unfinished:** where the influence edge coincides with the faction border the dotted line sits on the solid one and is hard to tell apart (same colour by request). Tier of a placed settlement still not editable.
+
+**Tests & build:** pass (69/69; `tsc` clean; build clean; headless browser run clean).
+
+**Commit(s):** `phase1: UI pass — …` + docs commit.
+
+**Build delivered:** `realms.html` (Session 8).
+
+**Next session should:**
+1. Omer's feedback on the UI pass; commit his scenario file when it arrives and make the build open on it.
+2. Yearly report / faction panel; buildings with effects; tuning; Phase 1 acceptance.
+
+## 2026-11-05 — Session 9 — Starting position + demographic realism pass
+
+**Phase:** 1 — **Goal of session:** adopt Omer's first starting position; implement the two ideas from the morning's discussion (migration trickle; randomness in births, deaths and harvests) behind data knobs and measure them on that position.
+
+**Done:**
+- `scenarios/start.json`: Omer's export (60 settlements: Hugeopolis metropolis 31,721; Omerburg 25,583 and Hillside 15,065 cities; 7 towns 7,600–16,000; 50 villages, 11 of them independent; 247,673 people), calendar rebased from year 521 to **February, year 1** (`rebaseAsStart`), founding dates zeroed, populations and granaries untouched. The build opens on it; "Start position" reloads it; "Bare map" gives the empty test map. `src/headless/inspect.ts` lists a scenario.
+- `src/sim/rng.ts`: `nextGaussian`, `nextPoisson`. `src/sim/noise.ts`: all knobs read live from the data files, `setNoise` / `NO_NOISE` for tests and the runner.
+- **Vital sampling** (`demography.ts` `yearlyUpdate` with `{rng}`): births and each band's deaths are Poisson draws around the expected value when `noise.vitalSampling` is 1.
+- **Harvest variance** (`economy.ts` `rollHarvestFactors`, January): factor = 1 + sd × (√share × regional + √(1−share) × local), regional = one gaussian per 12×12 block per year (seeded from one RNG draw + block key), floored at `minFactor`; `monthlyProduction` multiplies the farming part; forecasts use 1. Stored on the settlement (`harvestFactor`).
+- **Epidemics**: `chancePerYear` → that year's deaths × `deathMultiplier`; `report.epidemic`.
+- **Migration trickle** (December, after the yearly update, villages first): idle/hands > `minIdleShare` and parent fully fed this year → `sharePerYear` × idle hands (×(1 ± spread)) leave with dependants for the parent; `report.trickleOut/In`. `report.sufficiency` keeps the year's sufficiency for the parent check. Yearly report fields now survive the monthly reset.
+- `src/headless/start.ts`: runs the start position N calendar years with presets `baseline` (all off), `noise`, `trickle`, `all` (= data defaults) and per-knob overrides; yearly table by tier, per-settlement table with hunger/yr, village spread, CSV.
+- UI: hover card shows "Harvest this year: N %" and "⚠ epidemic"; panel adds a Harvest row and the trickle to "Last year".
+- Tests: 10 new (79) — Poisson/gaussian moments; sampling off = seed-independent, on = reproducible and unbiased, cities less jittery than villages; harvest factors (regional sharing, floor, mean); a bad year leaves less grain; epidemic doubles deaths; trickle amount, conservation, threshold, hungry parent, zero share, spread bounds; everything-on determinism; data defaults.
+
+**Findings on the start position (60 years; all figures from `--scenario start`):**
+- **Baseline (deterministic):** the realm is at its food ceiling: 247,673 → 245,683, flat. The three cities starve steadily — Hugeopolis ≈ 940, Omerburg ≈ 860, Hillside ≈ 300 hunger deaths *per year* (≈ 2,100/yr, 126,000 over 60 years) — because each sits exactly at what its orbit feeds (3.9–5.4 months of grain); births replace the dead each year. Towns never go hungry. Village 63 (900 people on 4 hill hexes under Hillside) starves and empties into Hillside within a decade. 50 villages, **14 distinct sizes** — Omer's observation confirmed.
+- **Sampling alone:** same totals, **47 distinct village sizes**; nothing else changes.
+- **Noise (sampling + harvest ±15 % + epidemics 1 %):** the steady 2,100 deaths/yr become **famine years** — 6,000–7,400 dead in a bad year (year 25, year 60), nothing in good ones; towns dip 10–40 % in bad years and refill; 27–43 epidemic-years per run; realm 239k–248k at year 60 depending on the seed. With sd 0.10 the swings are about half.
+- **Trickle alone:** 130–155 people/yr move village → town; towns +2.6k, villages −4.4k over 60 years; cities unchanged because they are never "fully fed" (the pull condition blocks them). Realm total unchanged.
+- **Everything on:** the trickle pumps ≈ 90,000 people over 60 years up the hierarchy in good years — cities swell from 71k to 100–110k (Hugeopolis to 52,000, Omerburg to 43,000) and then starve them back (140,000 hunger deaths); towns shrink 91k → 72k, villages 65k → 56k. The realm's total stays ≈ 246k: **the land caps the realm, the knobs only move people around within the cap.**
+- Reading: the realm as placed lives at the edge; every added realism exposes that (which is correct behaviour). The trickle's "parent is fed" pull is too weak a brake — the right brake is **work at the destination**, which doesn't exist until workshops (buildings session). Recommendation to Omer: adopt sampling; adopt harvest variance at 0.10–0.15 and epidemics; keep the trickle **off** (or tiny) until buildings give towns jobs, then add a jobs condition.
+
+**Design decisions made by Omer this session:** the starting position (DESIGN §4.8). The knobs are PROPOSED (DESIGN §4.1) pending his verdict.
+
+**Broken / unfinished:** knob values are drafts; the trickle lacks a jobs-at-destination condition (by design, until buildings).
+
+**Tests & build:** pass (79/79; `tsc` clean; build clean; headless browser run clean — 20 years on the start position in 173 ms).
+
+**Commit(s):** `scenario: Omer's starting position …` (3dd266a), `phase1: demographic realism knobs (PROPOSED) …` (298129b) + docs commit.
+
+**Build delivered:** `realms.html` (Session 9) — note it runs with all knobs ON at draft values.
+
+**Next session should:**
+1. Set the knobs to Omer's verdict; record in DESIGN §4.1 (DECIDED); rerun `--scenario start`.
+2. Buildings with effects + build queue (give towns work; then the trickle's jobs condition); yearly realm report; Phase 1 acceptance.
+
+## 2026-11-05 — Session 9b — Knob decisions, abandonment
+
+**Omer's decisions (DESIGN v0.3f):** vital sampling adopted; harvest variance adopted at sd 0.125; epidemics adopted for now (natural events to become a game-wide mechanic later, §4.9); trickle kept off (rule retained). Villages that empty out are removed automatically (an "abandoned settlement" entity may come later).
+
+**Done:** data values set; `abandonment.abandonBelow` 30 in `data/settlements.json`; `abandonEmptySettlements` (monthly, after spoilage/capping, before migration: the remnant walks to the parent if any, granary lost, `resolveAllParents` rerun); `state.events` + `logEvent` (v3 saves without it get an empty log); the top bar's details row shows the last event; `abandonBelow()` / `setAbandonBelow()` live-readable so the scale test can switch it off. Tests: 1 new (80). Rerun of the start position at the decided values: Village 63 abandoned (49 villages, min 834, 47 distinct sizes); realm 247,673 → 240,892 over 60 years; cities still at their ceiling (≈2,100 hunger deaths/yr); famine years of up to 8,000 dead; 33 epidemic-years.
+
+**Tests & build:** 80/80; `tsc` clean; build clean; headless browser run clean (12 years in the browser, zero errors). **Commit:** `phase1: Omer's knob decisions …; automatic abandonment …` (f100a4f) + docs. **Build delivered:** `realms.html` (Session 9b).
+
+**Next session should:** take Omer's decisions on the sharing model and the Cluster (see Current state → Next steps 2), then buildings.
+
+## 2026-11-05 — Session 9c — Sharing model and Cluster decided
+
+**Omer's decisions (DESIGN v0.3g):** **Tithe** adopted at 10 % (draft) of all subordinate food production, in kind, as produced — to become a player policy when §4.3 policies are built; **requisition** waits for Phase 4; the **Cluster** adopted as a derived view: cluster outline replaces the dotted influence line on the map (hover keeps the dotted edge), singletons outlined faintly, cluster panel. **Order of work:** cluster view → tithe with an A/B on the start position → buildings. Work continued in the same chat as Session 10.
