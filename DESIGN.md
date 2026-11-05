@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.4c — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.4d — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -117,7 +117,7 @@ Hexes are *unknown*, *explored* or *visible*. Settlements and units see 2 hexes 
 | Wine | River 4.5% · Hills 3.5% · Plains 1.2% | luxury |
 | Silver | Mountains 2.8% · Hills 0.5% (min 4 hexes apart) | money |
 
-**Water hexes are workable (DECIDED 2026-11-04).** Lake, River and **shore** hexes (a sea hex with at least one land neighbour) in a settlement's work zone yield food from fishing: **225 people fed per year for 30 hands** *(draft)*; with a Fish resource **450 for 90 hands**. Sea hexes that touch no land are *offshore* and need a port (below). River hexes keep their farming yield as well (fertility 4), so a river hex is the richest in the game — intended, to pull settlement toward rivers and coasts. Water hexes carry no pasture.
+**Water hexes are workable (DECIDED 2026-11-04).** Lake, River and **shore** hexes (a sea hex with at least one land neighbour) in a settlement's work zone yield food from fishing: **225 people fed per year for 30 hands** *(draft)*; with a Fish resource **450 for 90 hands**. Sea hexes that touch no land are *offshore* and need a port (below). River hexes keep their farming yield as well (fertility 4), so a river hex is the richest in the game — intended, to pull settlement toward rivers and coasts (confirmed by Omer 2026-11-05). Water hexes carry no pasture.
 
 **Game vs Furs (DECIDED 2026-11-04):** both stay — Game is food (hunting), Furs a trade good. **Horses are not a resource (DECIDED 2026-11-04):** mounted units need **access to a pasture-bearing hex**, in the settlement's zone or via a road to a settlement that has one. **Offshore fish (DECIDED 2026-11-04):** hand-placed sea hexes away from the coast, workable only with an improved port (a later building). The test map's resources are placed in the editor and live in the map file.
 
@@ -160,32 +160,32 @@ Four tiers: **Village**, **Town**, **City**, **Metropolis**. Every settlement ha
 
 **Subordination (DECIDED 2026-11-04):** a lower-tier settlement is subordinate to ("parent") the settlement whose influence zone covers its centre. If several qualify, default to the highest tier, then the nearest; the player can choose the parent explicitly. Surplus and migration go to the parent.
 
-**Metropolis (DECIDED 2026-11-04 as a tier; prerequisites PROPOSED):** a city of 36,000+ may be upgraded to a metropolis — 6 rings of influence and features to be defined. It must be rare and require roads and good land. PROPOSED prerequisites: population ≥ 36,000 for 3 consecutive years; a paved road to at least two towns; an institution from §4.3 (e.g. Chancery). A city's own orbit holds ~25,000–33,000 without roads, so the rarity is built into the geometry.
+**Metropolis (DECIDED 2026-11-04 as a tier; prerequisites accepted as a draft by Omer 2026-11-05, to be revisited when roads exist):** a city of 36,000+ may be upgraded to a metropolis — 6 rings of influence and features to be defined. It must be rare and require roads and good land. Prerequisites *(draft)*: population ≥ 36,000 for 3 consecutive years; a paved road to at least two towns; an institution from §4.3 (e.g. Chancery). A city's own orbit holds ~25,000–33,000 without roads, so the rarity is built into the geometry.
 
 Other details:
 
 - Overlapping influence zones between factions are **contested** territory — a source of diplomatic friction and a trigger for border events. *(PROPOSED)*
 - **Where a settlement may stand (PROPOSED, implemented as placeholder in Session 7):** any passable land hex (not water, not mountains), not already occupied. Placing inside a higher tier's work zone is allowed — the contested-hex rule simply leaves the new settlement fewer hexes, and the editor warns.
 - **Growth between tiers is a player decision**, not automatic: upgrading requires a population threshold, money, materials, and enough **administrative capacity** (§4.3). This is how "few cities, many villages" is enforced softly. *(DECIDED concept)*
-- **Buildings need hands (DECIDED 2026-11-04).** Buildings are staffed from the settlement's working hands before any hand goes to the fields; staffing is linear (half staff = half effect). Every settlement has from its founding a **hall** (village: *Moot Hall* — PLACEHOLDER name; town: Town Hall; city: City Hall; metropolis: TBD) that cannot be demolished and a **Granary**; hands *(draft, ×3)*: hall 30 / 150 / 300 / 600, granary 90 / 180 / 360 / 720. The hall is where government happens; an understaffed hall penalizes tax and order. Hands not needed by buildings or fields are, in a **village**, *spare hands* (the crowding pool, the builders and gatherers, later the levy pool); in a **town, city or metropolis** they are **private hands** (§4.2b).
+- **Buildings need hands (DECIDED 2026-11-04).** Buildings are staffed from the settlement's working hands before any hand goes to the fields; staffing is linear (half staff = half effect). Every settlement has from its founding a **hall** (village: *Moot Hall*; town: Town Hall; city: City Hall; metropolis: *Great Hall* — names DECIDED 2026-11-05) that cannot be demolished and a **Granary**; hands *(draft, ×3)*: hall 30 / 150 / 300 / 600, granary 90 / 180 / 360 / 720. The hall is where government happens; an understaffed hall penalizes tax and order. Hands not needed by buildings or fields are, in a **village**, *spare hands* (the crowding pool, the builders and gatherers, later the levy pool); in a **town, city or metropolis** they are **private hands** (§4.2b).
 
 **Buildings the player builds (DECIDED 2026-11-05; names and numbers draft, in `data/buildings.json`).** A settlement builds **one project at a time**, chosen by the player from the list its tier allows. Every building costs **money + labour + materials + time**: queuing a project pays its money from the faction treasury and its timber and stone from the cluster's stockpile at once (§4.2); construction then takes months and is done by the settlement's spare or private hands — fewer than the project wants means proportionally slower building, and in a town or city the hands on the site pay no tax while they build (§4.2b). Some buildings need a particular hex in the work zone (a river for the Mill, a shore/lake/river for the Wharf, pasture for the Stables — the §3.1 horses rule). Effects scale with staffing. The player can cancel a project for a full refund (draft). The AI will issue the same command in Phase 5.
 
 | Building | From tier | Hands | Cost (coins · timber / stone) | Months | Effect *(draft)* |
 |---|---|---|---|---|---|
-| Mill | village (river hex) | 30 | 400 · 90 / 30 | 6 | +15 % farming output |
-| Fishing Wharf | village (shore hex) | 60 | 400 · 120 / 0 | 6 | +50 % fishing; later the port for offshore fish |
-| Chapel | village | 30 | 300 · 60 / 90 | 9 | +5 order — recorded only until §4.4 exists |
-| Great Granary | town | 180 | 900 · 240 / 120 | 12 | +12 months of granary capacity, spoilage halved |
-| Workshop | town | 30 | 800 · 180 / 90 | 9 | multiplier on the private economy: +50 % goods per private hand |
-| Market | town | 30 | 600 · 120 / 60 | 6 | multiplier: the settlement sells 60 % of the cluster's goods a year instead of 20 % |
-| Warehouse | town | 30 | 600 · 150 / 60 | 6 | the cluster's stockpile cap +900 timber / +450 stone / +450 goods |
-| Archery Range | village | 15 | 300 · 90 / 0 | 4 | **military (Omer)** — unlocks archers in Phase 4 |
-| Stables | village (pasture hex) | 30 | 500 · 120 / 0 | 6 | **military (Omer)** — unlocks mounted units in Phase 4 |
-| Drill Yard *(PLACEHOLDER name)* | village | 15 | 300 · 90 / 30 | 4 | **military (Omer)** — trains melee levies, Phase 4 |
-| Palisade / Walls / Barracks / Ironworks / Citadel | village / town / town / city / city | 0 / 0 / 60 / 300 / 150 | 400 · 180/0 · 2,400 · 120/600 · 900 · 180/180 · 1,800 · 300/300 · 6,000 · 300/1200 | 6 / 24 / 12 / 18 / 36 | data only; effects come with Phase 4 |
+| Mill | village (river hex) | 30 | 2,000 · 90 / 30 | 6 | +15 % farming output |
+| Fishing Wharf | village (shore hex) | 60 | 2,000 · 120 / 0 | 6 | +50 % fishing; later the port for offshore fish |
+| Chapel | village | 30 | 1,500 · 60 / 90 | 9 | +5 order — recorded only until §4.4 exists |
+| Great Granary | town | 180 | 4,500 · 240 / 120 | 12 | +12 months of granary capacity, spoilage halved |
+| Workshop | town | 30 | 4,000 · 180 / 90 | 9 | multiplier on the private economy: +50 % goods per private hand |
+| Market | town | 30 | 3,000 · 120 / 60 | 6 | sells 60 % of the cluster's goods a year — **the only way goods become money** (Omer, Session 12c) |
+| Warehouse | town | 30 | 3,000 · 150 / 60 | 6 | the cluster's stockpile cap +900 timber / +450 stone / +450 goods |
+| Archery Range | village | 15 | 1,500 · 90 / 0 | 4 | **military (Omer)** — unlocks archers in Phase 4 |
+| Stables | village (pasture hex) | 30 | 2,500 · 120 / 0 | 6 | **military (Omer)** — unlocks mounted units in Phase 4 |
+| Drill Yard *(PLACEHOLDER name)* | village | 15 | 1,500 · 90 / 30 | 4 | **military (Omer)** — trains melee levies, Phase 4 |
+| Palisade / Walls / Barracks / Ironworks / Citadel | village / town / town / city / city | 0 / 0 / 60 / 300 / 150 | 2,000 · 180/0 · 12,000 · 120/600 · 4,500 · 180/180 · 9,000 · 300/300 · 30,000 · 300/1200 | 6 / 24 / 12 / 18 / 36 | data only; effects come with Phase 4 |
 
-Buildings for the professional army come later (Omer). Cathedral, School, Guildhall, Mint, Great Market, Inn remain PROPOSED for the institutions session (§4.3). Money costs are priced so that a town of ~10,000 affords one modest building a year from its own tax (Omer, Session 11b); whether that is the right scale once the realm's whole income is counted is OPEN (§5.11). The Workshop and Market are multipliers on the private economy, not employers (§4.2b).
+Buildings for the professional army come later (Omer). Cathedral, School, Guildhall, Mint, Great Market, Inn remain PROPOSED for the institutions session (§4.3). **Money costs (DECIDED by Omer 2026-11-05, Session 12c): five times the first draft** — a town of ~10,000 affords a modest building every 2–3 years from its own tax, and the realm's whole income buys a few a year; the sinks to come (upkeep, institutions, characters) will tighten it further. The Workshop is a multiplier on the private economy, not an employer; the **Market is the only way goods become money** (§4.2b).
 
 ### 3.4 Infrastructure and buildings outside settlements (DECIDED concept)
 
@@ -248,14 +248,14 @@ Economic output is computed from in-world activity — resources gathered, goods
 - Two building materials, **timber** and **stone**, plus **goods** (made by the private economy). Units are abstract (a Mill costs 90 timber).
 - **Gathering is done by the spare hands** — the hands the food jobs do not need — so it never costs food. Timber comes from the terrain's timber yield of the worked hexes (0 / 60 / 120 / 180 / 240 a year per fully worked hex, 30 hands); stone from worked **Stone** hexes (90 a year, 30 hands; Phase 2 quarries and lumber camps multiply this). A grassland city gathers nothing; its woodland villages gather for it. Spare hands that gather still count as spare for the crowding rule.
 - **The cluster is the stockpile.** Every settlement holds its own stock; the cluster's stockpile is the sum over its members, and a building project draws from it (the builder's own stock first, then the others). Goods likewise.
-- **Stockpile caps (DECIDED 2026-11-05, Session 11b):** a cluster's stockpile has a **cap** per material — *draft:* 300 timber / 150 stone / 150 goods plus 60 / 30 / 30 per member settlement, plus +900 / +450 / +450 per **Warehouse**; every month what a cluster holds above its cap flows to the **realm stockpile** (taken from the holders in proportion), which has its own cap — *a flat draft of 3,000 / 1,500 / 1,500 until administration quality exists (§4.3)* — above which it is lost. The player ships from the realm stockpile to any cluster; **the shipment arrives at once** — a PLACEHOLDER until roads and caravans carry it with delay and loss.
+- **Stockpile caps (DECIDED 2026-11-05, Session 11b; numbers left to Claude by Omer, Session 12c):** a cluster's stockpile has a **cap** per material — *draft:* 300 timber / 150 stone / 150 goods plus 60 / 30 / 30 per member settlement, plus +900 / +450 / +450 per **Warehouse** (a 22-settlement cluster holds 810 stone, enough for Walls; a Citadel's 1,200 needs a Warehouse or shipping); every month what a cluster holds above its cap flows to the **realm stockpile** (taken from the holders in proportion), which has its own cap — *a flat draft of 6,000 / 3,000 / 3,000 until administration quality exists (§4.3)* — above which it is lost. The player ships from the realm stockpile to any cluster; **the shipment arrives at once** — a PLACEHOLDER until roads and caravans carry it with delay and loss.
 - **Money** is **faction-wide**: clusters hold grain and materials, never coin. It comes from **tax on private hands** (§4.2b) and from goods sold; it pays for buildings and, later, upkeep and institutions.
 
-**4.2b The private economy (DECIDED by Omer 2026-11-05, Session 11b; draft numbers in `data/economy.json` `privateEconomy`: 0.2 coins and 0.05 goods per private hand per year, 20 % of the cluster's goods sold a year per town, 1 coin a good; administration quality = the hall's staffing until §4.3 exists; which uses of private hands cost their tax is partly OPEN, §5.11).** Omer's framing: the vast majority of townspeople did not work for the state — they were artisans, labourers, traders, professionals — and the crown saw them not as hands but as **revenue** (tolls, market dues, hearth taxes, tallage, charter sums). So in a town, city or metropolis every hand not in a building or a field is a **private hand**, and:
+**4.2b The private economy (DECIDED by Omer 2026-11-05, Session 11b; draft numbers in `data/economy.json` `privateEconomy`: 0.2 coins and 0.05 goods per private hand per year, 1 coin a good; administration quality = the hall's staffing until §4.3 exists).** Omer's framing: the vast majority of townspeople did not work for the state — they were artisans, labourers, traders, professionals — and the crown saw them not as hands but as **revenue** (tolls, market dues, hearth taxes, tallage, charter sums). So in a town, city or metropolis every hand not in a building or a field is a **private hand**, and:
 
 - Private hands **produce tax** (coins per hand per year, draft, into the faction treasury) and **goods** (artisan output into the cluster stockpile, which markets sell) *by themselves*, with no building required. Both are multiplied by **administration quality** (hall staffing now; institutions, the tax-regime policy and public order later).
-- **Using them costs money.** Construction gangs, levies, settlers and work-bands are drawn from the private pool, and the price is the tax and goods they no longer produce — shown in the panel as the tax base ("15,600 private hands → 3,100 coins/yr") and its dent while they are away. No separate rule; the lost tax *is* the cost.
-- Workshop, Market, Guildhall and the like are **multipliers** on the private economy, not employers (small hands counts).
+- **Using them costs money.** Construction gangs, timber and stone gatherers, levies, professional soldiers, settlers and work-bands are drawn from the private pool (list DECIDED by Omer 2026-11-05, Session 12c; more may be added), and the price is the tax and goods they no longer produce — shown in the panel as the tax base ("15,600 private hands → 3,100 coins/yr") and its dent while they are away. No separate rule; the lost tax *is* the cost.
+- Workshop, Market, Guildhall and the like are **multipliers** on the private economy, not employers (small hands counts). **Goods become money only through a Market** in a town or city (Omer, Session 12c): a cluster without one piles goods up to its cap and overflows them to the realm, from where the player can ship them to a cluster that has one.
 - The player **does not manage the private economy** hand by hand: it runs itself and the king sees the receipts. The levers are a king's levers — the tax regime, charters, markets, order, and taking people out of it.
 - Villages keep spare hands (peasants); only towns and above have a private economy.
 - Hook for §4.3: a **Town Charter** policy — the commune pays a fixed sum and keeps its autonomy (reliable money, less control, order up) vs direct taxation (more money when administration is good, less when it is not).
@@ -369,17 +369,17 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 
 ## 5. Open decisions (need Omer)
 
-1. **Desert** terrain: yes/no.
-2. Draft yield rows in the terrain table (§3.1) — confirm or change.
+1. ~~Desert terrain~~ — RESOLVED 2026-11-05: not now; perhaps a future iteration.
+2. The yield rows marked *draft* in the §3.1 terrain table — the ones Omer has not ruled on: River as grassland (fertility 4, pasture 1), Tundra pasture 1, Swamp fertility 1 / timber 1, Forest fertility 1, Hills timber 1, Woodland and Grassland pasture 1. Confirm or change.
 3. ~~Whether the 6 factions are hand-designed or generated~~ — RESOLVED 2026-11-05: hand-designed; player faction alone until the mechanics work (§4.8). Still OPEN: the culture groups and naming schemes (later).
 4. **Government & Institutions** detailed design — scheduled as a dedicated design session before Phase 2 (§4.3 is a sketch only).
-5. Name of the village hall (placeholder *Moot Hall*; alternatives *Reeve's House*, *Manor*) and of the metropolis hall.
-6. Whether River keeps both farming (600) and fishing (225) — currently yes (§3.1).
-7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
+5. ~~Hall names~~ — RESOLVED 2026-11-05: Moot Hall (village) and Great Hall (metropolis).
+6. ~~River farming + fishing~~ — RESOLVED 2026-11-05: yes, both.
+7. ~~Metropolis prerequisites~~ — accepted as a draft 2026-11-05; revisit with roads.
 8. ~~Tier upgrade thresholds~~ — RESOLVED 2026-11-04: **model scale ×3** (yields, hands, building staff, unit sizes); the town and city gates stay 1,500 / 6,000, the metropolis gate is 36,000; `data/economy.json` `modelScale: 3`; `tests/scale.test.ts` proves the curves invariant.
 9. ~~City growth brake~~ — RESOLVED 2026-11-05: the granary brake (§4.1) plus the pull factor.
 10. ~~Urban work scale~~ — RESOLVED 2026-11-05: the private economy (§4.2b); the pull factor runs on prosperity, not vacancies.
-11. **Money and the private economy — OPEN after Session 12** (measurements in DEVLOG Session 12): (a) the realm's whole income is far more than buildings can spend — raise building prices (~×5), lower the tax, or wait for the sinks (upkeep, institutions, characters, roads, settlers)? (b) should hands that *gather* timber and stone in a town count as drawn from the private pool (pay no tax — the current reading), or only construction gangs, levies, settlers and work-bands as Omer named? (c) the cap numbers (cluster base + per member, Warehouse, the flat realm cap) and what becomes of the goods that overflow to the realm (sold by nobody — a realm-level sale or a Great Market?).
+11. ~~Money and the private economy~~ — RESOLVED 2026-11-05 (Session 12c): building prices ×5; gatherers and professional soldiers join construction, levies, settlers and work-bands as uses that cost tax; cap numbers left to Claude (realm cap doubled); goods become money only through a Market.
 
 Every DECIDED item above carries its date; the change log below lists what each version settled, and the DEVLOG entries hold the discussion and the measurements behind each decision.
 
@@ -412,6 +412,7 @@ Every DECIDED item above carries its date; the change log below lists what each 
 
 ## Change log
 
+- 0.4d (2026-11-05, Session 12c): Omer's verdicts — prices ×5; uses of private hands that cost tax (incl. gatherers, professional soldiers); Market the only route from goods to money; realm cap doubled; desert no; hall names; river both; metropolis draft accepted; §5 updated.
 - 0.4c (2026-11-05, Session 12b): trimmed to a contract — implementation notes, findings and the resolved-items log removed or reduced to pointers (DEVLOG holds them); no decision changed.
 - 0.4b (2026-11-05, Session 12): §4.2b, §4.2 caps, §4.1 pull on prosperity implemented; §3.3 money column, Workshop/Market multipliers, Warehouse; §5.11 opened.
 - 0.4a (2026-11-05, Session 11b): §4.2b private economy DECIDED; buildings cost money; money faction-wide; stockpile caps with Warehouses; pull factor on prosperity; §5.10 resolved.

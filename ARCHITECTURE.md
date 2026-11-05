@@ -72,7 +72,7 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 
 | File | Holds |
 |---|---|
-| `economy.json` | `modelScale` 3; farming/herding/fishing/hunting yields and hands; harvest shares + variance; granary; sharing (reserve, `titheShare`); `privateEconomy`; `materials` (gathering yields, `cap`, `realmCap`) |
+| `economy.json` | `modelScale` 3; farming/herding/fishing/hunting yields and hands; harvest shares + variance; granary; sharing (reserve, `titheShare`); `privateEconomy` (tax and goods per private hand; `salesSharePerYear` 0 — only a Market sells); `materials` (gathering yields, `cap`, `realmCap`) |
 | `demography.json` | bands, rates, crowding, `granaryBrake`, hunger, migration (+ `trickle` = the pull factor), `noise` |
 | `settlements.json` | tiers (rings, gates), abandonment, metropolis prerequisites (proposed) |
 | `buildings.json` | mandatory halls/granaries per tier; buildable buildings (cost incl. money, months, hands, requires, effects, stockCap) |

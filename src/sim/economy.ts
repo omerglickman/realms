@@ -234,7 +234,7 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
   const taxPerYear = taxableHands * PRIVATE.taxPerHandPerYear * adminQuality;
   const taxLostPerYear = priv ? (privateHands - taxableHands) * PRIVATE.taxPerHandPerYear * adminQuality : 0;
   const goodsPerYear = taxableHands * PRIVATE.goodsPerHandPerYear * adminQuality * effects.goodsMult;
-  const salesSharePerYear = priv ? PRIVATE.salesSharePerYear + effects.salesShareBonus : 0;
+  const salesSharePerYear = priv ? PRIVATE.salesSharePerYear + effects.salesShare : 0; // goods become money only through a Market (Omer, Session 12c)
   return { hands, buildings, staffedHands, jobs: staffed, fieldHands, idleHands, landCapacity, plannedPerYear, granaryStaffing, effects, constructionHands, constructionFraction, gather, gatherHands, vacancies,
     privateHands, taxableHands, adminQuality, taxPerYear, goodsPerYear, taxLostPerYear, salesSharePerYear };
 }

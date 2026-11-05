@@ -87,14 +87,14 @@ export interface BuildingEffects {
   fishingMult: number;
   granaryExtraMonths: number;
   granarySpoilageMult: number;
-  /** Session 11b: multiplier on the goods the private hands make (Workshop) and the extra share of the cluster's goods sold a year (Market) */
+  /** Session 11b: multiplier on the goods the private hands make (Workshop); the share of the cluster's goods sold a year (Market — the only way goods become money) */
   goodsMult: number;
-  salesShareBonus: number;
+  salesShare: number;
   order: number;
 }
 
 export function sumEffects(staffed: { id: string; fraction: number }[]): BuildingEffects {
-  const e: BuildingEffects = { farmingMult: 1, fishingMult: 1, granaryExtraMonths: 0, granarySpoilageMult: 1, goodsMult: 1, salesShareBonus: 0, order: 0 };
+  const e: BuildingEffects = { farmingMult: 1, fishingMult: 1, granaryExtraMonths: 0, granarySpoilageMult: 1, goodsMult: 1, salesShare: 0, order: 0 };
   for (const b of staffed) {
     const def = buildingDef(b.id);
     const f = b.fraction;
@@ -104,7 +104,7 @@ export function sumEffects(staffed: { id: string; fraction: number }[]): Buildin
     if (x.granaryCapacityMonths) e.granaryExtraMonths += x.granaryCapacityMonths * f;
     if (x.granarySpoilageMult !== undefined) e.granarySpoilageMult *= 1 - (1 - x.granarySpoilageMult) * f;
     if (x.goodsMult) e.goodsMult += x.goodsMult * f;
-    if (x.salesShareBonus) e.salesShareBonus += x.salesShareBonus * f;
+    if (x.salesShare) e.salesShare += x.salesShare * f;
     if (x.order) e.order += x.order * f;
   }
   return e;

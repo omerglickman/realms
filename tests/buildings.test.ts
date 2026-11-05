@@ -45,7 +45,7 @@ function pair(): { state: GameState; town: Settlement; village: Settlement } {
   state.map.resource[cell(state, 18, 15)] = STONE;
   const village = found(state, 'Village', 'village', 18, 15, 1800);
   resolveAllParents(state);
-  state.factions[state.playerFaction].treasury = 10_000; // the Session 11 cases are about materials; money is tested on its own
+  state.factions[state.playerFaction].treasury = 100_000; // the Session 11 cases are about materials; money is tested on its own
   return { state, town, village };
 }
 
@@ -174,7 +174,7 @@ describe('build queue', () => {
     s2.map.terrain[cell(s2, 10, 10)] = G;
     const hamlet = found(s2, 'Hamlet', 'village', 10, 10, 450);
     hamlet.stock.timber = 500; hamlet.stock.stone = 500;
-    s2.factions[s2.playerFaction].treasury = 1000;
+    s2.factions[s2.playerFaction].treasury = 10_000;
     // make sure the hamlet has a few spare hands but far fewer than 60
     const spare0 = planLabour(s2.map, hamlet, workedCellsBySettlement(s2).get(hamlet.id)!).idleHands;
     expect(spare0).toBeGreaterThan(0);
@@ -195,7 +195,7 @@ describe('effects', () => {
     expect(e.granaryExtraMonths).toBe(12);
     expect(e.granarySpoilageMult).toBe(0.5);
     expect(e.goodsMult).toBe(1.5);
-    expect(e.salesShareBonus).toBeCloseTo(0.4, 9);
+    expect(e.salesShare).toBeCloseTo(0.6, 9);
     expect(granaryTerms(1, e).capacityMonths).toBe(36);
     expect(granaryTerms(1, e).spoilage).toBeCloseTo(0.0025, 9);
   });
@@ -215,7 +215,7 @@ describe('effects', () => {
     expect(b).toBeLessThan(a * 1.15 + 1e-6);
   });
 
-  it('a town\'s private hands make goods on their own; a workshop makes +50 % more; a market sells more of them; goods are conserved', () => {
+  it('a town\'s private hands make goods on their own; a workshop makes +50 % more; only a market turns them into money; goods are conserved', () => {
     const a = pair();
     run(a.state, 12);
     const plain = a.town.lastYear!.goods;
@@ -230,7 +230,8 @@ describe('effects', () => {
     const c = pair();
     c.town.buildings.push('market');
     run(c.state, 12);
-    expect(c.town.lastYear!.sold).toBeGreaterThan(a.town.lastYear!.sold * 2);
+    expect(a.town.lastYear!.sold).toBe(0); // no market → goods pile up (Omer, Session 12c)
+    expect(c.town.lastYear!.sold).toBeGreaterThan(0);
     // goods made = goods sold + goods still in the cluster + goods that overflowed to the realm
     for (const x of [a, b, c]) {
       const f = x.state.factions[x.state.playerFaction];
@@ -284,23 +285,23 @@ describe('the private economy (DESIGN §4.2b)', () => {
     const { state, town, village } = pair();
     village.stock.timber = 1000; village.stock.stone = 1000;
     const f = state.factions[state.playerFaction];
-    f.treasury = 1000;
     const cost = buildingDef('market').cost!.money!;
+    f.treasury = cost + 1000;
     const inv = applyCommand(state, { type: 'queueBuilding', id: town.id, building: 'market' });
-    expect(f.treasury).toBeCloseTo(1000 - cost, 9);
+    expect(f.treasury).toBeCloseTo(1000, 9);
     expect(town.build!.paidMoney).toBe(cost);
     expect(f.year.spent).toBe(cost);
     const restore = applyCommand(state, inv);
-    expect(f.treasury).toBeCloseTo(1000, 9);
+    expect(f.treasury).toBeCloseTo(cost + 1000, 9);
     expect(f.year.spent).toBe(0);
     applyCommand(state, restore);
-    expect(f.treasury).toBeCloseTo(1000 - cost, 9);
+    expect(f.treasury).toBeCloseTo(1000, 9);
     expect(town.build!.paidMoney).toBe(cost);
     town.build = null;
     f.treasury = 100;
     const check = canBuild(state, town, 'market');
     expect(check.ok).toBe(false);
-    expect(check.reason).toMatch(/treasury lacks 500 coins/);
+    expect(check.reason).toMatch(new RegExp(`treasury lacks ${cost - 100} coins`));
     expect(() => applyCommand(state, { type: 'queueBuilding', id: town.id, building: 'market' })).toThrow(/treasury/);
   });
 });
