@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3f — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3g — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -154,6 +154,8 @@ Four tiers: **Village**, **Town**, **City**, **Metropolis**. Every settlement ha
 
 **Abandonment (DECIDED 2026-11-05):** a settlement whose population falls below a threshold (30 people, draft, `data/settlements.json` `abandonment.abandonBelow`) is removed at the end of that month; whoever is left walks to its parent, its granary is lost, and the event is logged. *(PROPOSED for later: an "abandoned village/town/city" entity with 0 population that marks the site and makes resettling easy.)*
 
+**Cluster (DECIDED 2026-11-05, Omer's concept):** a cluster is an **unparented settlement together with every settlement subordinate to it, transitively** (its towns, their villages, its own villages). A lone village is a cluster of one. Food flows only inside a cluster, so the cluster is the real demographic and food unit of the realm; it is also the natural unit for the tithe (§4.2), for future provinces, governors and public order. It is a **derived view**, never stored: it is computed from the parent links each turn, so it cannot drift from the subordination rule. A town under a city is a member of the city's cluster (shown as a nested level), not a cluster of its own. UI: a **cluster outline** (one line around the union of the members' influence zones) replaces the dotted influence line on the map; hovering a town or city still shows its own dotted influence edge; singleton clusters are outlined faintly. A **cluster panel** shows population by tier, the year's food balance, tithe taken, migration in/out, hunger deaths and the member list; the realm's yearly report is the sum over clusters.
+
 **Contested hexes (DECIDED 2026-11-04):** each hex is worked by exactly one settlement. Where work zones overlap, the **higher tier wins**; ties go to the nearer centre; the player may reassign any hex by hand.
 
 **Subordination (DECIDED 2026-11-04):** a lower-tier settlement is subordinate to ("parent") the settlement whose influence zone covers its centre. If several qualify, default to the highest tier, then the nearest; the player can choose the parent explicitly. Surplus and migration go to the parent.
@@ -220,6 +222,7 @@ Economic output is computed from in-world activity — resources gathered, goods
 - **Staffing order:** halls and granary first, then fields (best hexes first), then extraction sites; what is left over are idle hands.
 - **Granary:** every settlement has one (§3.3). Fully staffed: capacity 24 months of consumption, spoilage 0.5 % of stock per month. Unstaffed: 15 months, 1.5 %. Linear in between.
 - **Sharing:** after the harvest a subordinate settlement keeps a **3-month reserve** and sends the rest to its parent each month (the parent takes what it lacks; the rest stays). Roads (Phase 2) extend this beyond the influence zone with losses per distance.
+- **Tithe (DECIDED 2026-11-05):** on top of the surplus flow, the parent takes a **fixed share of every subordinate's food production in kind, at the moment it is produced** — *10 % (draft)* of all food (farming at harvest, herding/fishing/hunting monthly), before the subordinate reckons its own needs. In a good year the tithe simply comes out of what the village would have sent anyway; in a lean year it is taken even though the village would have kept it, so famine shifts partly from the cities to the countryside — intended. The share is a single number in `data/economy.json` (`sharing.titheShare`) for now and **must become a player-decided policy** (light / customary / heavy, trading city food against countryside order) when §4.3 policies are built; it is the tax regime paid in grain. **Crisis requisition** (a parent taking a subordinate's stock down to a floor; costs order) is deferred to **Phase 4** (sieges).
 
 PROPOSED flow per settlement per turn:
 
@@ -340,6 +343,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
 8. **Tier upgrade thresholds — RESOLVED 2026-11-04 (Omer, late evening); IMPLEMENTED in Session 6 (2026-11-04), proven scale-invariant by `tests/scale.test.ts` and by a row-by-row comparison of the 20-year scenario tables before and after.** The model is linear in population, so **everything scales ×3**: hex yields (people fed per year) and the hands to work them, building hands, settler/scenario populations — curves stay identical with labels ×3. The **town gate stays 1,500 and the city gate stays 6,000**; at ×3 a village plateaus ~2,100 (crosses 1,500 by growth, ~30 years after founding), a town alone levels at ~10,000 and with villages ~18,000 (crosses 6,000 in 25–40 years). The **metropolis gate scales to 36,000** (it was calibrated to the orbit's ceiling: a good site reaches ~31,000 without roads). Tier population ranges in §3.3 become typical sizes, not gates. All later unit/settler sizes are written at the ×3 scale; `data/economy.json` carries `modelScale: 3`.
 
+Resolved 2026-11-05 (afternoon): tithe 10 % in kind on all subordinate food production, to become a policy with §4.3; requisition deferred to Phase 4; the Cluster adopted as a derived view with outline and panel (§3.3, §4.2). Order of work: cluster view → tithe with an A/B on the start position → buildings.
 Resolved 2026-11-05: factions hand-designed; build with the player faction alone through Phase 3; start positions placed in the editor with tier and population, optionally pre-run for a few years and saved as the starting state; player faction fixed; culture groups exist but are defined later; personas in Phase 5.
 Resolved 2026-11-04 (Phase 1 design, evening): city influence 5 rings, metropolis from 12,000 with 6 rings (A/B tested); crowding birth penalty 1.0 for villages; migration trigger = forecast of running out before the next harvest.
 Resolved 2026-11-04 (Phase 1 design): work vs influence zones per tier (1/1, 2/3, 2/4 → 2/5 in the evening, metropolis 2/5 → 2/6); contested hexes → higher tier wins; subordination to the parent by influence; metropolis tier; water hexes workable (shore = sea touching land); buildings need hands, every settlement has a hall and a granary; cohort demographic model with the §4.1 starting numbers; food model with the §4.2 starting numbers; migration of 10 % of idle hands/month with dependants to the parent when the settlement forecasts running out before the next harvest; settlers are a player action, never automatic.
@@ -353,6 +357,8 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 - **Influence zone** — rings of hexes around a settlement (1/3/5/6 for village/town/city/metropolis): surplus flows up through it, bonuses trickle down, borders are drawn from it.
 - **Work zone** — hexes a settlement's own hands extract from (1 ring for a village, 2 for the rest).
 - **Parent settlement** — the higher-tier settlement a village or town is subordinate to; receives its surplus and its migrants.
+- **Cluster** — an unparented settlement plus all its subordinates, transitively; the unit inside which food flows. Derived from parent links, never stored. A lone village is a cluster of one.
+- **Tithe** — the fixed share (10 % draft) of a subordinate's food production taken by its parent in kind as it is produced; later a policy.
 - **Shore** — a sea hex with at least one land neighbour; workable for fish. Sea touching no land is *offshore* (needs a port).
 - **Hands** — working adults 15–59. *Staffed* hands run buildings, *field* hands work hexes, *idle hands* do neither.
 - **Metropolis** — the fourth settlement tier: a city of 36,000+ upgraded to 6 rings of influence and unique features.
@@ -369,6 +375,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3g (2026-11-05, Session 9c): §3.3 Cluster DECIDED; §4.2 tithe DECIDED (10 % draft, policy later), requisition deferred to Phase 4; glossary.
 - 0.3f (2026-11-05, Session 9b): §4.1 realism knobs DECIDED (sampling, harvest 0.125, epidemics, trickle off); §3.3 abandonment DECIDED; §4.9 natural events to become game-wide.
 - 0.3e (2026-11-05, Session 9): §4.1 demographic realism knobs (PROPOSED); §4.8 the first starting position.
 - 0.3d (2026-11-05, Session 7): §3.3 placement rule (PROPOSED placeholder).

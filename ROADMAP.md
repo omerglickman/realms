@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.4e — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–5 done)**
+**Version 0.4f — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–5 done)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -163,6 +163,8 @@ Suggested order (each session ends with a build): (1) numbers first — propose 
 - [~] Buildings inside settlements — halls and granaries with hands (Session 5); starter list with effects and build queue: pending.
 - [x] Turn structure: 12 months, harvest in Sept/Oct, yearly update in December. *(Session 5; winter effects belong to armies, Phase 4)*
 - [~] Settlement panel, end-turn button, run-years, scenario save/load (Session 7); faction panel and yearly report: pending.
+- [ ] **Cluster view** (DESIGN §3.3, decided 2026-11-05): derived clusters, cluster outline on the map, cluster panel; realm report as the sum over clusters.
+- [ ] **Tithe** (DESIGN §4.2, decided 2026-11-05): 10 % in kind from subordinates; headless A/B on the start position.
 - [x] Headless scenario: 20 years, six cases; population and food curves. *(Session 5)*; `--scenario start` runs the real starting position with knob presets *(Session 9)*.
 
 **Acceptance**: a faction with a city and several villages survives and grows over 20 years; a city with no villages starves. Omer can read why from the panels.
@@ -228,6 +230,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.4f (2026-11-05): Session 9c — cluster view and tithe added to the Phase 1 checklist.
 - 0.4e (2026-11-05): Session 9b noted.
 - 0.4d (2026-11-05): Session 9 noted.
 - 0.4c (2026-11-05): Session 8 noted.
