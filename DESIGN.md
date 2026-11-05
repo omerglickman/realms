@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3h — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3i — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -208,6 +208,7 @@ The world contains a fixed, countable population: the sum of everyone in every s
   - *Epidemics* — **adopted for now** at 1 % chance per settlement per year of a year with double deaths (`demography.json` `noise.epidemic`). Omer's intent: natural events — droughts, disease and the like — become part of a **bigger game-wide events mechanic later** (§4.9); this is a placeholder for it.
   - *Migration trickle* — **kept OFF** (`migration.trickle.sharePerYear` = 0) until towns have work. The rule stays implemented: each December a settlement whose idle hands exceed 15 % of its hands would send 4 % of them (±50 %), with dependants, to a fully fed parent. Finding: with no work in towns and cities yet (hall and granary only), it piles people into cities that cannot feed them; a *jobs* condition at the destination is the fix once workshops exist.
   - All draws come from the seeded game RNG, so a game still replays identically; the headless runner and the tests can switch every knob off (`src/sim/noise.ts`).
+- **Granary brake (DECIDED by Omer 2026-11-05, Session 10; values draft):** towns, cities and the metropolis breed less when their stock is thin — at the December reckoning births are multiplied by a factor of *spare months* = months of stock − months until the next harvest: 1 at ≥ 4 spare months, 0.25 at ≤ 0 (it would not reach the harvest), linear between (`demography.json` `granaryBrake`). A city therefore stops growing *before* famine instead of growing until hunger deaths cancel its births, and settles with about two months to spare in a normal year, so only a bad harvest starves it. Villages keep the crowding rule instead. The matching **pull side** — idle people moving to towns and cities that have work for them — is Omer's decision too and comes with buildings (the migration trickle's jobs condition).
 - **Settlers from idle hands (DECIDED direction, Phase 2):** raising a settlers unit is the *player's* lever, never automatic — any settlement with idle hands can raise settlers from them (cost: the people); the panel flags "overcrowded". Later a starving city may use the same exit.
 
 ### 4.2 Economy (DECIDED concept; food model starting numbers approved 2026-11-04)
@@ -342,7 +343,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 6. Whether River keeps both farming (600) and fishing (225) — currently yes (§3.1).
 7. Metropolis prerequisites and features (§3.3) — PROPOSED only.
 8. **Tier upgrade thresholds — RESOLVED 2026-11-04 (Omer, late evening); IMPLEMENTED in Session 6 (2026-11-04), proven scale-invariant by `tests/scale.test.ts` and by a row-by-row comparison of the 20-year scenario tables before and after.** The model is linear in population, so **everything scales ×3**: hex yields (people fed per year) and the hands to work them, building hands, settler/scenario populations — curves stay identical with labels ×3. The **town gate stays 1,500 and the city gate stays 6,000**; at ×3 a village plateaus ~2,100 (crosses 1,500 by growth, ~30 years after founding), a town alone levels at ~10,000 and with villages ~18,000 (crosses 6,000 in 25–40 years). The **metropolis gate scales to 36,000** (it was calibrated to the orbit's ceiling: a good site reaches ~31,000 without roads). Tier population ranges in §3.3 become typical sizes, not gates. All later unit/settler sizes are written at the ×3 scale; `data/economy.json` carries `modelScale: 3`.
-9. **City growth brake (OPEN, raised Session 10).** Cities and towns have no crowding rule (§4.1), so a city grows until hunger deaths equal its surplus births — on the start position the three cities carry a standing ≈2,100 hunger deaths a year whatever food they get (the tithe and the trickle only raise the ceiling they grow to). Options: accept it as the cost of a city; make births fall when the granary is thin (so a city stops growing *before* famine); or a city-side crowding term tied to idle hands once workshops give towns work. Omer to decide.
+9. ~~City growth brake~~ — RESOLVED 2026-11-05 (Omer, Session 10): births fall when the granary is thin (§4.1 granary brake, implemented), and once cities have jobs a pull factor moves idle people to them (with buildings). On the start position the brake cuts hunger deaths from 126,000 to 7,000 over 60 years.
 
 Resolved 2026-11-05 (afternoon): tithe 10 % in kind on all subordinate food production, to become a policy with §4.3; requisition deferred to Phase 4; the Cluster adopted as a derived view with outline and panel (§3.3, §4.2). Order of work: cluster view → tithe with an A/B on the start position → buildings.
 Resolved 2026-11-05: factions hand-designed; build with the player faction alone through Phase 3; start positions placed in the editor with tier and population, optionally pre-run for a few years and saved as the starting state; player faction fixed; culture groups exist but are defined later; personas in Phase 5.
@@ -376,6 +377,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3i (2026-11-05, Session 10b): §4.1 granary brake DECIDED and implemented; §5.9 resolved.
 - 0.3h (2026-11-05, Session 10): §5.9 city growth brake raised as OPEN after the tithe A/B.
 - 0.3g (2026-11-05, Session 9c): §3.3 Cluster DECIDED; §4.2 tithe DECIDED (10 % draft, policy later), requisition deferred to Phase 4; glossary.
 - 0.3f (2026-11-05, Session 9b): §4.1 realism knobs DECIDED (sampling, harvest 0.125, epidemics, trickle off); §3.3 abandonment DECIDED; §4.9 natural events to become game-wide.

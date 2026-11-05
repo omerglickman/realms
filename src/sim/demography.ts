@@ -108,6 +108,30 @@ export interface YearlyOptions {
   rng?: RngState;
   /** multiplies this year's death rates (epidemic year); 1 = normal */
   deathMultiplier?: number;
+  /** extra multiplier on births (the granary brake, DESIGN §4.1); 1 = none */
+  birthFactor?: number;
+}
+
+/** Which tiers the granary brake applies to (read live; the runner and tests can change it — [] = off). */
+export function granaryBrakeTiers(): string[] {
+  return (DEMOGRAPHY as { granaryBrake?: { appliesTo: string[] } }).granaryBrake?.appliesTo ?? [];
+}
+export function setGranaryBrakeTiers(tiers: string[]): void {
+  const g = (DEMOGRAPHY as { granaryBrake?: { appliesTo: string[] } }).granaryBrake;
+  if (g) g.appliesTo = tiers;
+}
+
+/**
+ * Granary brake (DECIDED 2026-11-05): birth multiplier for a settlement of `tierId`
+ * whose December stock will leave `spareMonths` months of food when the next harvest
+ * arrives (negative = it will run out first). 1 for tiers the brake does not apply to.
+ */
+export function granaryBrakeFactor(tierId: string, spareMonths: number): number {
+  const g = (DEMOGRAPHY as { granaryBrake?: { appliesTo: string[]; spareFull: number; spareEmpty: number; minFactor: number } }).granaryBrake;
+  if (!g || !g.appliesTo.includes(tierId)) return 1;
+  const span = Math.max(1e-9, g.spareFull - g.spareEmpty);
+  const t = Math.max(0, Math.min(1, (spareMonths - g.spareEmpty) / span));
+  return g.minFactor + (1 - g.minFactor) * t;
 }
 
 /** Expected count → realized count: exact when sampling is off or no rng is given, Poisson otherwise. */
@@ -134,6 +158,7 @@ export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boo
   if (plenty && suff >= 1) mult *= DEMOGRAPHY.plentyBirthMultiplier;
   // Crowding lowers births in villages (DESIGN §4.1, DECIDED 2026-11-04); penalty 0 turns it off
   mult *= Math.max(0, 1 - DEMOGRAPHY.crowdingBirthPenalty * Math.max(0, Math.min(1, idleShare)));
+  mult *= opts.birthFactor ?? 1;
   const births = realize(fertileWomen(p) * DEMOGRAPHY.birthsPerWomanPerYear * mult, rng, Infinity);
   // 3. aging: 1/width of each band moves up; the last band is terminal
   const share = 1 / DEMOGRAPHY.bandWidthYears;

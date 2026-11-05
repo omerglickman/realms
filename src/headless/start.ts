@@ -2,7 +2,7 @@
 // realm's demography behaves under the Session 9 knobs.
 // Usage: npm run sim -- --scenario start [--years 60] [--file scenarios/start.json]
 //        [--preset baseline|noise|trickle|all] [--seed x] [--csv out.csv]
-//        [--sampling 0|1] [--harvestSd 0.15] [--epidemic 0.01] [--trickle 0.04] [--minIdle 0.15] [--tithe 0.10]
+//        [--sampling 0|1] [--harvestSd 0.15] [--epidemic 0.01] [--trickle 0.04] [--minIdle 0.15] [--tithe 0.10] [--brake 0|1]
 // Presets: baseline = every knob off (the deterministic model); noise = sampling + harvest + epidemic;
 //          trickle = the migration trickle only (0.04 if the data file has it off); all = the data-file values (Omer's decisions).
 
@@ -16,6 +16,7 @@ import { totalPopulation } from '../sim/demography';
 import { setNoise, NO_NOISE, noise, type NoiseKnobs } from '../sim/noise';
 import { seedRng } from '../sim/rng';
 import { titheShare, setTitheShare } from '../sim/economy';
+import { granaryBrakeTiers, setGranaryBrakeTiers } from '../sim/demography';
 
 function arg(name: string, def: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -45,12 +46,14 @@ setNoise(knobs);
 if (process.argv.includes('--tithe')) setTitheShare(Number(arg('tithe', '0')));
 else if (PRESET === 'baseline') setTitheShare(0);
 const TITHE = titheShare();
+if (process.argv.includes('--brake') ? arg('brake', '1') === '0' : PRESET === 'baseline') setGranaryBrakeTiers([]);
+const BRAKE = granaryBrakeTiers().length > 0;
 
 const { state, name } = loadScenarioFile(JSON.parse(readFileSync(FILE, 'utf8')));
 if (SEED) state.rng = seedRng(SEED);
 const cal0 = calendar(state.turn);
 console.log(`scenario "${name}" from ${cal0.monthName}, year ${cal0.year} · ${Object.keys(state.settlements).length} settlements · preset ${PRESET}${SEED ? ` · seed ${SEED}` : ''}`);
-console.log(`knobs: sampling ${knobs.vitalSampling} · harvest sd ${knobs.harvestSd} (regional ${knobs.harvestRegionalShare}) · epidemic ${knobs.epidemicChance}×${knobs.epidemicDeathMultiplier} · trickle ${knobs.trickleShare} above ${knobs.trickleMinIdle} idle ±${knobs.trickleSpread}${knobs.trickleRequireFedParent ? ' (fed parent only)' : ''} · tithe ${TITHE}`);
+console.log(`knobs: sampling ${knobs.vitalSampling} · harvest sd ${knobs.harvestSd} (regional ${knobs.harvestRegionalShare}) · epidemic ${knobs.epidemicChance}×${knobs.epidemicDeathMultiplier} · trickle ${knobs.trickleShare} above ${knobs.trickleMinIdle} idle ±${knobs.trickleSpread}${knobs.trickleRequireFedParent ? ' (fed parent only)' : ''} · tithe ${TITHE} · granary brake ${BRAKE ? 'on' : 'off'}`);
 
 const list = (): Settlement[] => Object.values(state.settlements);
 const rankOf = (s: Settlement) => TIERS[s.tier].rank;

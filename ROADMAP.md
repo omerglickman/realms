@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.4g — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–5 done)**
+**Version 0.4h — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 1–5 done)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -21,7 +21,7 @@ This document says *how* we build the game described in DESIGN.md, in what order
 | **ROADMAP.md** | How we build it, phases, tech, conventions, session protocol | Claude updates phase status; structural changes need Omer's OK |
 | **DEVLOG.md** | What was done, session by session; current state; how to run; next step | Claude appends an entry every session, no exceptions |
 
-**DEVLOG-archive.md** (added Session 10, Claude's call — Omer may veto) holds older DEVLOG session entries: when DEVLOG.md grows past ~45 KB the oldest entries are moved there in a batch, unedited, because the tooling cannot mirror a doc larger than that to the Project in one piece. DEVLOG.md's Current state block is always complete on its own; a session that needs the history reads the archive too.
+**DEVLOG-archive.md** (rule agreed with Omer 2026-11-05) holds older DEVLOG session entries. **Every fifth session (15, 20, 25…), and sooner if DEVLOG.md passes ~45 KB,** the closing step moves every entry except the last three sessions into the archive, unedited and in order (the tooling cannot mirror a doc larger than ~45 KB to the Project in one piece). DEVLOG.md's Current state block is always complete on its own; a session that needs older history reads the archive too.
 
 The Project docs in the claude.ai Project ("Strategy Game") are the **canonical** copies. The same three files are committed to the code repository at the end of every session so that git history has them too. If the two ever disagree, the Project doc wins and the repo copy is overwritten.
 
@@ -232,6 +232,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.4h (2026-11-05): archive rule (A.2) agreed — every fifth session or past 45 KB.
 - 0.4g (2026-11-05): Session 10 — cluster view and tithe done; DEVLOG-archive.md introduced (A.2).
 - 0.4f (2026-11-05): Session 9c — cluster view and tithe added to the Phase 1 checklist.
 - 0.4e (2026-11-05): Session 9b noted.

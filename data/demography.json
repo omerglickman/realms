@@ -14,6 +14,13 @@
   "crowdingBirthPenalty": 1.0,
   "crowdingAppliesTo": ["village"],
   "_crowdingComment": "DECIDED by Omer 2026-11-04 (value 1.0 is a draft for tuning): in the listed tiers, births are multiplied by (1 − penalty × idle share of hands). 0 = off. At 1.0 a village with 30 % of its hands idle has 30 % fewer births — land-starved villages stop growing instead of starving. Towns and cities are excluded: their idle hands are the workshop/recruit pool, not crowding.",
+  "granaryBrake": {
+    "_comment": "DECIDED by Omer 2026-11-05 (values draft): in the listed tiers births are also multiplied by a factor that falls as the granary thins at the December reckoning. The measure is SPARE months = months of stock minus the months until the next harvest (9 in December): spare ≥ spareFull → factor 1; spare ≤ spareEmpty (it will not reach the harvest) → minFactor; linear between. A city stops growing BEFORE famine instead of growing until hunger deaths cancel its births; it settles with about two months to spare in a normal year, so only a bad harvest starves it. The pull side (idle people moving to cities with work) comes with buildings.",
+    "appliesTo": ["town", "city", "metropolis"],
+    "spareFull": 4,
+    "spareEmpty": 0,
+    "minFactor": 0.25
+  },
   "plentyBirthMultiplier": 1.15,
   "boySexRatio": 0.51,
   "deathRatePerYear": { "child": 0.03, "young": 0.01, "prime": 0.015, "mature": 0.03, "old": 0.10 },

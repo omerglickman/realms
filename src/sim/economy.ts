@@ -17,7 +17,7 @@ import {
   type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, emptyYearTotals, POP_HISTORY_YEARS, abandonBelow,
 } from './settlements';
 import { logEvent } from './state';
-import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate } from './demography';
+import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate, granaryBrakeFactor } from './demography';
 import { seedRng, nextFloat, nextGaussian, nextU32 } from './rng';
 import { noise } from './noise';
 
@@ -193,6 +193,8 @@ function monthlyNeed(s: Settlement): number {
 }
 
 const HARVEST_START = ECONOMY.farming.harvest.shares.findIndex((x) => x > 0);
+/** the month the yearly demographic update runs in (December) */
+const DEMOGRAPHY_YEAR_MONTH = 11;
 
 /** Months from this month to the start of the next harvest (1–12; 12 in the harvest month itself). */
 export function monthsUntilHarvest(month: number): number {
@@ -380,7 +382,11 @@ export function demographyYear(state: GameState): void {
     const crowdable = (DEMOGRAPHY as { crowdingAppliesTo: string[] }).crowdingAppliesTo.includes(TIERS[s.tier].id);
     const idleShare = crowdable && s.report.hands > 0 ? s.report.idleHands / s.report.hands : 0;
     const epidemic = k.epidemicChance > 0 && nextFloat(state.rng) < k.epidemicChance;
-    const res = yearlyUpdate(s.pop, suff, plenty, idleShare, { rng: state.rng, deathMultiplier: epidemic ? k.epidemicDeathMultiplier : 1 });
+    // granary brake (DESIGN §4.1, DECIDED 2026-11-05): towns and cities breed less when their stock is thin
+    const need = monthlyNeed(s);
+    const spare = (need > 0 ? s.food / need : 0) - monthsUntilHarvest(DEMOGRAPHY_YEAR_MONTH);
+    const birthFactor = granaryBrakeFactor(TIERS[s.tier].id, spare);
+    const res = yearlyUpdate(s.pop, suff, plenty, idleShare, { rng: state.rng, deathMultiplier: epidemic ? k.epidemicDeathMultiplier : 1, birthFactor });
     s.report.births = res.births;
     s.report.deaths = res.deaths;
     s.report.epidemic = epidemic;

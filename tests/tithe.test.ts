@@ -121,3 +121,35 @@ describe('tithe', () => {
     expect(after).toBeCloseTo(before, 6);
   });
 });
+
+describe('granary brake (DESIGN §4.1, DECIDED 2026-11-05)', () => {
+  it('factor is 1 with a full granary, minFactor when empty, linear between, and 1 for villages', async () => {
+    const { granaryBrakeFactor, DEMOGRAPHY } = await import('../src/sim/demography');
+    const g = (DEMOGRAPHY as unknown as { granaryBrake: { spareFull: number; spareEmpty: number; minFactor: number } }).granaryBrake;
+    expect(granaryBrakeFactor('city', g.spareFull)).toBe(1);
+    expect(granaryBrakeFactor('city', g.spareFull + 10)).toBe(1);
+    expect(granaryBrakeFactor('city', g.spareEmpty)).toBeCloseTo(g.minFactor, 9);
+    expect(granaryBrakeFactor('city', -5)).toBeCloseTo(g.minFactor, 9);
+    const mid = (g.spareFull + g.spareEmpty) / 2;
+    expect(granaryBrakeFactor('town', mid)).toBeCloseTo((1 + g.minFactor) / 2, 9);
+    expect(granaryBrakeFactor('village', 0)).toBe(1);
+  });
+
+  it('a lone city stops growing before it starves: fewer hunger deaths and a fuller granary than without the brake', async () => {
+    const { setGranaryBrakeTiers, granaryBrakeTiers } = await import('../src/sim/demography');
+    const saved = granaryBrakeTiers();
+    const run = (on: boolean) => {
+      setGranaryBrakeTiers(on ? saved : []);
+      const state = createGameState('brake', createMap(30, 30, G));
+      const c = found(state, 'City', 'city', 15, 15, 9000); // its 19 grassland hexes feed ~10,000
+      let hunger = 0;
+      for (let i = 0; i < 40 * 12; i++) { endTurn(state); hunger += c.report.hungerDeaths; }
+      return { pop: totalPopulation(c.pop), hunger, months: c.food / Math.max(1, totalPopulation(c.pop)) };
+    };
+    const off = run(false), on = run(true);
+    setGranaryBrakeTiers(saved);
+    expect(on.hunger).toBeLessThan(off.hunger * 0.25);
+    expect(on.months).toBeGreaterThan(off.months);
+    expect(on.pop).toBeGreaterThan(8000); // it does not collapse — it levels off near what the land feeds
+  });
+});
