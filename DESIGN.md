@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.3c — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.3d — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -161,6 +161,7 @@ Four tiers: **Village**, **Town**, **City**, **Metropolis**. Every settlement ha
 Other details:
 
 - Overlapping influence zones between factions are **contested** territory — a source of diplomatic friction and a trigger for border events. *(PROPOSED)*
+- **Where a settlement may stand (PROPOSED, implemented as placeholder in Session 7):** any passable land hex (not water, not mountains), not already occupied. Placing inside a higher tier's work zone is allowed — the contested-hex rule simply leaves the new settlement fewer hexes, and the editor warns.
 - **Growth between tiers is a player decision**, not automatic: upgrading requires a population threshold, money, materials, and enough **administrative capacity** (§4.3). This is how "few cities, many villages" is enforced softly. *(DECIDED concept)*
 - **Buildings need hands (DECIDED 2026-11-04).** Buildings inside a settlement are staffed from its working hands before any hand goes to the fields. Staffing is linear: a building at half staff gives half its effect. Every settlement has from its founding a **hall** (village: *Moot Hall* — PLACEHOLDER name; town: Town Hall; city: City Hall; metropolis: TBD) that cannot be demolished and a **Granary**. Hands *(draft, ×3 scale)*: hall 30 / 150 / 300 / 600; granary 90 / 180 / 360 / 720 by tier. The hall is where government happens — taxes, order, and (Phase 2) administrative capacity; an understaffed hall penalizes tax and order. Hands not needed by buildings or fields are **idle hands** — the pool later used for workshops, recruitment and unrest, and the source of migration (§4.1). Other buildings (PROPOSED starter list: Mill, Palisade, Chapel; Market, Workshop, Walls, Barracks, Stables, Inn; Cathedral, School, Guildhall, Citadel, Mint, Ironworks, Great Market) each carry a hands requirement in `data/buildings.json`.
 
@@ -360,6 +361,7 @@ Resolved 2026-11-03: name; turn length (1 month); hex scale (nominal, movement t
 
 ## Change log
 
+- 0.3d (2026-11-05, Session 7): §3.3 placement rule (PROPOSED placeholder).
 - 0.3c (2026-11-05): §4.8 — factions hand-designed, player faction alone until mechanics work, start positions via editor + optional pre-run, fixed player faction; §5.3 resolved.
 - 0.3b (2026-11-04, Session 6): model scale ×3 implemented — §3.1 fishing, §3.2 unit sizes, §3.3 gates vs typical sizes and building hands, §4.2 yields, §5.8, glossary.
 - 0.3a (2026-11-04, evening): city 5 rings / metropolis 12,000 @ 6 rings after A/B test; crowding birth penalty for villages; migration trigger by forecast.
