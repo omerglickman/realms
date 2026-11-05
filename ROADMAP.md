@@ -21,6 +21,8 @@ This document says *how* we build the game described in DESIGN.md, in what order
 | **ROADMAP.md** | How we build it, phases, tech, conventions, session protocol | Claude updates phase status; structural changes need Omer's OK |
 | **DEVLOG.md** | What was done, session by session; current state; how to run; next step | Claude appends an entry every session, no exceptions |
 
+**DEVLOG-archive.md** (added Session 10, Claude's call — Omer may veto) holds older DEVLOG session entries: when DEVLOG.md grows past ~45 KB the oldest entries are moved there in a batch, unedited, because the tooling cannot mirror a doc larger than that to the Project in one piece. DEVLOG.md's Current state block is always complete on its own; a session that needs the history reads the archive too.
+
 The Project docs in the claude.ai Project ("Strategy Game") are the **canonical** copies. The same three files are committed to the code repository at the end of every session so that git history has them too. If the two ever disagree, the Project doc wins and the repo copy is overwritten.
 
 ### A.3 Session protocol — every future chat follows this
@@ -39,7 +41,7 @@ The Project docs in the claude.ai Project ("Strategy Game") are the **canonical*
 7. Build passes; tests pass. If not, say so loudly in the DEVLOG entry.
 8. Commit and push to the repository with a clear message.
 9. Append a DEVLOG entry (template in DEVLOG.md) and update its "Current state" block: phase, what works, what is broken, exact next steps, open questions for Omer.
-10. Mirror DESIGN.md / ROADMAP.md / DEVLOG.md into the repo (and the Project).
+10. Mirror DESIGN.md / ROADMAP.md / DEVLOG.md (and DEVLOG-archive.md when it changed) into the repo (and the Project).
 11. Deliver the playable build to Omer (see A.5).
 
 ### A.4 Where the code lives (DECIDED 2026-11-03)
@@ -230,7 +232,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
-- 0.4g (2026-11-05): Session 10 — cluster view and tithe done.
+- 0.4g (2026-11-05): Session 10 — cluster view and tithe done; DEVLOG-archive.md introduced (A.2).
 - 0.4f (2026-11-05): Session 9c — cluster view and tithe added to the Phase 1 checklist.
 - 0.4e (2026-11-05): Session 9b noted.
 - 0.4d (2026-11-05): Session 9 noted.
