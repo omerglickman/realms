@@ -1,17 +1,22 @@
-// The browser application: PixiJS stage, camera, input, HUD, editor wiring.
-// All game rules live in src/sim; this file only displays and forwards input.
+// The browser application: PixiJS stage, camera, input, HUD, editor wiring,
+// settlement layer and panel, turn controls. All game rules live in src/sim;
+// this file only displays and forwards input.
 
 import { Application, Graphics } from 'pixi.js';
 import { MapRenderer, HEX_SIZE } from './render/mapRenderer';
+import { SettlementLayer } from './render/settlementLayer';
 import { Camera } from './camera';
 import { Editor } from './editor/editor';
+import { hoverLine, renderPanel } from './panels/settlementPanel';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
+import { endTurn } from '../sim/turn';
 import { pixelToAxial, axialToOffset, offsetToPixel, hexCorners } from '../sim/hex';
-import { inBounds, getTerrain, getResource, countTerrain } from '../sim/map';
+import { inBounds, getTerrain, getResource, countTerrain, idx } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
 import { resourceByIndex } from '../sim/resources';
 import { loadMapFile } from '../sim/mapfile';
+import { settlementIdAt, computeWorkAssignment } from '../sim/settlements';
 import testmapJson from '../../maps/testmap.json';
 
 function el<T extends HTMLElement>(id: string): T {
@@ -76,10 +81,18 @@ export async function startApp(): Promise<void> {
     mapName = loaded.name;
   }
 
+  // ---- selection / hover of settlements ----
+  let selectedId: string | null = null;
+  let hoverId: string | null = null;
+  let workAssign = computeWorkAssignment(state);
+  const panel = el<HTMLDivElement>('settlement');
+  let mouseX = -1, mouseY = -1;
+
   const renderer = new MapRenderer(state.map);
+  const settlementLayer = new SettlementLayer();
   const camera = new Camera(renderer.root, app.screen.width, app.screen.height);
   const hover = new Graphics();
-  renderer.root.addChild(hover);
+  renderer.root.addChild(settlementLayer.root, hover);
   app.stage.addChild(renderer.root);
 
   const editor = new Editor({
@@ -91,10 +104,12 @@ export async function startApp(): Promise<void> {
         const w = state.map.width;
         for (const i of cells) renderer.invalidateHex(i % w, Math.floor(i / w));
       }
-      updateMapInfo();
+      stateChanged();
     },
     getMapName: () => mapName,
     setMapName: (n) => { mapName = n; updateMapInfo(); },
+    setState: (s) => { replaceState(s, true); },
+    onSelect: (id) => select(id),
   });
 
   applyMap(true);
@@ -108,11 +123,35 @@ export async function startApp(): Promise<void> {
 
   function applyMap(fit: boolean): void {
     renderer.setMap(state.map);
-    renderer.root.addChild(hover);
+    renderer.root.addChild(settlementLayer.root, hover);
     const ws = renderer.worldSize();
     camera.setWorldSize(ws.width, ws.height);
     if (fit) camera.fit();
+    stateChanged();
+  }
+
+  /** Swap in a whole new state (new map, loaded scenario). */
+  function replaceState(s: GameState, fit: boolean): void {
+    state = s;
+    selectedId = null;
+    hoverId = null;
+    applyMap(fit);
+  }
+
+  /** Anything in the state may have changed: refresh every readout and layer. */
+  function stateChanged(): void {
+    if (selectedId && !state.settlements[selectedId]) selectedId = null;
+    if (hoverId && !state.settlements[hoverId]) hoverId = null;
+    workAssign = computeWorkAssignment(state);
     updateMapInfo();
+    refreshLayer();
+    refreshPanel();
+    editor.refreshPanel();
+    if (mouseX >= 0) updateHover(mouseX, mouseY);
+  }
+
+  function refreshLayer(): void {
+    settlementLayer.update(state, { hover: hoverId, selected: selectedId, zoom: camera.zoom });
   }
 
   function updateMapInfo(): void {
@@ -120,17 +159,57 @@ export async function startApp(): Promise<void> {
     const land = state.map.terrain.length - (counts[TERRAIN.findIndex((t) => t.id === 'sea')] ?? 0);
     const cal = calendar(state.turn);
     const label = mapName ? `map "${mapName}"` : `seed "${state.seed}"`;
+    const n = Object.keys(state.settlements).length;
     el('info-map').textContent =
-      `${state.map.width}×${state.map.height} hexes · ${label} · land ${((100 * land) / state.map.terrain.length).toFixed(0)}% · ${cal.monthName}, year ${cal.year}`;
+      `${state.map.width}×${state.map.height} hexes · ${label} · land ${((100 * land) / state.map.terrain.length).toFixed(0)}%${n ? ` · ${n} settlement${n === 1 ? '' : 's'}` : ''}`;
+    el('info-date').textContent = `${cal.monthName}, year ${cal.year}`;
   }
+
+  // ---- settlement selection and panel ----
+  function select(id: string | null): void {
+    selectedId = id && state.settlements[id] ? id : null;
+    refreshLayer();
+    refreshPanel();
+  }
+  function refreshPanel(): void {
+    const s = selectedId ? state.settlements[selectedId] : null;
+    if (!s) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
+    panel.classList.remove('hidden');
+    renderPanel(panel, state, s, {
+      onRename: (id, name) => { editor.renameSettlement(id, name); },
+      onRemove: (id) => { editor.removeSettlement(id); },
+      onFocus: (id) => {
+        const t = state.settlements[id];
+        if (!t) return;
+        select(id);
+        const p = offsetToPixel(t.col, t.row, HEX_SIZE);
+        camera.centerOn(p.x, p.y);
+      },
+      onClose: () => select(null),
+    }, editor.active);
+  }
+
+  // ---- turns ----
+  function advance(months: number): void {
+    const t0 = performance.now();
+    for (let i = 0; i < months; i++) endTurn(state);
+    const ms = performance.now() - t0;
+    el('info-run').textContent = months > 1 ? `${months / 12} years in ${ms.toFixed(0)} ms` : '';
+    editor.stateChangedExternally();
+    stateChanged();
+  }
+  el<HTMLButtonElement>('end-turn').addEventListener('click', () => advance(1));
+  el<HTMLButtonElement>('run-years-btn').addEventListener('click', () => {
+    const years = Math.max(1, Math.min(200, Math.round(Number(el<HTMLInputElement>('run-years').value) || 1)));
+    advance(12 * years);
+  });
 
   // ---- HUD controls ----
   function regenerate(): void {
     const t0 = performance.now();
     mapName = `draft ${seedInput.value.trim() || 'realms'}`;
-    state = newGameFrom(readParams());
     editor.resetHistory();
-    applyMap(true);
+    replaceState(newGameFrom(readParams()), true);
     el('info-perf').textContent = `generated in ${(performance.now() - t0).toFixed(0)} ms`;
   }
   el<HTMLButtonElement>('generate').addEventListener('click', regenerate);
@@ -143,21 +222,21 @@ export async function startApp(): Promise<void> {
     regenerate();
   });
   el<HTMLButtonElement>('testmap').addEventListener('click', () => {
+    if (Object.keys(state.settlements).length && !confirm('Reload the shipped test map? Settlements and the calendar will be discarded (save a scenario first if you want to keep them).')) return;
     const loaded = loadMapFile(testmapJson);
-    state = createGameState('testmap', loaded.map);
     mapName = loaded.name;
     history.replaceState(null, '', location.pathname);
     editor.resetHistory();
-    applyMap(true);
+    replaceState(createGameState('testmap', loaded.map), true);
   });
 
-  // ---- input: pan / zoom / hover / paint ----
+  // ---- input: pan / zoom / hover / paint / select ----
   const canvas = app.canvas;
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   let panning = false;
   let painting = false;
   let lastX = 0, lastY = 0;
-  let mouseX = -1, mouseY = -1;
+  let downX = 0, downY = 0, moved = false;
 
   function hexAt(sx: number, sy: number): { col: number; row: number } {
     const w = camera.screenToWorld(sx, sy);
@@ -167,8 +246,9 @@ export async function startApp(): Promise<void> {
 
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
-    lastX = e.clientX;
-    lastY = e.clientY;
+    lastX = downX = e.clientX;
+    lastY = downY = e.clientY;
+    moved = false;
     const paintButton = editor.active && e.button === 0;
     if (paintButton) {
       painting = true;
@@ -180,14 +260,20 @@ export async function startApp(): Promise<void> {
     }
   });
   canvas.addEventListener('pointerup', (e) => {
+    const wasPanning = panning;
     panning = false;
     if (painting) {
       painting = false;
       editor.pointerUp();
+    } else if (wasPanning && e.button === 0 && !moved) {
+      // a plain click outside edit mode: select the settlement under the cursor (or deselect)
+      const h = hexAt(e.clientX, e.clientY);
+      select(inBounds(state.map, h.col, h.row) ? settlementIdAt(state, h.col, h.row) : null);
     }
     canvas.releasePointerCapture(e.pointerId);
   });
   canvas.addEventListener('pointermove', (e) => {
+    if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 4) moved = true;
     if (panning) {
       camera.panBy(e.clientX - lastX, e.clientY - lastY);
       lastX = e.clientX;
@@ -221,10 +307,14 @@ export async function startApp(): Promise<void> {
     else if (e.key === 'ArrowDown') camera.panBy(0, -step);
     else if (e.key === 'g' || e.key === 'G') renderer.setGridVisible(!renderer.gridVisible);
     else if (e.key === 'r' || e.key === 'R') renderer.setResourcesVisible(!renderer.resourcesVisible);
+    else if (e.key === 'z' || e.key === 'Z') settlementLayer.setZonesVisible(!settlementLayer.zonesVisible);
     else if (e.key === 'Home') camera.fit();
-    else if (e.key === 'e' || e.key === 'E') editor.setActive(!editor.active);
+    else if (e.key === 'e' || e.key === 'E') { editor.setActive(!editor.active); refreshPanel(); }
+    else if (e.key === ' ') { e.preventDefault(); advance(1); }
+    else if (e.key === 'Escape') select(null);
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   });
+  el('edit-toggle').addEventListener('click', () => refreshPanel());
 
   window.addEventListener('resize', () => camera.resize(app.screen.width, app.screen.height));
   window.addEventListener('beforeunload', (e) => {
@@ -234,15 +324,25 @@ export async function startApp(): Promise<void> {
   function updateHover(sx: number, sy: number): void {
     const h = hexAt(sx, sy);
     hover.clear();
+    const prevHover = hoverId;
     if (!inBounds(state.map, h.col, h.row)) {
       el('info-hex').textContent = 'Outside the map';
+      el('info-settlement').textContent = '';
+      hoverId = null;
+      if (prevHover !== hoverId) refreshLayer();
       return;
     }
     const t = TERRAIN[getTerrain(state.map, h.col, h.row)];
     const r = resourceByIndex(getResource(state.map, h.col, h.row));
     const y = [t.fertility ? `fertility ${t.fertility}` : '', t.pasture ? `pasture ${t.pasture}` : '', t.timber ? `timber ${t.timber}` : ''].filter(Boolean).join(' ');
+    const workedBy = workAssign.get(idx(state.map, h.col, h.row));
+    const workedText = workedBy && state.settlements[workedBy] ? `  · worked by ${state.settlements[workedBy].name}` : '';
     el('info-hex').textContent =
-      `hex (${h.col}, ${h.row})  ${t.name}${r ? ` · ${r.name}` : ''}  move ${t.passable ? t.moveCost : '—'}${y ? '  ' + y : ''}`;
+      `hex (${h.col}, ${h.row})  ${t.name}${r ? ` · ${r.name}` : ''}  move ${t.passable ? t.moveCost : '—'}${y ? '  ' + y : ''}${workedText}`;
+    hoverId = settlementIdAt(state, h.col, h.row);
+    const hs = hoverId ? state.settlements[hoverId] : null;
+    el('info-settlement').textContent = hs ? hoverLine(state, hs) : '';
+    if (prevHover !== hoverId) refreshLayer();
     const lw = 2 / camera.zoom;
     if (editor.active) {
       const w = state.map.width;
@@ -250,17 +350,18 @@ export async function startApp(): Promise<void> {
         const p = offsetToPixel(i % w, Math.floor(i / w), HEX_SIZE);
         hover.poly(hexCorners(p.x, p.y, HEX_SIZE));
       }
-      hover.stroke({ width: lw, color: 0xffffff, alpha: 0.85 });
+      hover.stroke({ width: lw, color: 0xffffff, alpha: editor.tool === 'settle' ? 0.5 : 0.85 });
     } else {
       const p = offsetToPixel(h.col, h.row, HEX_SIZE);
       hover.poly(hexCorners(p.x, p.y, HEX_SIZE)).stroke({ width: lw, color: 0xffffff, alpha: 0.9 });
     }
   }
 
-  // ---- frame loop: culling + perf readout ----
-  let frames = 0, lastFps = performance.now(), fps = 0, maxBuild = 0;
+  // ---- frame loop: culling + perf readout; redraw the settlement layer when the zoom changes ----
+  let frames = 0, lastFps = performance.now(), fps = 0, maxBuild = 0, lastZoom = -1;
   app.ticker.add(() => {
     renderer.setZoom(camera.zoom);
+    if (Math.abs(camera.zoom - lastZoom) > 1e-6) { lastZoom = camera.zoom; refreshLayer(); }
     const visible = renderer.cull(camera.viewRect());
     maxBuild = Math.max(maxBuild, renderer.lastBuildMs);
     frames++;

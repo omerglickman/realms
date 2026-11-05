@@ -50,6 +50,12 @@ export class Camera {
     this.clamp();
   }
 
+  /** Put the world point (wx, wy) at the centre of the screen, keeping the zoom. */
+  centerOn(wx: number, wy: number): void {
+    this.world.position.set(this.screenW / 2 - wx * this.zoom, this.screenH / 2 - wy * this.zoom);
+    this.clamp();
+  }
+
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
     return {
       x: (sx - this.world.position.x) / this.zoom,

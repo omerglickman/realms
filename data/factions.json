@@ -1,0 +1,7 @@
+{
+  "_comment": "Factions (DESIGN §4.8). Omer 2026-11-05: the game is built with the player's faction alone through Phase 3; the other five of the six test-map factions are added later as data (hand-designed names, start positions, culture group, AI persona). ORDER IS INDEX-STABLE once more than one faction exists. Name and colour are PLACEHOLDERS. 'culture' is reserved for the culture groups Omer will define later.",
+  "playerFaction": "player",
+  "factions": [
+    { "id": "player", "name": "The Realm", "color": "#c8323c", "culture": null, "player": true }
+  ]
+}

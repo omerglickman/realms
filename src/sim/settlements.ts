@@ -7,6 +7,7 @@ import buildingData from '../../data/buildings.json';
 import type { GameState } from './state';
 import type { MapData } from './map';
 import { inBounds, idx } from './map';
+import { TERRAIN } from './terrain';
 import { axialRange, axialDistance, offsetToAxial, axialToOffset, type Axial } from './hex';
 import { createPopulation, type Population } from './demography';
 
@@ -93,7 +94,14 @@ export interface Settlement {
   yearMonths: number;
   yearSufficiency: number;
   report: SettlementReport;
+  /** total population at the end of each December since founding (newest last; capped) — for growth trends */
+  popHistory: number[];
+  /** the turn the settlement was founded (or placed in the editor) */
+  foundedTurn: number;
 }
+
+/** How many year-end totals a settlement remembers. */
+export const POP_HISTORY_YEARS = 30;
 
 export function emptyReport(): SettlementReport {
   return {
@@ -115,6 +123,15 @@ export interface FoundOptions {
   foodMonths?: number;
 }
 
+/** Terrain a settlement centre may stand on: passable land (DESIGN §3.3; water and mountains excluded). */
+export function canSettleAt(state: GameState, col: number, row: number): { ok: boolean; reason?: string } {
+  if (!inBounds(state.map, col, row)) return { ok: false, reason: 'off the map' };
+  const t = TERRAIN[state.map.terrain[idx(state.map, col, row)]];
+  if (!t.passable) return { ok: false, reason: `cannot settle on ${t.name.toLowerCase()}` };
+  if (settlementIdAt(state, col, row)) return { ok: false, reason: 'a settlement already stands here' };
+  return { ok: true };
+}
+
 /** Create a settlement object (does not add it to the state — see commands.ts foundSettlement). */
 export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
   const tier = typeof o.tier === 'string' ? tierIndex(o.tier) : o.tier;
@@ -128,7 +145,7 @@ export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
     tier,
     col: o.col,
     row: o.row,
-    faction: o.faction ?? null,
+    faction: o.faction === undefined ? state.playerFaction : o.faction,
     pop: createPopulation(o.population),
     food: o.population * (o.foodMonths ?? 12),
     buildings: [def.hall, def.granary],
@@ -137,7 +154,25 @@ export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
     yearMonths: 0,
     yearSufficiency: 0,
     report: emptyReport(),
+    popHistory: [],
+    foundedTurn: state.turn,
   };
+}
+
+/**
+ * Yearly growth trend as a fraction (+0.016 = +1.6 %/year): the last two
+ * year-end totals compared. null until two Decembers have passed.
+ */
+export function growthTrend(s: Settlement): number | null {
+  const h = s.popHistory;
+  if (h.length < 2) return null;
+  const prev = h[h.length - 2], last = h[h.length - 1];
+  return prev > 0 ? last / prev - 1 : null;
+}
+
+/** Settlements whose resolved parent is `id`. */
+export function childrenOf(state: GameState, id: string): Settlement[] {
+  return Object.values(state.settlements).filter((s) => s.parent === id);
 }
 
 export function settlementAxial(s: Settlement): Axial {

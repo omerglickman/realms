@@ -213,8 +213,10 @@ describe('20-year scenarios (ROADMAP Phase 1 acceptance)', () => {
 
   it('loads a Phase 0 (version 1) save with no settlements', () => {
     const s = deserializeState(JSON.stringify({ version: 1, seed: 's', rng: { a: 1, b: 2, c: 3, d: 4 }, turn: 3, map: createMap(5, 5) }));
-    expect(s.version).toBe(2);
+    expect(s.version).toBe(3);
     expect(s.settlements).toEqual({});
+    expect(s.factions.player).toBeDefined();
+    expect(s.playerFaction).toBe('player');
   });
 
   it('settlement commands invert: found → remove → restore', () => {

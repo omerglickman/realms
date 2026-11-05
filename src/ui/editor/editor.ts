@@ -11,8 +11,13 @@ import { RESOURCES, NO_RESOURCE, computeResourceSpawn, countResources } from '..
 import { seedRng } from '../../sim/rng';
 import { inBounds, idx } from '../../sim/map';
 import { loadMapFile, saveMapFile } from '../../sim/mapfile';
+import { TIERS, canSettleAt, settlementIdAt, zoneCells, workRangeCells, workedCellsBySettlement } from '../../sim/settlements';
+import { saveScenarioFile, loadScenarioFile, detectFile } from '../../sim/scenario';
 
-export type Tool = 'brush' | 'fill' | 'pick' | 'resource';
+export type Tool = 'brush' | 'fill' | 'pick' | 'resource' | 'settle';
+
+/** Default starting population per tier when placing in the editor (×3 model scale; DESIGN §3.3 typical sizes). */
+const DEFAULT_POP: Record<string, number> = { village: 900, town: 9000, city: 24000, metropolis: 36000 };
 export const BRUSH_RADII = [0, 1, 2, 4] as const; // sizes 1, 2, 3, 5
 
 const AUTOSAVE_KEY = 'realms.editor.autosave';
@@ -30,6 +35,10 @@ export interface EditorHost {
   /** The map's display name (shown in the HUD, used for export filename). */
   getMapName(): string;
   setMapName(name: string): void;
+  /** Replace the whole game state (after loading a scenario). */
+  setState(state: GameState): void;
+  /** A settlement was placed or clicked in the editor (null = deselect). */
+  onSelect(id: string | null): void;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -45,6 +54,9 @@ export class Editor {
   resource = NO_RESOURCE; // selected resource for the resource tool (-1 = eraser)
   radiusIndex = 1; // size 2
   dirty = false;
+  /** settle tool: tier index into TIERS */
+  settleTier = 0;
+  private settleCounter = 0;
 
   private undoStack: UndoEntry[] = [];
   private redoStack: UndoEntry[] = [];
@@ -54,6 +66,7 @@ export class Editor {
   constructor(private host: EditorHost) {
     this.buildPalette();
     this.buildResourcePalette();
+    this.buildSettlePanel();
     this.wirePanel();
     this.refreshPanel();
     this.checkAutosave();
@@ -79,7 +92,59 @@ export class Editor {
     const map = this.host.getState().map;
     if (!inBounds(map, col, row)) return [];
     if (this.tool === 'brush') return brushCells(map, col, row, this.brushRadius);
+    if (this.tool === 'settle') {
+      // show the influence reach of the tier about to be placed
+      const fake = { col, row, tier: this.settleTier } as Parameters<typeof zoneCells>[1];
+      return zoneCells(map, fake, TIERS[this.settleTier].influenceRings);
+    }
     return [idx(map, col, row)];
+  }
+
+  /** Found a settlement of the selected tier at (col,row) with the panel's name and population. */
+  placeSettlement(col: number, row: number): void {
+    const state = this.host.getState();
+    const existing = settlementIdAt(state, col, row);
+    if (existing) { this.host.onSelect(existing); return; }
+    const check = canSettleAt(state, col, row);
+    if (!check.ok) { el('editor-msg').textContent = `Cannot place here: ${check.reason}.`; return; }
+    const tier = TIERS[this.settleTier];
+    const popInput = el<HTMLInputElement>('settle-pop');
+    const population = Math.max(1, Math.round(Number(popInput.value) || DEFAULT_POP[tier.id] || 900));
+    const nameInput = el<HTMLInputElement>('settle-name');
+    const name = nameInput.value.trim() || this.nextName();
+    this.execute({ type: 'foundSettlement', settlement: { name, tier: this.settleTier, col, row, population } });
+    const id = settlementIdAt(state, col, row)!;
+    const placed = state.settlements[id];
+    const wanted = workRangeCells(state.map, placed).length;
+    const got = (workedCellsBySettlement(state).get(id) ?? []).length;
+    const note = got < wanted ? ` ⚠ only ${got} of its ${wanted} hexes are free — the rest are worked by a higher tier (DESIGN §3.3).` : '';
+    el('editor-msg').textContent = `Placed ${name} (${tier.name}, ${population.toLocaleString('en-US')} people).${note}`;
+    nameInput.value = ''; // next one gets an automatic name unless typed
+    this.host.onSelect(id);
+  }
+
+  private nextName(): string {
+    const state = this.host.getState();
+    const tier = TIERS[this.settleTier].name;
+    const taken = new Set(Object.values(state.settlements).map((s) => s.name));
+    let n = this.settleCounter;
+    let name: string;
+    do { n += 1; name = `${tier} ${n}`; } while (taken.has(name));
+    this.settleCounter = n;
+    return name;
+  }
+
+  removeSettlement(id: string): void {
+    const state = this.host.getState();
+    const s = state.settlements[id];
+    if (!s) return;
+    this.execute({ type: 'removeSettlement', id });
+    el('editor-msg').textContent = `Removed ${s.name}.`;
+    this.host.onSelect(null);
+  }
+
+  renameSettlement(id: string, name: string): void {
+    this.execute({ type: 'renameSettlement', id, name });
   }
 
   private applyStrokeCommand(cmd: SetTerrainCommand | SetResourceCommand): void {
@@ -109,6 +174,10 @@ export class Editor {
       case 'resource': {
         this.stroke = new Map();
         this.paintAt(col, row);
+        return;
+      }
+      case 'settle': {
+        this.placeSettlement(col, row);
         return;
       }
     }
@@ -224,6 +293,7 @@ export class Editor {
     if (up === 'F') { this.tool = 'fill'; this.refreshPanel(); return true; }
     if (up === 'I') { this.tool = 'pick'; this.refreshPanel(); return true; }
     if (up === 'X') { this.tool = 'resource'; this.resource = NO_RESOURCE; this.refreshPanel(); return true; }
+    if (up === 'T') { this.tool = 'settle'; this.refreshPanel(); return true; }
     if (k === '[') { this.radiusIndex = Math.max(0, this.radiusIndex - 1); this.refreshPanel(); return true; }
     if (k === ']') { this.radiusIndex = Math.min(BRUSH_RADII.length - 1, this.radiusIndex + 1); this.refreshPanel(); return true; }
     const ti = TERRAIN_KEYS.indexOf(up);
@@ -248,11 +318,43 @@ export class Editor {
     this.refreshPanel();
   }
 
-  importMapFromText(text: string): void {
-    const { map, name } = loadMapFile(JSON.parse(text));
+  /** Import either a map file (terrain + resources; settlements are kept) or a scenario file (whole state). */
+  importMapFromText(text: string): 'map' | 'scenario' {
+    const raw = JSON.parse(text);
+    const kind = detectFile(raw);
+    if (kind === 'scenario') {
+      const { state, name } = loadScenarioFile(raw);
+      this.host.setState(state);
+      this.host.setMapName(name);
+      this.resetHistory();
+      return 'scenario';
+    }
+    const { map, name } = loadMapFile(raw);
     this.execute({ type: 'replaceMap', map });
     this.host.setMapName(name);
     this.resetHistory();
+    return 'map';
+  }
+
+  /** Download the whole game state as a scenario file (the organic starting position — DESIGN §4.8). */
+  exportScenario(): void {
+    const name = this.host.getMapName() || 'scenario';
+    const file = saveScenarioFile(this.host.getState(), name, { exportedAt: new Date().toISOString() });
+    const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name.replace(/[^\w.-]+/g, '_')}.scenario.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    this.dirty = false;
+    this.refreshPanel();
+  }
+
+  /** Called by the app after turns ran: the state changed outside the command layer. */
+  stateChangedExternally(): void {
+    this.markDirty();
   }
 
   private markDirty(): void {
@@ -264,7 +366,7 @@ export class Editor {
 
   private autosave(): void {
     try {
-      const file = saveMapFile(this.host.getState().map, this.host.getMapName(), { autosavedAt: new Date().toISOString() });
+      const file = saveScenarioFile(this.host.getState(), this.host.getMapName(), { autosavedAt: new Date().toISOString() });
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(file));
       el('editor-autosave-status').textContent = `autosaved ${new Date().toLocaleTimeString()}`;
     } catch {
@@ -279,8 +381,10 @@ export class Editor {
       if (!raw) { box.classList.add('hidden'); return; }
       const parsed = JSON.parse(raw);
       const when = parsed?.meta?.autosavedAt ? new Date(parsed.meta.autosavedAt).toLocaleString() : 'unknown time';
-      el('editor-restore-label').textContent = `Unsaved edits found (${parsed?.name ?? 'map'}, ${when}).`;
+      const what = detectFile(parsed) === 'scenario' ? `${parsed.meta?.settlements ?? 0} settlements, ${parsed.meta?.date ?? ''}` : 'map only';
+      el('editor-restore-label').textContent = `Unsaved edits found (${parsed?.name ?? 'map'}, ${when}; ${what}).`;
       box.classList.remove('hidden');
+      this.setActive(true); // the notice lives in the editor panel — make sure it can be seen
       el<HTMLButtonElement>('editor-restore-yes').onclick = () => {
         this.importMapFromText(raw);
         box.classList.add('hidden');
@@ -329,6 +433,30 @@ export class Editor {
     RESOURCES.forEach((r, i) => mk(r.name, i, r.color));
   }
 
+  private buildSettlePanel(): void {
+    const sel = el<HTMLSelectElement>('settle-tier');
+    sel.innerHTML = '';
+    TIERS.forEach((t, i) => {
+      const o = document.createElement('option');
+      o.value = String(i);
+      o.textContent = t.name;
+      sel.appendChild(o);
+    });
+    sel.value = String(this.settleTier);
+    const pop = el<HTMLInputElement>('settle-pop');
+    pop.value = String(DEFAULT_POP[TIERS[this.settleTier].id] ?? 900);
+    sel.addEventListener('change', () => {
+      this.settleTier = Number(sel.value) || 0;
+      pop.value = String(DEFAULT_POP[TIERS[this.settleTier].id] ?? 900);
+      this.tool = 'settle';
+      this.refreshPanel();
+    });
+    el('tool-settle').addEventListener('click', () => { this.tool = 'settle'; this.refreshPanel(); });
+    pop.addEventListener('focus', () => { this.tool = 'settle'; this.refreshPanel(); });
+    el('settle-name').addEventListener('focus', () => { this.tool = 'settle'; this.refreshPanel(); });
+    el('editor-export-scenario').addEventListener('click', () => this.exportScenario());
+  }
+
   private wirePanel(): void {
     el('res-spawn').addEventListener('click', () => this.spawnResources('replace'));
     el('res-fill').addEventListener('click', () => this.spawnResources('fill'));
@@ -353,8 +481,8 @@ export class Editor {
       const f = fileInput.files?.[0];
       if (!f) return;
       try {
-        this.importMapFromText(await f.text());
-        el('editor-msg').textContent = `Loaded "${this.host.getMapName()}".`;
+        const kind = this.importMapFromText(await f.text());
+        el('editor-msg').textContent = `Loaded ${kind} "${this.host.getMapName()}".`;
       } catch (err) {
         el('editor-msg').textContent = `Could not load: ${err instanceof Error ? err.message : String(err)}`;
       }
@@ -377,6 +505,11 @@ export class Editor {
     el('tool-brush').classList.toggle('selected', this.tool === 'brush');
     el('tool-fill').classList.toggle('selected', this.tool === 'fill');
     el('tool-pick').classList.toggle('selected', this.tool === 'pick');
+    el('tool-settle').classList.toggle('selected', this.tool === 'settle');
+    const sel = el<HTMLSelectElement>('settle-tier');
+    if (sel.value !== String(this.settleTier)) sel.value = String(this.settleTier);
+    const n = Object.keys(this.host.getState().settlements).length;
+    el('settle-count').textContent = n ? `${n} settlement${n === 1 ? '' : 's'} on the map` : 'no settlements yet';
     document.querySelectorAll<HTMLButtonElement>('#brush-sizes button').forEach((b, i) => {
       b.classList.toggle('selected', i === this.radiusIndex);
     });

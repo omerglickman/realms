@@ -49,13 +49,21 @@ export interface RestoreSettlementCommand {
   settlement: Settlement;
 }
 
+/** Rename a settlement (its own inverse). */
+export interface RenameSettlementCommand {
+  type: 'renameSettlement';
+  id: string;
+  name: string;
+}
+
 export type Command =
   | SetTerrainCommand
   | SetResourceCommand
   | ReplaceMapCommand
   | FoundSettlementCommand
   | RemoveSettlementCommand
-  | RestoreSettlementCommand;
+  | RestoreSettlementCommand
+  | RenameSettlementCommand;
 
 /** Apply a command, mutating the state, and return the inverse command. */
 export function applyCommand(state: GameState, cmd: Command): Command {
@@ -106,12 +114,24 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       state.settlements[cmd.settlement.id] = cmd.settlement;
       return { type: 'removeSettlement', id: cmd.settlement.id };
     }
+    case 'renameSettlement': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      const prev = s.name;
+      s.name = cmd.name;
+      return { type: 'renameSettlement', id: cmd.id, name: prev };
+    }
   }
 }
 
 /** Does this command change anything? (used to skip empty undo entries) */
 export function isNoop(cmd: Command): boolean {
   return (cmd.type === 'setTerrain' || cmd.type === 'setResource') && cmd.cells.length === 0;
+}
+
+/** Does this command touch settlements (so zone/marker layers must redraw)? */
+export function commandTouchesSettlements(cmd: Command): boolean {
+  return cmd.type === 'foundSettlement' || cmd.type === 'removeSettlement' || cmd.type === 'restoreSettlement' || cmd.type === 'renameSettlement' || cmd.type === 'replaceMap';
 }
 
 /** Cells touched by a command (for renderer invalidation); 'all' for whole-map commands. */

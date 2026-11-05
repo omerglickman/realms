@@ -14,7 +14,7 @@ import { neighborsOffset } from './map';
 import { TERRAIN, terrainIndex } from './terrain';
 import { RESOURCES } from './resources';
 import {
-  type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport,
+  type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, POP_HISTORY_YEARS,
 } from './settlements';
 import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate } from './demography';
 
@@ -282,6 +282,8 @@ export function demographyYear(state: GameState): void {
     s.report.deaths = res.deaths;
     s.yearMonths = 0;
     s.yearSufficiency = 0;
+    s.popHistory.push(totalPopulation(s.pop));
+    if (s.popHistory.length > POP_HISTORY_YEARS) s.popHistory.splice(0, s.popHistory.length - POP_HISTORY_YEARS);
   }
 }
 

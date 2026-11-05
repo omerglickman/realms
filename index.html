@@ -10,7 +10,7 @@
     <div id="map"></div>
 
     <div id="hud">
-      <div class="hud-title">Realms, Kings and Other Stuff <span class="hud-build">Phase 0 · editor</span></div>
+      <div class="hud-title">Realms, Kings and Other Stuff <span class="hud-build">Phase 1 · settlements</span></div>
       <div class="hud-row">
         <button id="edit-toggle">Edit map</button>
         <button id="testmap" title="Reload the shipped test map">Test map</button>
@@ -41,10 +41,18 @@
           </div>
         </details>
       </div>
+      <div class="hud-row turn-row">
+        <span id="info-date" class="date">January, year 1</span>
+        <button id="end-turn" title="Advance one month (Space)">End turn</button>
+        <label>Run <input id="run-years" type="number" min="1" max="200" value="10" style="width:3.2em" /> years</label>
+        <button id="run-years-btn" title="Run the simulation for that many years">Run</button>
+        <span id="info-run" class="hud-dim"></span>
+      </div>
       <div class="hud-row hud-info"><span id="info-map"></span></div>
       <div class="hud-row hud-info"><span id="info-hex">Hover a hex</span></div>
+      <div class="hud-row hud-info"><span id="info-settlement" class="settlement-line"></span></div>
       <div class="hud-row hud-info hud-dim"><span id="info-perf"></span></div>
-      <div class="hud-row hud-help hud-dim" id="help-view">Drag to pan · wheel to zoom · arrows scroll · Home fits · G grid · R resources · E editor</div>
+      <div class="hud-row hud-help hud-dim" id="help-view">Drag to pan · wheel to zoom · arrows scroll · Home fits · Space ends the turn · click a settlement for details · G grid · R resources · Z zones · E editor</div>
     </div>
 
     <div id="editor" class="hidden">
@@ -59,8 +67,9 @@
         <span id="editor-dirty" class="dirty"></span>
       </div>
       <div class="row">
-        <button id="editor-export" title="Download the map as a .json file">Export .json</button>
-        <button id="editor-import" title="Load a map .json file">Import…</button>
+        <button id="editor-export" title="Download the map (terrain + resources) as a .json file">Export map</button>
+        <button id="editor-export-scenario" title="Download the whole state — map, settlements, people, calendar — as a scenario .json file">Save scenario</button>
+        <button id="editor-import" title="Load a map or a scenario .json file">Import…</button>
         <input id="editor-import-file" type="file" accept="application/json,.json" class="hidden" />
         <button id="editor-undo" title="Ctrl+Z">Undo</button>
         <button id="editor-redo" title="Ctrl+Y">Redo</button>
@@ -71,7 +80,17 @@
         <button id="tool-brush" title="B">Brush</button>
         <button id="tool-fill" title="F — fill a connected region">Fill</button>
         <button id="tool-pick" title="I — pick the terrain under the cursor">Pick</button>
+        <button id="tool-settle" title="T — place settlements">Settle</button>
       </div>
+      <div class="section">Settlements <span class="dim">(Settle tool: click to place; click one to inspect)</span></div>
+      <div class="row small">
+        <label>Tier <select id="settle-tier"></select></label>
+        <label>People <input id="settle-pop" type="number" min="1" step="100" style="width:5.5em" /></label>
+      </div>
+      <div class="row small">
+        <label>Name <input id="settle-name" type="text" size="14" placeholder="(automatic)" /></label>
+      </div>
+      <div class="row small"><span id="settle-count" class="dim"></span></div>
       <div class="section">Brush size <span class="dim">[ ]</span></div>
       <div class="row" id="brush-sizes">
         <button>1</button><button>2</button><button>3</button><button>5</button>
@@ -92,6 +111,8 @@
       <div class="row small"><span id="res-count" class="dim"></span></div>
       <div class="help dim">Left-drag paints · right-drag or middle-drag pans · wheel zooms · Ctrl+Z / Ctrl+Y undo/redo · number keys pick terrain</div>
     </div>
+
+    <div id="settlement" class="hidden"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
