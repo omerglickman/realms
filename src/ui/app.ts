@@ -19,6 +19,8 @@ import { loadMapFile } from '../sim/mapfile';
 import { settlementIdAt, computeWorkAssignment } from '../sim/settlements';
 import { SettlementLayer as SL } from './render/settlementLayer';
 import testmapJson from '../../maps/testmap.json';
+import startJson from '../../scenarios/start.json';
+import { loadScenarioFile } from '../sim/scenario';
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -74,12 +76,16 @@ export async function startApp(): Promise<void> {
   // ---- state: the shipped test map by default; a generated draft if the URL asks for one ----
   let state: GameState;
   let mapName = '';
+  /** The shipped starting position (scenarios/start.json — Omer's placed and pre-run realm, DESIGN §4.8). */
+  function loadStart(): GameState {
+    const { state: st, name } = loadScenarioFile(startJson);
+    mapName = name;
+    return st;
+  }
   if (hash.has('seed')) {
     state = newGameFrom(readParams());
   } else {
-    const loaded = loadMapFile(testmapJson);
-    state = createGameState('testmap', loaded.map);
-    mapName = loaded.name;
+    state = loadStart();
   }
 
   // ---- selection / hover of settlements ----
@@ -282,8 +288,14 @@ export async function startApp(): Promise<void> {
     seedInput.value = w;
     regenerate();
   });
+  el<HTMLButtonElement>('start-position').addEventListener('click', () => {
+    if (editor.dirty && !confirm('Reload the shipped starting position? Unsaved changes will be lost (save a scenario first if you want to keep them).')) return;
+    history.replaceState(null, '', location.pathname);
+    editor.resetHistory();
+    replaceState(loadStart(), true);
+  });
   el<HTMLButtonElement>('testmap').addEventListener('click', () => {
-    if (Object.keys(state.settlements).length && !confirm('Reload the shipped test map? Settlements and the calendar will be discarded (save a scenario first if you want to keep them).')) return;
+    if (Object.keys(state.settlements).length && !confirm('Load the bare test map (terrain and resources, no settlements)? Unsaved changes will be lost.')) return;
     const loaded = loadMapFile(testmapJson);
     mapName = loaded.name;
     history.replaceState(null, '', location.pathname);

@@ -45,6 +45,19 @@ export function loadScenarioFile(raw: unknown): { state: GameState; name: string
   return { state: deserializeState(JSON.stringify(f.state)), name: f.name ?? 'scenario' };
 }
 
+/**
+ * Turn a pre-run state into a starting position (DESIGN §4.8): keep every
+ * settlement, population and granary exactly as they are, but rebase the
+ * calendar so the game opens in year 1 (same month, so stocks stay in season)
+ * and every settlement counts as founded "at the start".
+ */
+export function rebaseAsStart(state: GameState): GameState {
+  const month = state.turn % 12;
+  state.turn = month;
+  for (const s of Object.values(state.settlements)) s.foundedTurn = 0;
+  return state;
+}
+
 export type RealmsFileKind = 'map' | 'scenario' | 'unknown';
 
 export function detectFile(raw: unknown): RealmsFileKind {
