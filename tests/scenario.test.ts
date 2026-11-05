@@ -111,6 +111,30 @@ describe('settling rules and commands', () => {
   });
 });
 
+describe('editSettlement command', () => {
+  it('scales every cohort to the new total, keeps the granary months, and inverts exactly', () => {
+    const s = createGameState('e', createMap(12, 12, G));
+    const v = found(s, 'v', 'village', 5, 5, 900);
+    for (let i = 0; i < 5; i++) endTurn(s);
+    const before = { pop: JSON.parse(JSON.stringify(v.pop)), food: v.food, total: totalPopulation(v.pop) };
+    const monthsBefore = v.food / before.total;
+    const inv = applyCommand(s, { type: 'editSettlement', id: v.id, population: 2700, name: 'Big' });
+    expect(v.name).toBe('Big');
+    expect(totalPopulation(v.pop)).toBeCloseTo(2700, 6);
+    expect(v.food / 2700).toBeCloseTo(monthsBefore, 9);
+    // structure preserved: each cohort scaled by the same factor
+    const k = 2700 / before.total;
+    for (let b = 0; b < v.pop.m.length; b++) {
+      expect(v.pop.m[b]).toBeCloseTo(before.pop.m[b] * k, 9);
+      expect(v.pop.f[b]).toBeCloseTo(before.pop.f[b] * k, 9);
+    }
+    applyCommand(s, inv);
+    expect(v.name).toBe('v');
+    expect(v.pop).toEqual(before.pop);
+    expect(v.food).toBe(before.food);
+  });
+});
+
 describe('scenario files', () => {
   it('round-trips the whole state and is told apart from a map file', () => {
     const s = createGameState('sc', createMap(20, 20, G));

@@ -1,7 +1,10 @@
-// Map editor: palette, brush / fill / pick tools, undo-redo, export/import,
+// Map editor: three tabs — Terrain (brush / fill / pick + palette), Resources
+// (palette + spawning), Settlements (place / pick). Undo-redo, export/import,
 // autosave. All edits go through the command layer (src/sim/commands.ts).
 // This file owns the editor panel DOM (#editor) and the edit-mode flag; the
 // app forwards pointer and key events to it while edit mode is on.
+// The active tab decides what a click on the map does; switching tabs
+// drops the previous tab's tool (Omer, 2026-11-05).
 
 import type { GameState } from '../../sim/state';
 import type { Command, SetTerrainCommand, SetResourceCommand } from '../../sim/commands';
@@ -14,14 +17,17 @@ import { loadMapFile, saveMapFile } from '../../sim/mapfile';
 import { TIERS, canSettleAt, settlementIdAt, zoneCells, workRangeCells, workedCellsBySettlement } from '../../sim/settlements';
 import { saveScenarioFile, loadScenarioFile, detectFile } from '../../sim/scenario';
 
-export type Tool = 'brush' | 'fill' | 'pick' | 'resource' | 'settle';
+export type Tab = 'terrain' | 'resources' | 'settlements';
+/** brush / fill / pick belong to the Terrain tab; resource to Resources; settle (place) and inspect (pick) to Settlements. */
+export type Tool = 'brush' | 'fill' | 'pick' | 'resource' | 'settle' | 'inspect';
+export const BRUSH_RADII = [0, 1, 2, 4] as const; // sizes 1, 2, 3, 5
 
 /** Default starting population per tier when placing in the editor (×3 model scale; DESIGN §3.3 typical sizes). */
 const DEFAULT_POP: Record<string, number> = { village: 900, town: 9000, city: 24000, metropolis: 36000 };
-export const BRUSH_RADII = [0, 1, 2, 4] as const; // sizes 1, 2, 3, 5
 
 const AUTOSAVE_KEY = 'realms.editor.autosave';
 const TERRAIN_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'S'];
+const TABS: Tab[] = ['terrain', 'resources', 'settlements'];
 
 interface UndoEntry {
   undo: Command;
@@ -37,8 +43,10 @@ export interface EditorHost {
   setMapName(name: string): void;
   /** Replace the whole game state (after loading a scenario). */
   setState(state: GameState): void;
-  /** A settlement was placed or clicked in the editor (null = deselect). */
+  /** A settlement was placed or picked in the editor (null = deselect). */
   onSelect(id: string | null): void;
+  /** The tab or tool changed (the app refreshes hover previews and layers). */
+  onToolChanged(): void;
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -49,6 +57,7 @@ function el<T extends HTMLElement>(id: string): T {
 
 export class Editor {
   active = false;
+  tab: Tab = 'terrain';
   tool: Tool = 'brush';
   terrain = 1; // grassland
   resource = NO_RESOURCE; // selected resource for the resource tool (-1 = eraser)
@@ -76,27 +85,47 @@ export class Editor {
     return BRUSH_RADII[this.radiusIndex];
   }
 
-  // ---------- mode ----------
+  /** Is the player choosing where to place a settlement? (the layer hatches worked hexes) */
+  get settling(): boolean {
+    return this.active && this.tab === 'settlements' && this.tool === 'settle';
+  }
+
+  // ---------- mode / tabs ----------
 
   setActive(on: boolean): void {
     this.active = on;
     el('editor').classList.toggle('hidden', !on);
     el<HTMLButtonElement>('edit-toggle').textContent = on ? 'Leave editor' : 'Edit map';
     document.body.classList.toggle('editing', on);
+    this.host.onToolChanged();
+  }
+
+  setTab(tab: Tab): void {
+    this.tab = tab;
+    this.tool = tab === 'terrain' ? 'brush' : tab === 'resources' ? 'resource' : 'settle';
+    this.refreshPanel();
+    this.host.onToolChanged();
+  }
+
+  setTool(tool: Tool): void {
+    this.tool = tool;
+    this.refreshPanel();
+    this.host.onToolChanged();
   }
 
   // ---------- pointer interaction (called by the app with map coordinates) ----------
 
-  /** Cells the brush would touch at (col,row); for the hover preview. */
+  /** Cells the current tool would touch at (col,row); for the hover preview. */
   previewCells(col: number, row: number): number[] {
     const map = this.host.getState().map;
     if (!inBounds(map, col, row)) return [];
     if (this.tool === 'brush') return brushCells(map, col, row, this.brushRadius);
     if (this.tool === 'settle') {
-      // show the influence reach of the tier about to be placed
+      // show the work zone of the tier about to be placed (the hatch shows what is taken)
       const fake = { col, row, tier: this.settleTier } as Parameters<typeof zoneCells>[1];
-      return zoneCells(map, fake, TIERS[this.settleTier].influenceRings);
+      return zoneCells(map, fake, TIERS[this.settleTier].workRings);
     }
+    if (this.tool === 'inspect') return [];
     return [idx(map, col, row)];
   }
 
@@ -143,8 +172,8 @@ export class Editor {
     this.host.onSelect(null);
   }
 
-  renameSettlement(id: string, name: string): void {
-    this.execute({ type: 'renameSettlement', id, name });
+  editSettlement(id: string, changes: { name?: string; population?: number }): void {
+    this.execute({ type: 'editSettlement', id, ...changes });
   }
 
   private applyStrokeCommand(cmd: SetTerrainCommand | SetResourceCommand): void {
@@ -178,6 +207,10 @@ export class Editor {
       }
       case 'settle': {
         this.placeSettlement(col, row);
+        return;
+      }
+      case 'inspect': {
+        this.host.onSelect(settlementIdAt(state, col, row));
         return;
       }
     }
@@ -289,15 +322,21 @@ export class Editor {
     if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'y') { this.redo(); return true; }
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     const up = k.toUpperCase();
-    if (up === 'B') { this.tool = 'brush'; this.refreshPanel(); return true; }
-    if (up === 'F') { this.tool = 'fill'; this.refreshPanel(); return true; }
-    if (up === 'I') { this.tool = 'pick'; this.refreshPanel(); return true; }
-    if (up === 'X') { this.tool = 'resource'; this.resource = NO_RESOURCE; this.refreshPanel(); return true; }
-    if (up === 'T') { this.tool = 'settle'; this.refreshPanel(); return true; }
-    if (k === '[') { this.radiusIndex = Math.max(0, this.radiusIndex - 1); this.refreshPanel(); return true; }
-    if (k === ']') { this.radiusIndex = Math.min(BRUSH_RADII.length - 1, this.radiusIndex + 1); this.refreshPanel(); return true; }
-    const ti = TERRAIN_KEYS.indexOf(up);
-    if (ti >= 0 && ti < TERRAIN.length) { this.terrain = ti; this.refreshPanel(); return true; }
+    if (k === 'Tab') { this.setTab(TABS[(TABS.indexOf(this.tab) + (e.shiftKey ? 2 : 1)) % 3]); return true; }
+    if (this.tab === 'terrain') {
+      if (up === 'B') { this.setTool('brush'); return true; }
+      if (up === 'F') { this.setTool('fill'); return true; }
+      if (up === 'I') { this.setTool('pick'); return true; }
+      if (k === '[') { this.radiusIndex = Math.max(0, this.radiusIndex - 1); this.refreshPanel(); return true; }
+      if (k === ']') { this.radiusIndex = Math.min(BRUSH_RADII.length - 1, this.radiusIndex + 1); this.refreshPanel(); return true; }
+      const ti = TERRAIN_KEYS.indexOf(up);
+      if (ti >= 0 && ti < TERRAIN.length) { this.terrain = ti; this.refreshPanel(); return true; }
+    } else if (this.tab === 'resources') {
+      if (up === 'X') { this.resource = NO_RESOURCE; this.setTool('resource'); return true; }
+    } else {
+      if (up === 'P') { this.setTool('settle'); return true; }
+      if (up === 'I') { this.setTool('inspect'); return true; }
+    }
     return false;
   }
 
@@ -306,10 +345,21 @@ export class Editor {
   exportMap(): void {
     const name = this.host.getMapName() || 'map';
     const file = saveMapFile(this.host.getState().map, name, { exportedAt: new Date().toISOString() });
-    const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
+    this.download(JSON.stringify(file), `${name.replace(/[^\w.-]+/g, '_')}.json`);
+  }
+
+  /** Download the whole game state as a scenario file (the organic starting position — DESIGN §4.8). */
+  exportScenario(): void {
+    const name = this.host.getMapName() || 'scenario';
+    const file = saveScenarioFile(this.host.getState(), name, { exportedAt: new Date().toISOString() });
+    this.download(JSON.stringify(file), `${name.replace(/[^\w.-]+/g, '_')}.scenario.json`);
+  }
+
+  private download(text: string, filename: string): void {
+    const blob = new Blob([text], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${name.replace(/[^\w.-]+/g, '_')}.json`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -334,22 +384,6 @@ export class Editor {
     this.host.setMapName(name);
     this.resetHistory();
     return 'map';
-  }
-
-  /** Download the whole game state as a scenario file (the organic starting position — DESIGN §4.8). */
-  exportScenario(): void {
-    const name = this.host.getMapName() || 'scenario';
-    const file = saveScenarioFile(this.host.getState(), name, { exportedAt: new Date().toISOString() });
-    const blob = new Blob([JSON.stringify(file)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${name.replace(/[^\w.-]+/g, '_')}.scenario.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    this.dirty = false;
-    this.refreshPanel();
   }
 
   /** Called by the app after turns ran: the state changed outside the command layer. */
@@ -413,7 +447,7 @@ export class Editor {
       b.className = 'swatch';
       b.dataset.index = String(i);
       b.innerHTML = `<span class="chip" style="background:${t.color}"></span>${t.name}<kbd>${TERRAIN_KEYS[i] ?? ''}</kbd>`;
-      b.addEventListener('click', () => { this.terrain = i; this.refreshPanel(); });
+      b.addEventListener('click', () => { this.terrain = i; if (this.tool === 'pick') this.tool = 'brush'; this.refreshPanel(); });
       pal.appendChild(b);
     });
   }
@@ -426,7 +460,7 @@ export class Editor {
       b.className = 'swatch';
       b.dataset.index = String(index);
       b.innerHTML = `<span class="chip${color ? '' : ' none'}" style="${color ? `background:${color}` : ''}"></span>${label}`;
-      b.addEventListener('click', () => { this.tool = 'resource'; this.resource = index; this.refreshPanel(); });
+      b.addEventListener('click', () => { this.resource = index; this.setTool('resource'); });
       pal.appendChild(b);
     };
     mk('Erase (X)', NO_RESOURCE, null);
@@ -448,16 +482,18 @@ export class Editor {
     sel.addEventListener('change', () => {
       this.settleTier = Number(sel.value) || 0;
       pop.value = String(DEFAULT_POP[TIERS[this.settleTier].id] ?? 900);
-      this.tool = 'settle';
-      this.refreshPanel();
+      this.setTool('settle');
     });
-    el('tool-settle').addEventListener('click', () => { this.tool = 'settle'; this.refreshPanel(); });
-    pop.addEventListener('focus', () => { this.tool = 'settle'; this.refreshPanel(); });
-    el('settle-name').addEventListener('focus', () => { this.tool = 'settle'; this.refreshPanel(); });
-    el('editor-export-scenario').addEventListener('click', () => this.exportScenario());
+    el('tool-settle').addEventListener('click', () => this.setTool('settle'));
+    el('tool-inspect').addEventListener('click', () => this.setTool('inspect'));
+    pop.addEventListener('focus', () => this.setTool('settle'));
+    el('settle-name').addEventListener('focus', () => this.setTool('settle'));
   }
 
   private wirePanel(): void {
+    document.querySelectorAll<HTMLButtonElement>('#editor-tabs button').forEach((b) => {
+      b.addEventListener('click', () => this.setTab(b.dataset.tab as Tab));
+    });
     el('res-spawn').addEventListener('click', () => this.spawnResources('replace'));
     el('res-fill').addEventListener('click', () => this.spawnResources('fill'));
     el('res-clear').addEventListener('click', () => this.spawnResources('clear'));
@@ -466,15 +502,16 @@ export class Editor {
     dens.addEventListener('input', syncDens);
     syncDens();
     el('edit-toggle').addEventListener('click', () => this.setActive(!this.active));
-    el('tool-brush').addEventListener('click', () => { this.tool = 'brush'; this.refreshPanel(); });
-    el('tool-fill').addEventListener('click', () => { this.tool = 'fill'; this.refreshPanel(); });
-    el('tool-pick').addEventListener('click', () => { this.tool = 'pick'; this.refreshPanel(); });
+    el('tool-brush').addEventListener('click', () => this.setTool('brush'));
+    el('tool-fill').addEventListener('click', () => this.setTool('fill'));
+    el('tool-pick').addEventListener('click', () => this.setTool('pick'));
     document.querySelectorAll<HTMLButtonElement>('#brush-sizes button').forEach((b, i) => {
       b.addEventListener('click', () => { this.radiusIndex = i; this.refreshPanel(); });
     });
     el('editor-undo').addEventListener('click', () => this.undo());
     el('editor-redo').addEventListener('click', () => this.redo());
     el('editor-export').addEventListener('click', () => this.exportMap());
+    el('editor-export-scenario').addEventListener('click', () => this.exportScenario());
     const fileInput = el<HTMLInputElement>('editor-import-file');
     el('editor-import').addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', async () => {
@@ -493,11 +530,17 @@ export class Editor {
   }
 
   refreshPanel(): void {
+    document.querySelectorAll<HTMLButtonElement>('#editor-tabs button').forEach((b) => {
+      b.classList.toggle('selected', b.dataset.tab === this.tab);
+    });
+    document.querySelectorAll<HTMLElement>('#editor .tab-page').forEach((p) => {
+      p.classList.toggle('hidden', p.dataset.tab !== this.tab);
+    });
     document.querySelectorAll<HTMLButtonElement>('#palette .swatch').forEach((b) => {
       b.classList.toggle('selected', Number(b.dataset.index) === this.terrain);
     });
     document.querySelectorAll<HTMLButtonElement>('#res-palette .swatch').forEach((b) => {
-      b.classList.toggle('selected', this.tool === 'resource' && Number(b.dataset.index) === this.resource);
+      b.classList.toggle('selected', Number(b.dataset.index) === this.resource);
     });
     const rc = countResources(this.host.getState().map);
     const total = rc.reduce((a, b) => a + b, 0);
@@ -506,13 +549,14 @@ export class Editor {
     el('tool-fill').classList.toggle('selected', this.tool === 'fill');
     el('tool-pick').classList.toggle('selected', this.tool === 'pick');
     el('tool-settle').classList.toggle('selected', this.tool === 'settle');
+    el('tool-inspect').classList.toggle('selected', this.tool === 'inspect');
+    document.querySelectorAll<HTMLButtonElement>('#brush-sizes button').forEach((b, i) => {
+      b.classList.toggle('selected', i === this.radiusIndex);
+    });
     const sel = el<HTMLSelectElement>('settle-tier');
     if (sel.value !== String(this.settleTier)) sel.value = String(this.settleTier);
     const n = Object.keys(this.host.getState().settlements).length;
     el('settle-count').textContent = n ? `${n} settlement${n === 1 ? '' : 's'} on the map` : 'no settlements yet';
-    document.querySelectorAll<HTMLButtonElement>('#brush-sizes button').forEach((b, i) => {
-      b.classList.toggle('selected', i === this.radiusIndex);
-    });
     el<HTMLButtonElement>('editor-undo').disabled = this.undoStack.length === 0;
     el<HTMLButtonElement>('editor-redo').disabled = this.redoStack.length === 0;
     el('editor-dirty').textContent = this.dirty ? '● unsaved edits' : '';

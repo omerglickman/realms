@@ -43,8 +43,28 @@ export function hoverLine(state: GameState, s: Settlement): string {
   return parts.join(' · ');
 }
 
+/** The small hover card next to a settlement (Omer 2026-11-05): name, tier, people, growth, food, parent. */
+export function renderPopover(root: HTMLElement, state: GameState, s: Settlement): void {
+  const pop = totalPopulation(s.pop);
+  const parent = s.parent ? state.settlements[s.parent] : null;
+  const months = foodMonths(s);
+  const t = growthTrend(s);
+  const esc = (x: string) => x.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+  const row = (k: string, v: string) => `<div class="pop-row"><span>${k}</span><span>${v}</span></div>`;
+  root.innerHTML = `
+    <div><span class="pop-name">${esc(s.name)}</span><span class="pop-tier">${tierName(s)}</span></div>
+    ${row('People', fmt(pop))}
+    ${row('Growth', t === null ? '— (new)' : `${pct(t)} / yr`)}
+    ${row('Food', `${months.toFixed(1)} months <span class="dim">(${fmt(s.food)})</span>`)}
+    ${row('Subordinate to', parent ? `${esc(parent.name)} <span class="dim">(${tierName(parent)})</span>` : TIERS[s.tier].rank < 2 ? '<span class="dim">none in range</span>' : '<span class="dim">independent</span>')}
+    ${s.report.hungerDeaths > 0.5 ? `<div class="warn">⚠ ${fmt(s.report.hungerDeaths)} starved last month</div>` : ''}
+    <div class="pop-hint">click for details</div>
+  `;
+}
+
 export interface PanelHost {
   onRename(id: string, name: string): void;
+  onSetPopulation(id: string, population: number): void;
   onRemove(id: string): void;
   onFocus(id: string): void;
   onClose(): void;
@@ -88,11 +108,15 @@ export function renderPanel(root: HTMLElement, state: GameState, s: Settlement, 
       <button id="sp-close" title="Close">×</button>
     </div>
     <table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>
-    ${editing ? `<div class="row"><button id="sp-remove" class="danger">Remove settlement</button></div>` : ''}
+    ${editing ? `<div class="row"><label class="edit-pop">Set people <input id="sp-pop" type="number" min="1" step="100" value="${Math.round(pop)}" /> <button id="sp-pop-apply">Apply</button></label><button id="sp-remove" class="danger">Remove settlement</button></div>` : ''}
   `;
   const name = root.querySelector<HTMLInputElement>('#sp-name')!;
   if (editing) {
     name.addEventListener('change', () => { const v = name.value.trim(); if (v && v !== s.name) host.onRename(s.id, v); });
+    const popInput = root.querySelector<HTMLInputElement>('#sp-pop')!;
+    const apply = () => { const v = Math.round(Number(popInput.value)); if (v > 0 && Math.abs(v - pop) >= 0.5) host.onSetPopulation(s.id, v); };
+    root.querySelector<HTMLButtonElement>('#sp-pop-apply')!.addEventListener('click', apply);
+    popInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });
     root.querySelector<HTMLButtonElement>('#sp-remove')!.addEventListener('click', () => host.onRemove(s.id));
   }
   root.querySelector<HTMLButtonElement>('#sp-close')!.addEventListener('click', () => host.onClose());

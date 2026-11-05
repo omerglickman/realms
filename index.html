@@ -9,50 +9,56 @@
   <body>
     <div id="map"></div>
 
-    <div id="hud">
-      <div class="hud-title">Realms, Kings and Other Stuff <span class="hud-build">Phase 1 · settlements</span></div>
-      <div class="hud-row">
+    <div id="topbar">
+      <div class="bar-row bar-main">
+        <span class="bar-title">Realms, Kings and Other Stuff <span class="bar-build">Phase 1</span></span>
+        <span id="info-date" class="bar-date">January, year 1</span>
+        <button id="end-turn" title="Advance one month (Space)">End turn</button>
+        <label class="bar-run">Run <input id="run-years" type="number" min="1" max="200" value="10" /> yrs</label>
+        <button id="run-years-btn" title="Run the simulation for that many years">Run</button>
+        <span class="bar-sep"></span>
         <button id="edit-toggle">Edit map</button>
         <button id="testmap" title="Reload the shipped test map">Test map</button>
         <details id="gen">
           <summary>New draft…</summary>
-          <div class="hud-row">
-            <label>Seed <input id="seed" type="text" value="vinral" size="10" /></label>
-            <button id="random" title="Pick a random seed and generate">Random</button>
-            <label>Size
-              <select id="size">
-                <option value="160x100" selected>160 × 100</option>
-                <option value="80x50">80 × 50</option>
-                <option value="400x250">400 × 250</option>
-              </select>
-            </label>
-          </div>
-          <div class="hud-row">
-            <label>Continents
-              <select id="continents">
-                <option value="1">1</option>
-                <option value="2" selected>2</option>
-                <option value="3">3</option>
-              </select>
-            </label>
-            <label>Islands <input id="islands" type="number" min="0" max="20" value="6" style="width:3em" /></label>
-            <label>Land <input id="land" type="range" min="25" max="70" value="45" style="width:6em" /> <span id="land-val">45%</span></label>
-            <button id="generate">Generate draft</button>
+          <div class="gen-body">
+            <div class="bar-row">
+              <label>Seed <input id="seed" type="text" value="vinral" size="10" /></label>
+              <button id="random" title="Pick a random seed and generate">Random</button>
+              <label>Size
+                <select id="size">
+                  <option value="160x100" selected>160 × 100</option>
+                  <option value="80x50">80 × 50</option>
+                  <option value="400x250">400 × 250</option>
+                </select>
+              </label>
+            </div>
+            <div class="bar-row">
+              <label>Continents
+                <select id="continents">
+                  <option value="1">1</option>
+                  <option value="2" selected>2</option>
+                  <option value="3">3</option>
+                </select>
+              </label>
+              <label>Islands <input id="islands" type="number" min="0" max="20" value="6" style="width:3em" /></label>
+              <label>Land <input id="land" type="range" min="25" max="70" value="45" style="width:6em" /> <span id="land-val">45%</span></label>
+              <button id="generate">Generate draft</button>
+            </div>
           </div>
         </details>
+        <span class="bar-spacer"></span>
+        <span id="info-hex" class="bar-info">Hover a hex</span>
+        <button id="bar-toggle" title="Show / hide details">▾</button>
       </div>
-      <div class="hud-row turn-row">
-        <span id="info-date" class="date">January, year 1</span>
-        <button id="end-turn" title="Advance one month (Space)">End turn</button>
-        <label>Run <input id="run-years" type="number" min="1" max="200" value="10" style="width:3.2em" /> years</label>
-        <button id="run-years-btn" title="Run the simulation for that many years">Run</button>
-        <span id="info-run" class="hud-dim"></span>
+      <div class="bar-row bar-details" id="bar-details">
+        <span id="info-map" class="bar-info"></span>
+        <span class="bar-sep"></span>
+        <span id="info-run" class="bar-info bar-dim"></span>
+        <span id="info-perf" class="bar-info bar-dim"></span>
+        <span class="bar-spacer"></span>
+        <span class="bar-help bar-dim">Drag to pan · wheel to zoom · Home fits · Space ends the turn · click a settlement for details · G grid · R resources · Z zones · E editor</span>
       </div>
-      <div class="hud-row hud-info"><span id="info-map"></span></div>
-      <div class="hud-row hud-info"><span id="info-hex">Hover a hex</span></div>
-      <div class="hud-row hud-info"><span id="info-settlement" class="settlement-line"></span></div>
-      <div class="hud-row hud-info hud-dim"><span id="info-perf"></span></div>
-      <div class="hud-row hud-help hud-dim" id="help-view">Drag to pan · wheel to zoom · arrows scroll · Home fits · Space ends the turn · click a settlement for details · G grid · R resources · Z zones · E editor</div>
     </div>
 
     <div id="editor" class="hidden">
@@ -75,44 +81,67 @@
         <button id="editor-redo" title="Ctrl+Y">Redo</button>
       </div>
       <div class="row small"><span id="editor-msg"></span> <span id="editor-autosave-status" class="dim"></span></div>
-      <div class="section">Tool</div>
-      <div class="row">
-        <button id="tool-brush" title="B">Brush</button>
-        <button id="tool-fill" title="F — fill a connected region">Fill</button>
-        <button id="tool-pick" title="I — pick the terrain under the cursor">Pick</button>
-        <button id="tool-settle" title="T — place settlements">Settle</button>
+
+      <div id="editor-tabs">
+        <button data-tab="terrain">Terrain</button>
+        <button data-tab="resources">Resources</button>
+        <button data-tab="settlements">Settlements</button>
       </div>
-      <div class="section">Settlements <span class="dim">(Settle tool: click to place; click one to inspect)</span></div>
-      <div class="row small">
-        <label>Tier <select id="settle-tier"></select></label>
-        <label>People <input id="settle-pop" type="number" min="1" step="100" style="width:5.5em" /></label>
+
+      <div class="tab-page" data-tab="terrain">
+        <div class="section">Tool</div>
+        <div class="row">
+          <button id="tool-brush" title="B">Brush</button>
+          <button id="tool-fill" title="F — fill a connected region">Fill</button>
+          <button id="tool-pick" title="I — pick the terrain under the cursor">Pick</button>
+        </div>
+        <div class="section">Brush size <span class="dim">[ ]</span></div>
+        <div class="row" id="brush-sizes">
+          <button>1</button><button>2</button><button>3</button><button>5</button>
+        </div>
+        <div class="section">Terrain</div>
+        <div id="palette"></div>
+        <div class="help dim">Left-drag paints · right-drag or middle-drag pans · number keys pick terrain · Tab switches tabs</div>
       </div>
-      <div class="row small">
-        <label>Name <input id="settle-name" type="text" size="14" placeholder="(automatic)" /></label>
+
+      <div class="tab-page hidden" data-tab="resources">
+        <div class="section">Resource <span class="dim">(brush size 1)</span></div>
+        <div id="res-palette"></div>
+        <div class="section">Spawn</div>
+        <div class="row small">
+          <label>Seed <input id="res-seed" type="text" value="vinral" size="8" /></label>
+          <label>Density <input id="res-density" type="range" min="25" max="300" value="100" style="width:5em" /> <span id="res-density-val">100%</span></label>
+        </div>
+        <div class="row small">
+          <button id="res-spawn" title="Place resources everywhere by the terrain weights in data/resources.json (undoable)">Spawn resources</button>
+          <button id="res-fill" title="Only fill hexes that have no resource yet (undoable)">Fill empty</button>
+          <button id="res-clear" title="Remove all resources (undoable)">Clear all</button>
+        </div>
+        <div class="row small"><span id="res-count" class="dim"></span></div>
+        <div class="help dim">Left-click or drag paints the selected resource · X selects the eraser</div>
       </div>
-      <div class="row small"><span id="settle-count" class="dim"></span></div>
-      <div class="section">Brush size <span class="dim">[ ]</span></div>
-      <div class="row" id="brush-sizes">
-        <button>1</button><button>2</button><button>3</button><button>5</button>
+
+      <div class="tab-page hidden" data-tab="settlements">
+        <div class="section">Mode</div>
+        <div class="row">
+          <button id="tool-settle" title="P — click a free hex to found a settlement">Place</button>
+          <button id="tool-inspect" title="I — click a settlement to open it for editing">Pick</button>
+        </div>
+        <div class="section">New settlement</div>
+        <div class="row small">
+          <label>Tier <select id="settle-tier"></select></label>
+          <label>People <input id="settle-pop" type="number" min="1" step="100" style="width:5.5em" /></label>
+        </div>
+        <div class="row small">
+          <label>Name <input id="settle-name" type="text" size="14" placeholder="(automatic)" /></label>
+        </div>
+        <div class="row small"><span id="settle-count" class="dim"></span></div>
+        <div class="help dim">Place: hatched hexes are already worked; dotted lines are the influence edges of towns and cities (a new village inside one becomes its dependant). Pick: opens a settlement so you can change its name and population or remove it.</div>
       </div>
-      <div class="section">Terrain</div>
-      <div id="palette"></div>
-      <div class="section">Resources <span class="dim">(brush size 1)</span></div>
-      <div id="res-palette"></div>
-      <div class="row small">
-        <label>Seed <input id="res-seed" type="text" value="vinral" size="8" /></label>
-        <label>Density <input id="res-density" type="range" min="25" max="300" value="100" style="width:5em" /> <span id="res-density-val">100%</span></label>
-      </div>
-      <div class="row small">
-        <button id="res-spawn" title="Place resources everywhere by the terrain weights in data/resources.json (undoable)">Spawn resources</button>
-        <button id="res-fill" title="Only fill hexes that have no resource yet (undoable)">Fill empty</button>
-        <button id="res-clear" title="Remove all resources (undoable)">Clear all</button>
-      </div>
-      <div class="row small"><span id="res-count" class="dim"></span></div>
-      <div class="help dim">Left-drag paints · right-drag or middle-drag pans · wheel zooms · Ctrl+Z / Ctrl+Y undo/redo · number keys pick terrain</div>
     </div>
 
     <div id="settlement" class="hidden"></div>
+    <div id="popover" class="hidden"></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

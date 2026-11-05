@@ -9,6 +9,7 @@ import type { MapData } from './map';
 import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
 import { makeSettlement, settlementIdAt, type FoundOptions, type Settlement } from './settlements';
+import { totalPopulation, createPopulation, type Population } from './demography';
 
 export interface CellEdit {
   /** flat index = row * width + col */
@@ -56,6 +57,21 @@ export interface RenameSettlementCommand {
   name: string;
 }
 
+/**
+ * Edit a placed settlement (editor): name and/or population. A new population
+ * keeps the age/sex structure (every cohort is scaled) and keeps the granary at
+ * the same number of months. The inverse carries the exact previous cohorts.
+ */
+export interface EditSettlementCommand {
+  type: 'editSettlement';
+  id: string;
+  name?: string;
+  population?: number;
+  /** exact cohorts to restore (used by inverses) */
+  pop?: Population;
+  food?: number;
+}
+
 export type Command =
   | SetTerrainCommand
   | SetResourceCommand
@@ -63,7 +79,8 @@ export type Command =
   | FoundSettlementCommand
   | RemoveSettlementCommand
   | RestoreSettlementCommand
-  | RenameSettlementCommand;
+  | RenameSettlementCommand
+  | EditSettlementCommand;
 
 /** Apply a command, mutating the state, and return the inverse command. */
 export function applyCommand(state: GameState, cmd: Command): Command {
@@ -121,6 +138,25 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       s.name = cmd.name;
       return { type: 'renameSettlement', id: cmd.id, name: prev };
     }
+    case 'editSettlement': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      const inverse: EditSettlementCommand = { type: 'editSettlement', id: cmd.id };
+      if (cmd.name !== undefined) { inverse.name = s.name; s.name = cmd.name; }
+      if (cmd.pop) {
+        inverse.pop = s.pop; inverse.food = s.food;
+        s.pop = { m: cmd.pop.m.slice(), f: cmd.pop.f.slice() };
+        if (cmd.food !== undefined) s.food = cmd.food;
+      } else if (cmd.population !== undefined) {
+        const before = totalPopulation(s.pop);
+        inverse.pop = s.pop; inverse.food = s.food;
+        const target = Math.max(0, cmd.population);
+        const k = before > 0 ? target / before : 0;
+        s.pop = before > 0 ? { m: s.pop.m.map((x) => x * k), f: s.pop.f.map((x) => x * k) } : createPopulation(target);
+        s.food = before > 0 ? s.food * k : target * 12;
+      }
+      return inverse;
+    }
   }
 }
 
@@ -131,7 +167,7 @@ export function isNoop(cmd: Command): boolean {
 
 /** Does this command touch settlements (so zone/marker layers must redraw)? */
 export function commandTouchesSettlements(cmd: Command): boolean {
-  return cmd.type === 'foundSettlement' || cmd.type === 'removeSettlement' || cmd.type === 'restoreSettlement' || cmd.type === 'renameSettlement' || cmd.type === 'replaceMap';
+  return cmd.type === 'foundSettlement' || cmd.type === 'removeSettlement' || cmd.type === 'restoreSettlement' || cmd.type === 'renameSettlement' || cmd.type === 'editSettlement' || cmd.type === 'replaceMap';
 }
 
 /** Cells touched by a command (for renderer invalidation); 'all' for whole-map commands. */

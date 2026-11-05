@@ -7,7 +7,7 @@ import { MapRenderer, HEX_SIZE } from './render/mapRenderer';
 import { SettlementLayer } from './render/settlementLayer';
 import { Camera } from './camera';
 import { Editor } from './editor/editor';
-import { hoverLine, renderPanel } from './panels/settlementPanel';
+import { renderPanel, renderPopover } from './panels/settlementPanel';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
 import { endTurn } from '../sim/turn';
@@ -17,6 +17,7 @@ import { TERRAIN } from '../sim/terrain';
 import { resourceByIndex } from '../sim/resources';
 import { loadMapFile } from '../sim/mapfile';
 import { settlementIdAt, computeWorkAssignment } from '../sim/settlements';
+import { SettlementLayer as SL } from './render/settlementLayer';
 import testmapJson from '../../maps/testmap.json';
 
 function el<T extends HTMLElement>(id: string): T {
@@ -95,6 +96,62 @@ export async function startApp(): Promise<void> {
   renderer.root.addChild(settlementLayer.root, hover);
   app.stage.addChild(renderer.root);
 
+  // ---- top bar collapse ----
+  const topbar = el<HTMLDivElement>('topbar');
+  const barToggle = el<HTMLButtonElement>('bar-toggle');
+  function syncBarHeight(): void {
+    document.documentElement.style.setProperty('--bar-h', `${topbar.offsetHeight}px`);
+  }
+  function setBarCollapsed(c: boolean): void {
+    topbar.classList.toggle('collapsed', c);
+    barToggle.textContent = c ? '▸' : '▾';
+    try { localStorage.setItem('realms.topbar.collapsed', c ? '1' : '0'); } catch { /* ignore */ }
+    syncBarHeight();
+  }
+  new ResizeObserver(syncBarHeight).observe(topbar);
+  barToggle.addEventListener('click', () => setBarCollapsed(!topbar.classList.contains('collapsed')));
+  try { setBarCollapsed(localStorage.getItem('realms.topbar.collapsed') === '1'); } catch { /* ignore */ }
+
+  // ---- hover popover: a small card to the right of the hovered settlement ----
+  const popover = el<HTMLDivElement>('popover');
+  let popoverId: string | null = null;
+  function showPopover(id: string | null): void {
+    const s = id ? state.settlements[id] : null;
+    if (!s) { popover.classList.add('hidden'); popoverId = null; return; }
+    popoverId = id;
+    renderPopover(popover, state, s);
+    popover.style.borderLeftColor = state.factions[s.faction ?? '']?.color ?? '#9a9484';
+    popover.classList.remove('hidden');
+    positionPopover();
+  }
+  function positionPopover(): void {
+    const s = popoverId ? state.settlements[popoverId] : null;
+    if (!s) return;
+    const p = offsetToPixel(s.col, s.row, HEX_SIZE);
+    const r = SL.markerRadius(s, camera.zoom) * camera.zoom;
+    const sx = renderer.root.position.x + p.x * camera.zoom;
+    const sy = renderer.root.position.y + p.y * camera.zoom;
+    const w = popover.offsetWidth, h = popover.offsetHeight;
+    let left = sx + r + 12;
+    if (left + w > window.innerWidth - 8) left = sx - r - 12 - w; // flip to the left when there is no room
+    let top = sy - h / 2;
+    top = Math.max(topbar.offsetHeight + 4, Math.min(window.innerHeight - h - 8, top));
+    popover.style.left = `${Math.max(4, left)}px`;
+    popover.style.top = `${top}px`;
+  }
+  popover.addEventListener('pointerleave', (e) => {
+    // leaving the card: keep it only if the cursor went back onto the settlement itself
+    const h = hexAt(e.clientX, e.clientY);
+    const over = inBounds(state.map, h.col, h.row) ? settlementIdAt(state, h.col, h.row) : null;
+    if (over !== popoverId) { hoverId = null; showPopover(null); refreshLayer(); }
+  });
+  popover.addEventListener('click', () => { if (popoverId) select(popoverId); });
+  // the cursor can leave the map for a panel without the canvas ever seeing a move: close the card then
+  window.addEventListener('pointermove', (e) => {
+    const t = e.target as Node | null;
+    if (hoverId && t !== app.canvas && !popover.contains(t)) { hoverId = null; showPopover(null); refreshLayer(); }
+  });
+
   const editor = new Editor({
     getState: () => state,
     onChanged: (cells) => {
@@ -110,6 +167,7 @@ export async function startApp(): Promise<void> {
     setMapName: (n) => { mapName = n; updateMapInfo(); },
     setState: (s) => { replaceState(s, true); },
     onSelect: (id) => select(id),
+    onToolChanged: () => { refreshLayer(); refreshPanel(); if (mouseX >= 0) updateHover(mouseX, mouseY); },
   });
 
   applyMap(true);
@@ -151,7 +209,8 @@ export async function startApp(): Promise<void> {
   }
 
   function refreshLayer(): void {
-    settlementLayer.update(state, { hover: hoverId, selected: selectedId, zoom: camera.zoom });
+    settlementLayer.update(state, { hover: hoverId, selected: selectedId, zoom: camera.zoom, settling: editor.settling });
+    positionPopover();
   }
 
   function updateMapInfo(): void {
@@ -176,7 +235,8 @@ export async function startApp(): Promise<void> {
     if (!s) { panel.classList.add('hidden'); panel.innerHTML = ''; return; }
     panel.classList.remove('hidden');
     renderPanel(panel, state, s, {
-      onRename: (id, name) => { editor.renameSettlement(id, name); },
+      onRename: (id, name) => { editor.editSettlement(id, { name }); },
+      onSetPopulation: (id, population) => { editor.editSettlement(id, { population }); },
       onRemove: (id) => { editor.removeSettlement(id); },
       onFocus: (id) => {
         const t = state.settlements[id];
@@ -197,6 +257,7 @@ export async function startApp(): Promise<void> {
     el('info-run').textContent = months > 1 ? `${months / 12} years in ${ms.toFixed(0)} ms` : '';
     editor.stateChangedExternally();
     stateChanged();
+    renderPopoverIfStale();
   }
   el<HTMLButtonElement>('end-turn').addEventListener('click', () => advance(1));
   el<HTMLButtonElement>('run-years-btn').addEventListener('click', () => {
@@ -278,6 +339,7 @@ export async function startApp(): Promise<void> {
       camera.panBy(e.clientX - lastX, e.clientY - lastY);
       lastX = e.clientX;
       lastY = e.clientY;
+      positionPopover();
     } else if (painting) {
       const h = hexAt(e.clientX, e.clientY);
       editor.pointerMove(h.col, h.row);
@@ -309,12 +371,11 @@ export async function startApp(): Promise<void> {
     else if (e.key === 'r' || e.key === 'R') renderer.setResourcesVisible(!renderer.resourcesVisible);
     else if (e.key === 'z' || e.key === 'Z') settlementLayer.setZonesVisible(!settlementLayer.zonesVisible);
     else if (e.key === 'Home') camera.fit();
-    else if (e.key === 'e' || e.key === 'E') { editor.setActive(!editor.active); refreshPanel(); }
+    else if (e.key === 'e' || e.key === 'E') { editor.setActive(!editor.active); }
     else if (e.key === ' ') { e.preventDefault(); advance(1); }
     else if (e.key === 'Escape') select(null);
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   });
-  el('edit-toggle').addEventListener('click', () => refreshPanel());
 
   window.addEventListener('resize', () => camera.resize(app.screen.width, app.screen.height));
   window.addEventListener('beforeunload', (e) => {
@@ -327,9 +388,8 @@ export async function startApp(): Promise<void> {
     const prevHover = hoverId;
     if (!inBounds(state.map, h.col, h.row)) {
       el('info-hex').textContent = 'Outside the map';
-      el('info-settlement').textContent = '';
       hoverId = null;
-      if (prevHover !== hoverId) refreshLayer();
+      if (prevHover !== hoverId) { showPopover(null); refreshLayer(); }
       return;
     }
     const t = TERRAIN[getTerrain(state.map, h.col, h.row)];
@@ -340,21 +400,25 @@ export async function startApp(): Promise<void> {
     el('info-hex').textContent =
       `hex (${h.col}, ${h.row})  ${t.name}${r ? ` · ${r.name}` : ''}  move ${t.passable ? t.moveCost : '—'}${y ? '  ' + y : ''}${workedText}`;
     hoverId = settlementIdAt(state, h.col, h.row);
-    const hs = hoverId ? state.settlements[hoverId] : null;
-    el('info-settlement').textContent = hs ? hoverLine(state, hs) : '';
-    if (prevHover !== hoverId) refreshLayer();
+    if (prevHover !== hoverId) { showPopover(hoverId); refreshLayer(); }
+    else if (hoverId) renderPopoverIfStale();
     const lw = 2 / camera.zoom;
-    if (editor.active) {
+    if (editor.active && editor.tool !== 'inspect') {
       const w = state.map.width;
       for (const i of editor.previewCells(h.col, h.row)) {
         const p = offsetToPixel(i % w, Math.floor(i / w), HEX_SIZE);
         hover.poly(hexCorners(p.x, p.y, HEX_SIZE));
       }
-      hover.stroke({ width: lw, color: 0xffffff, alpha: editor.tool === 'settle' ? 0.5 : 0.85 });
+      hover.stroke({ width: lw, color: 0xffffff, alpha: editor.tool === 'settle' ? 0.6 : 0.85 });
     } else {
       const p = offsetToPixel(h.col, h.row, HEX_SIZE);
       hover.poly(hexCorners(p.x, p.y, HEX_SIZE)).stroke({ width: lw, color: 0xffffff, alpha: 0.9 });
     }
+  }
+
+  /** After turns ran the hovered settlement's numbers changed: redraw the card in place. */
+  function renderPopoverIfStale(): void {
+    if (popoverId && popoverId === hoverId && state.settlements[popoverId]) renderPopover(popover, state, state.settlements[popoverId]);
   }
 
   // ---- frame loop: culling + perf readout; redraw the settlement layer when the zoom changes ----
