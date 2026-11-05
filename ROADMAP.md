@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.4j — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 5–12 done)**
+**Version 0.5 — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 5–12 done; working agreement revised in Session 12b)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -15,34 +15,40 @@ This document says *how* we build the game described in DESIGN.md, in what order
 
 ### A.2 The three documents
 
-| Document | Purpose | Who changes it |
-|---|---|---|
-| **DESIGN.md** | What the game is (the contract) | Claude edits only to record Omer's decisions or to add clearly-marked proposals |
-| **ROADMAP.md** | How we build it, phases, tech, conventions, session protocol | Claude updates phase status; structural changes need Omer's OK |
-| **DEVLOG.md** | What was done, session by session; current state; how to run; next step | Claude appends an entry every session, no exceptions |
+| Document | Lives | Purpose | Who changes it |
+|---|---|---|---|
+| **DESIGN.md** | Project + repo | What the game is (the contract). Rules and decisions only — findings and implementation notes go in the DEVLOG | Claude edits only to record Omer's decisions or to add clearly-marked proposals |
+| **ROADMAP.md** | Project + repo | How we build it, phases, tech, conventions, working agreement | Claude updates phase status; structural changes need Omer's OK |
+| **DEVLOG.md** | Project + repo | A **Current state** block (overwritten each session; under ~6 KB; present tense, by feature, no session history) + one entry per session with the detail, the findings and the measurements | Claude, every session, no exceptions |
+| **DEVLOG-archive.md** | Project + repo | Older session entries | Moved in batches (below) |
+| **CLAUDE.md** | repo | The session protocol in short, the commands, the close checklist | Claude, with Omer's OK for protocol changes |
+| **ARCHITECTURE.md** | repo | Module map, turn order, data files, state versions — updated **in place**, never by session | Claude, whenever a module's job changes |
 
-**DEVLOG-archive.md** (rule agreed with Omer 2026-11-05) holds older DEVLOG session entries. **Every fifth session (15, 20, 25…), and sooner if DEVLOG.md passes ~45 KB,** the closing step moves every entry except the last three sessions into the archive, unedited and in order (the tooling cannot mirror a doc larger than ~45 KB to the Project in one piece). DEVLOG.md's Current state block is always complete on its own; a session that needs older history reads the archive too.
+**Archive rule (Omer, 2026-11-05):** every fifth session (15, 20, 25…), and sooner if DEVLOG.md passes ~45 KB, the closing step moves every entry except the last three sessions into DEVLOG-archive.md, unedited and in order. The Current state block is always complete on its own.
 
-The Project docs in the claude.ai Project ("Strategy Game") are the **canonical** copies. The same three files are committed to the code repository at the end of every session so that git history has them too. If the two ever disagree, the Project doc wins and the repo copy is overwritten.
+**Why the split (Session 12b):** mirroring a doc to the Project requires reading it in full, so every kilobyte in the three Project docs is read at least twice a session. The Project docs therefore stay small and are read selectively (A.3); the repo docs carry the detail a session needs only when it touches a module.
+
+The Project docs in the claude.ai Project ("Strategy Game") are the **canonical** copies. The same files are committed to the code repository at the end of every session so that git history has them too. If the two ever disagree, the Project doc wins and the repo copy is overwritten.
 
 ### A.3 Session protocol — every future chat follows this
 
-**Start of session**
-1. Read DESIGN.md, ROADMAP.md and DEVLOG.md from the Project (`project_read`). The "Current state" block at the top of DEVLOG.md says where we are.
-2. Attach and clone the repository `omerglickman/realms` (GitHub; see A.4). Run `npm install`, `npm test`, `npm run build` and confirm all pass before changing anything.
-3. State in one or two sentences what this session will do, taken from "Next steps" in DEVLOG.md unless Omer says otherwise.
+**Start of session** (revised Session 12b — the short form is the repo's CLAUDE.md)
+1. Read the **Current state** block of DEVLOG.md from the Project; the latest entry only if Current state points at it.
+2. Clone `omerglickman/realms` (A.4); read **CLAUDE.md** and the parts of **ARCHITECTURE.md** the session will touch. Run `npm install`, `npm test`, `npm run build` — all green before changing anything.
+3. Read **DESIGN.md by section** (the §§ the session implements); in full only in a design session. Read ROADMAP.md at phase boundaries or when the agreement is in question.
+4. State in one or two sentences what this session will do, taken from Current state → Next steps unless Omer says otherwise. **One feature cluster per session** — the fixed cost of a session is the argument for fewer, not smaller, sessions, but scope creep is what makes one long.
 
 **During session**
-4. Work in small, verifiable steps. Game rules go in `src/sim/`, rendering and UI in `src/ui/`, numbers in `data/`.
-5. Anything not covered by a DECIDED item is implemented as a placeholder and marked as such in code comments and in the DEVLOG entry.
-6. Run the tests and the headless simulation after any change to rules. Load the built `dist/realms.html` in a headless browser (Playwright, `file://` URL) and check for console errors before delivering.
+5. Work in small, verifiable steps. Game rules go in `src/sim/`, rendering and UI in `src/ui/`, numbers in `data/`.
+6. Anything not covered by a DECIDED item is implemented as a placeholder and marked as such in code comments and in the DEVLOG entry.
+7. Run the tests and the headless simulation after any change to rules; before delivering, `npm run build` and **`npm run smoke`** (headless Chrome over `dist/realms.html`; fails on console errors).
 
 **End of session (mandatory, even if the work is unfinished)**
-7. Build passes; tests pass. If not, say so loudly in the DEVLOG entry.
-8. Commit and push to the repository with a clear message.
-9. Append a DEVLOG entry (template in DEVLOG.md) and update its "Current state" block: phase, what works, what is broken, exact next steps, open questions for Omer.
-10. Mirror DESIGN.md / ROADMAP.md / DEVLOG.md (and DEVLOG-archive.md when it changed) into the repo (and the Project).
-11. Deliver the playable build to Omer (see A.5).
+8. Build passes; tests pass. If not, say so loudly in the DEVLOG entry.
+9. Commit and push with a clear message.
+10. DEVLOG.md: overwrite the Current state block; append a session entry (template in DEVLOG.md) with what was done, how, the findings and measurements, what broke, next steps. Update ARCHITECTURE.md in place if a module's job changed. Record Omer's decisions in DESIGN.md the same session.
+11. Mirror DESIGN.md / ROADMAP.md / DEVLOG.md (and DEVLOG-archive.md when it changed) to the Project and the repo.
+12. Deliver the playable build to Omer (A.5).
 
 ### A.4 Where the code lives (DECIDED 2026-11-03)
 
@@ -83,6 +89,7 @@ Written for a non-programmer first; the technical specifics follow.
 | UI panels | Plain HTML/CSS | Text-heavy UI is easier outside the canvas |
 | Tests | Vitest 5 | Fast unit tests for the rules |
 | Headless runner | `tsx` (`npm run sim`) | Runs `src/sim` in Node without a browser |
+| Smoke test | `scripts/smoke.py` (`npm run smoke`; Python Playwright + system Chrome) | Loads the built game headless, exercises the panels and a purchase, fails on console errors |
 | Data | JSON in `data/` (CSV allowed for big tables) | Editable without code |
 | Save format | JSON (download/upload + browser autosave) | State is already JSON |
 | Random numbers | Seeded sfc32 PRNG, state stored inside `GameState` | Reproducibility |
@@ -106,7 +113,8 @@ Written for a non-programmer first; the technical specifics follow.
 ### B.4 Repository layout
 
 ```
-/                 README.md, DESIGN.md, ROADMAP.md, DEVLOG.md (mirrors of Project docs)
+/                 README.md, CLAUDE.md, ARCHITECTURE.md; DESIGN.md, ROADMAP.md, DEVLOG.md, DEVLOG-archive.md (mirrors of Project docs)
+/scripts          smoke.py (npm run smoke)
 /data             terrain.json, resources.json, units.json, buildings.json,
                   institutions.json, factions.json, names/…
 /maps             testmap.json (the hand-edited map), generated drafts
@@ -235,6 +243,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.5 (2026-11-05, Session 12b): working agreement revised for shorter sessions — CLAUDE.md and ARCHITECTURE.md in the repo, Project docs kept small and read selectively, `npm run smoke`, one feature cluster per session (A.2, A.3, B.2, B.4).
 - 0.4j (2026-11-05): Session 12 — private economy, money, caps, pull on prosperity done; Phase 1 checklist updated.
 - 0.4i (2026-11-05): Session 11 — buildings, materials, pull factor done; Phase 1 checklist updated.
 - 0.4h (2026-11-05): archive rule (A.2) agreed — every fifth session or past 45 KB.
