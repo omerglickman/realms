@@ -1,0 +1,125 @@
+# Realms, Kings and Other Stuff — UI Design
+
+**Version 1.1 — 2026-11-06 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13 and 13b. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
+
+Omer's brief (2026-11-05): the bottom lines (funds, people, resources) always visible in a clear place that hides little of the map; everything else in hover summaries or modals that present resources, buildings, economic activity and demographics in an orderly, friendly way, with graphics; headers in a hand resembling Carolingian minuscule; a medieval palette. Design left to Claude; Omer amends.
+
+---
+
+## 1. Principles
+
+1. **The map is the screen.** Chrome is one thin strip at the top (48 px) and one at the bottom (≈ 20 px). Nothing else is permanent.
+2. **Three depths of information:** the *bottom lines* on the strip (always); a *hover card* for the thing under the cursor (one glance); a *ledger* (modal) for everything about a settlement, a cluster or the realm (reading). A number appears at the shallowest depth where it is useful and in full at the deepest.
+3. **The map stays live under a ledger.** The backdrop only dims; clicking another settlement swaps the ledger. Esc, × or a click on empty map closes.
+4. **Words in the game's voice, numbers tabular.** "hands", "spare hands", "private hands", "tithe", "the crown's money" — the terms of DESIGN.md's glossary; every number uses tabular figures and thousands separators.
+5. **Explain on hover, not in the layout.** Explanations (what a building does, what a tile measures) live in tooltips; the layout shows names, numbers and state.
+6. **One icon set everywhere.** A resource looks the same on the strip, in a ledger and on its hex (§4).
+
+## 2. Palette
+
+CSS variables in `src/ui/style.css` `:root`. Use the variables, never literals, so the palette can be retuned in one place.
+
+| Role | Variable | Value | Used for |
+|---|---|---|---|
+| Parchment | `--parch` / `--parch-2` / `--parch-3` / `--parch-4` | `#ecdfc2` / `#e3d3ae` / `#d3bf95` / `#c2ab7c` | ledger and card backgrounds; darker steps for inputs, bar troughs, hover |
+| Ink | `--ink` / `--ink-2` / `--ink-3` | `#2b1d12` / `#5a4632` / `#8a7658` | text; secondary text; dim labels and hints |
+| Rule | `--rule` | `#b59a6c` | hairlines, table rules, borders inside parchment |
+| Oak | `--oak` / `--oak-2` | `#4a2f1a` / `#6b4423` | headings in the script hand, borders of parchment panels, icon colour in ledgers |
+| Leather | `--leather` / `--leather-2` | `#3a2314` / `#4d3220` | the top strip and its buttons |
+| Vermilion | `--verm` / `--verm-2` | `#a8321e` / `#c94a33` | warnings, hunger, shortfalls, the active tab, the End-month seal |
+| Lapis | `--lapis` / `--lapis-2` | `#2f4f7f` / `#4a6ea6` | links; the "private economy" / first series in bars |
+| Verdigris | `--verd` / `--verd-2` | `#4f7a52` / `#6c9a6e` | good / positive, the Start action, built things |
+| Gold | `--gold` / `--gold-2` / `--gold-3` | `#c7972b` / `#e5c466` / `#f3dc96` | accents: the strip's rule and icons, the project (under construction), the mid level of gauges |
+| Map void | body background | `#221a12` | the space around the map |
+
+Semantic use: green = good or available, gold = in progress or "watch", vermilion = bad or blocked, lapis = a link or the first data series, oak = structure. Never encode a meaning in colour alone — pair it with a word or a number.
+
+Bar/stack series: `.c1` lapis, `.c2` verdigris, `.c3` gold, `.c4` oak, `.c5` vermilion, `.c6` parchment-4. Tier stacks use c4 → c1 from village to metropolis.
+
+The map's terrain colours are untouched by this document (they live in `data/terrain.json`); faction colours come from `data/factions.json`.
+
+## 3. Type
+
+| Role | Font | Size | Notes |
+|---|---|---|---|
+| Script hand (headers, settlement names on the map, tab labels, cube names) | **Lugrasimo** (default) · *Uncial Antiqua* (alternative, chosen in Settings; stored in the browser) · Almendra kept as a third option | title 26 px, section 17 px, card/cube 14–16 px, map labels 13 px | Omer is deciding between Lugrasimo (closer to a Carolingian book hand, more legible) and Uncial Antiqua (more stylised); both stay (2026-11-06). The map labels follow the chosen hand (`setLabelFont`). |
+| Body | **Alegreya** 400 / 700 / italic | 13.5 px in ledgers, 12.5 px in cards and tables, 11 px uppercase for small labels (letter-spacing 0.06–0.1 em) | numerals tabular (`font-variant-numeric: tabular-nums`) |
+| Mono | Consolas / Courier | 11 px | the fps readout and `kbd` keys only |
+
+All fonts are bundled in `src/ui/fonts/` (woff2, SIL OFL, licences alongside) and declared with `@font-face` in `style.css`, so `realms.html` works from disk.
+
+## 4. Icons
+
+One set, `src/ui/icons.ts`: original line glyphs on a 24 × 24 grid, 1.6-px round stroke, no fill, `currentColor` in the DOM. The same paths are rasterised for the map (`iconTexture`, 64-px textures, preloaded at startup). Omer's direction (2026-11-06): the simple-line, highly legible style of the strip's food / timber / stone icons is the style for everything.
+
+| Group | Ids | Where |
+|---|---|---|
+| Bottom lines | `coin` `people` `wheat` `timber` `stone` `goods` | the strip, stat tiles, cost chips |
+| Map resources | `game` `stone` `iron` `fish` `furs` `salt` `wine` `silver` — the `icon` field of `data/resources.json` | on the hex as a **badge** (ink icon on a parchment disc with an ink border, ⌀ 0.92 hex), in the hex readout, in ledgers. The old coloured glyph is the fallback for a resource without an icon. |
+| Settlement tiers | `village` (hut) `town` (houses + church) `city` (walls and towers) `metropolis` (towers around a spire) | the map **marker**: a disc in the faction colour (radius by tier: 0.42 / 0.60 / 0.78 / 0.95 hex, never under 5 screen px) with the icon in parchment on it (⌀ 1.6 × radius); hover ring white 70 %, selection ring white |
+| Built on hexes | `mill` (house with a wheel) `wharf` (pier and boat) — and, for later, `castle1` `castle2` `castle3` (tower / tower with wall / keep), `station` (road station) | badge style, ⌀ 0.8 hex, offset to the upper right of the hex centre so a resource badge stays readable. A Mill is drawn on the settlement's worked **river** hex, a Wharf on its worked fishing hex (shore or lake first). Castles and stations are defined now and used when the entities exist. |
+| Buildings | `granary` `chapel` `market` `workshop` `warehouse` `range` `stables` `drill` `walls` `barracks` `ironworks` `citadel` plus the tier icons for halls — the `icon` field of `data/buildings.json` | the building cubes |
+| Interface | `hammer` `sun` `calendar` `hand` `scroll` `crown` `warn` `skull` `walk` `arrowUp` `cow` `deer` `house` `tree` `map` `gear` `book` `grid` `close` | stat tiles, warnings, job kinds (farm = wheat, herd = cow, fish = fish, hunt = deer, timber, stone) |
+
+Adding an icon: draw it in the same grid and stroke, add it to `ICON_PATHS`, reference it by id from the data file; anything drawn on the map must be in the preload list in `app.ts`.
+
+## 5. Layout and components
+
+**The ledger strip** (`#topbar`, 48 px, leather, gold rule): brand and date · tiles **Treasury** (coins; net last year) · **People** (realm; growth last year) · **Food** (months of stock; starved) · **Stockpile** (timber · stone · goods on one line; caps or losses underneath) · End month (vermilion seal, script hand) · run N yrs · ☰ menu. Tiles have an uppercase 10.5-px label, a 15-px number, an 11.5-px subline (green up / red down); each has a tooltip (§5, tooltips) and opens the matching page of the realm ledger. Below 1440 px the sublines go, below 1200 px the labels and the title, so the strip never collides with the turn controls (the stockpile is one tile for the same reason).
+
+**The status strip** (`#status`, bottom, translucent leather): the hovered hex (terrain, resource, coordinates, move cost, yields, who works it) · the last event · the run timing · the fps readout.
+
+**Menu** (`#menu`): Realm ledger (K) · Edit map (E) · Start position · Bare map · New draft… · Settings… · Keys & help (?).
+
+**Hover card** (`#popover`): parchment, a faction-colour left edge, name in the script hand, tier, people with trend, food months with a gauge marked at the 3-month reserve, land, tax, parent, cluster, project, harvest, warnings in vermilion; "click to open the ledger". Placed right of the marker, flipped left when there is no room.
+
+**Ledgers** (`#modal`): 900 px wide (1040 for wide tables), parchment with an oak border and an inset gold rule, a faction-colour stripe by the title, the date at the right, tabs in the script hand (active one vermilion), a scrolling body that keeps its scroll position across the monthly re-render, an optional footer (the editor's name / people / remove controls).
+- **Settlement:** Overview · People · Land & Food · Economy · Buildings.
+- **Cluster:** Overview · Members · Food · Stockpile.
+- **Realm:** Overview · Clusters · People · Food · Treasury · Stockpile.
+- Also: Settings (header hand), Keys & help, New draft (the generator form).
+
+**Components** (all in `src/ui/panels/format.ts` and `style.css`):
+- *Stat tile* (`.stat`): icon, uppercase label, 18-px number with a small unit, a subline, optional gauge. A page opens with a row of 3–5.
+- *Gauge* (`.gauge`): 9-px bar, green / gold / red by level (< 34 % / < 67 %), thin ink marks for thresholds (the next harvest, the reserve).
+- *Bars* (`.bars` + `.hbar`): label · bar · value rows for stock vs cap, people by tier.
+- *Stack* (`.stack` + `.legend`): one 16-px bar of parts with a legend (where the hands go, the year's food flows).
+- *Tables*: `table.kv` (label / value rows) and `table.data` (uppercase column heads, tabular numerals, right-aligned numbers, dotted row rules, nested rows indented by depth, tier glyphs before names).
+- *Cards* (`.card`): used for the running project on the Overview page.
+- *Cubes* (`.cube`, Session 13b): the Buildings page — 128-px tiles with the icon, name (script), family (uppercase) and cost chips; order **built → under construction → available → unavailable**; built green with a staffing gauge, the project gold with a progress gauge and Cancel, available green-outlined and clickable (click = start), unavailable greyed. The description, full cost, months, hands and the reason live in the tooltip.
+- *Age pyramid* (SVG): men lapis left, women vermilion right, working bands full, dependants faded.
+- *Growth line* (SVG sparkline): people at each December, oak line over a light fill.
+- *Harvest calendar*: twelve bars of monthly production, the current month outlined in vermilion, a dashed vermilion line for monthly consumption.
+- *Hex table*: terrain chip (terrain colour), name, resource, yields, each job with its icon and "now / full" figures.
+- *Buttons*: `.btn` parchment; `.btn.primary` verdigris, script hand (Start, Send, Go); `.btn.danger` vermilion outline (Cancel, Remove).
+- *Tooltips* (`#tooltip`, `src/ui/panels/tooltip.ts`): one shared element; any element with `data-tip` and a hidden child `.tip` shows it below (or above) the element on hover. Parchment, gold top rule, a script-hand heading (`.tiph`).
+
+**Editor** (`#editor`): a parchment drawer at the top right, 262 px, with the same buttons and tabs in the script hand; `body.editing` gives the map a crosshair cursor.
+
+## 6. The map at different zooms
+
+Camera zoom 1 ≈ one hex 42 px wide; the start position fits a 1500-px window at ≈ 0.43. Four levels (`src/ui/zoomLevels.ts`; Omer 2026-11-06):
+
+| Level | Zoom | Shown |
+|---|---|---|
+| 0 | ≥ 2.0 | everything: all markers, all names, resource badges, hex badges (mill, wharf) |
+| 1 | 1.0 – 2.0 | village names hidden |
+| 2 | 0.6 – 1.0 | town names and village markers hidden too |
+| 3 | < 0.6 | town markers, resource badges and hex badges hidden — only cities and the metropolis, with their names |
+
+The hex grid hides below 0.5. Thresholds are starting values; tune them in `ZOOM_LEVELS`.
+
+Other map marks (unchanged from Sessions 7–10): influence zones as a light faction fill with a solid border; cluster outlines inset and lighter; the hovered / selected settlement's worked hexes outlined white with its influence edge dotted; in settle mode every worked hex hatched.
+
+## 7. Open UI questions
+
+- Modals vs side panels for the settlement ledger (Omer to say after playing).
+- The script hand: Lugrasimo or Uncial Antiqua.
+- A per-faction palette for the six factions (Phase 5).
+
+---
+
+## Change log
+
+- 1.1 (2026-11-06, Session 13b): §4 the icon set extended to every resource, the tiers, mill / wharf on hexes, future castles and stations, the buildings; map resources as badges, tier icons on faction discs; §5 the stockpile tile, the responsive strip, the shared tooltip, the building cubes; §6 the four zoom levels; §3 both hands kept.
+- 1.0 (2026-11-05, Session 13): first version — the Session 13 overhaul as built.

@@ -8,6 +8,9 @@ import { Container, Graphics, Rectangle } from 'pixi.js';
 import type { MapData } from '../../sim/map';
 import { TERRAIN, colorToNumber } from '../../sim/terrain';
 import { RESOURCES, type Glyph } from '../../sim/resources';
+import { iconTexture, MAP_BADGE } from '../icons';
+import { showResources as resourcesAtZoom } from '../zoomLevels';
+import { Sprite } from 'pixi.js';
 import { offsetToPixel, hexCorners, hexWidth, hexRowStep } from '../../sim/hex';
 
 export const HEX_SIZE = 12; // world units (pixels at zoom 1), centre to corner
@@ -18,7 +21,7 @@ interface Chunk {
   cy: number;
   container: Container;
   fill: Graphics;
-  res: Graphics;
+  res: Container;
   grid: Graphics;
   built: boolean;
   bounds: Rectangle; // world-space bounds
@@ -93,10 +96,10 @@ export class MapRenderer {
     return this.showResources;
   }
 
-  /** Grid lines are thinner than a pixel below zoom 0.5 and only cause moiré; resource glyphs are unreadable below 0.3. */
+  /** Grid lines are thinner than a pixel below zoom 0.5 and only cause moiré; resource icons follow the zoom levels (src/ui/zoomLevels.ts). */
   setZoom(zoom: number): void {
     const ok = zoom >= 0.5;
-    const rok = zoom >= 0.3;
+    const rok = resourcesAtZoom(zoom);
     if (ok !== this.gridZoomOk || rok !== this.resZoomOk) {
       this.gridZoomOk = ok;
       this.resZoomOk = rok;
@@ -142,7 +145,7 @@ export class MapRenderer {
       for (let cx = 0; cx < cols; cx++) {
         const container = new Container();
         const fill = new Graphics();
-        const res = new Graphics();
+        const res = new Container();
         const grid = new Graphics();
         grid.visible = this.showGrid && this.gridZoomOk;
         res.visible = this.showResources && this.resZoomOk;
@@ -161,7 +164,6 @@ export class MapRenderer {
     const { fill, grid, res } = c;
     fill.clear();
     grid.clear();
-    res.clear();
     const map = this.map;
     const c0 = c.cx * CHUNK, r0 = c.cy * CHUNK;
     const c1 = Math.min(map.width, c0 + CHUNK), r1 = Math.min(map.height, r0 + CHUNK);
@@ -188,39 +190,33 @@ export class MapRenderer {
       }
     }
     grid.stroke({ width: 0.5, color: 0x000000, alpha: 0.18 });
-    // resources: group by resource, dark outline then fill
-    const byRes: number[][] = this.resourceColors.map(() => []);
+    // resources: one badge sprite per hex — the resource's icon in ink on a parchment disc (Session 13b);
+    // the data file's glyph/colour remain the fallback for a resource without an icon
+    res.removeChildren().forEach((ch) => ch.destroy());
+    const diameter = HEX_SIZE * 0.92;
+    const fallback = new Graphics();
+    let anyFallback = false;
     for (let row = r0; row < r1; row++) {
       for (let col = c0; col < c1; col++) {
         const r = map.resource[row * map.width + col];
-        if (r >= 0) byRes[r].push(col, row);
+        if (r < 0) continue;
+        const p = offsetToPixel(col, row, HEX_SIZE);
+        const def = RESOURCES[r];
+        if (def.icon) {
+          const sp = new Sprite(iconTexture(def.icon, MAP_BADGE));
+          sp.anchor.set(0.5);
+          sp.width = diameter; sp.height = diameter;
+          sp.position.set(p.x, p.y);
+          res.addChild(sp);
+        } else {
+          drawGlyph(fallback, def.glyph, p.x, p.y, HEX_SIZE * 0.42);
+          fallback.fill(this.resourceColors[r]);
+          fallback.stroke({ width: 1, color: 0x000000, alpha: 0.55 });
+          anyFallback = true;
+        }
       }
     }
-    const gr = HEX_SIZE * 0.42;
-    for (let r = 0; r < byRes.length; r++) {
-      const cells = byRes[r];
-      if (cells.length === 0) continue;
-      const glyph = RESOURCES[r].glyph;
-      if (glyph === 'ring') {
-        for (let i = 0; i < cells.length; i += 2) {
-          const p = offsetToPixel(cells[i], cells[i + 1], HEX_SIZE);
-          drawGlyph(res, glyph, p.x, p.y, gr);
-        }
-        res.stroke({ width: gr * 0.7, color: 0x000000, alpha: 0.55 });
-        for (let i = 0; i < cells.length; i += 2) {
-          const p = offsetToPixel(cells[i], cells[i + 1], HEX_SIZE);
-          drawGlyph(res, glyph, p.x, p.y, gr);
-        }
-        res.stroke({ width: gr * 0.4, color: this.resourceColors[r] });
-        continue;
-      }
-      for (let i = 0; i < cells.length; i += 2) {
-        const p = offsetToPixel(cells[i], cells[i + 1], HEX_SIZE);
-        drawGlyph(res, glyph, p.x, p.y, gr);
-      }
-      res.fill(this.resourceColors[r]);
-      res.stroke({ width: 1, color: 0x000000, alpha: 0.55 });
-    }
+    if (anyFallback) res.addChild(fallback); else fallback.destroy();
     c.built = true;
   }
 

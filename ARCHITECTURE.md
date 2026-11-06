@@ -44,13 +44,16 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 |---|---|
 | `app.ts` | wiring: state, camera, renderer, the ledger strip, hover card, the ledgers (`view` = settlement / cluster / realm / settings / help / draft; K, C, ?, Esc, Z, G, R, E), End month / Run N years, the ☰ menu, scenario save/import, autosave, `act(cmd)` → `editor.execute`, the header-font setting |
 | `camera.ts` | pan/zoom |
-| `render/mapRenderer.ts` | chunked, culled hex terrain + resource glyphs (PixiJS 8) |
-| `render/settlementLayer.ts` | influence zones, faction border, cluster outlines, worked-hex hatching, markers and labels (`setLabelFont`) |
+| `render/mapRenderer.ts` | chunked, culled hex terrain + resource icon badges (PixiJS 8) |
+| `icons.ts` | the icon set (UI-DESIGN.md §4): SVG bodies, `icon()` for the DOM, `iconTexture` / `preloadIconTextures` for the map (badge and mark styles) |
+| `zoomLevels.ts` | the four zoom levels: which tiers show markers and names, when resources show (UI-DESIGN.md §6) |
+| `render/settlementLayer.ts` | influence zones, faction border, cluster outlines, worked-hex hatching, faction-disc markers with tier icons, mill / wharf badges on hexes, labels by zoom level (`setLabelFont`) |
 | `panels/format.ts` | shared display helpers: `fmt`, `esc`, tier words, `foodMonths`, `clusterLine`, `costText`, `projectText`, gauges / bars / stacks / stat tiles / `kv` tables, the sparkline, the inline-SVG `ICON` set |
 | `panels/hud.ts` | the ledger strip (Session 13): date, treasury, people, food, realm stockpile tiles with hover tips; clicks open the realm ledger |
 | `panels/hoverCard.ts` | the settlement hover card |
 | `panels/modal.ts` | the modal shell (`ModalShell.show(key, spec, host)`, `wireLinks`) |
-| `panels/settlementModal.ts` | the settlement ledger: Overview · People (age pyramid, growth line, crowding / granary brake) · Land & Food (harvest calendar, every worked hex) · Economy (hands stack, tax, stockpile, gathering) · Buildings (cards, Start / Cancel); editor footer (rename / people / remove) |
+| `panels/tooltip.ts` | the one shared tooltip (`data-tip` + a hidden `.tip` child) |
+| `panels/settlementModal.ts` | the settlement ledger: Overview · People (age pyramid, growth line, crowding / granary brake) · Land & Food (harvest calendar, every worked hex) · Economy (hands stack, tax, stockpile, gathering) · Buildings (cubes: built → project → available → unavailable, tooltips, click to start); editor footer (rename / people / remove) |
 | `panels/clusterModal.ts` | the cluster ledger: Overview · Members · Food · Stockpile (+ the Send form helpers `sendForm` / `wireSend`, `stockBars`, `yearFoodText`) |
 | `panels/realmModal.ts` | the realm ledger: Overview · Clusters · People · Food · Treasury · Stockpile |
 | `fonts/` | bundled woff2 fonts (SIL OFL): Lugrasimo, Almendra, Uncial Antiqua (header hands), Alegreya (body) |

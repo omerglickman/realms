@@ -30,6 +30,9 @@ import testmapJson from '../../maps/testmap.json';
 import startJson from '../../scenarios/start.json';
 import { loadScenarioFile } from '../sim/scenario';
 import { esc } from './panels/format';
+import { preloadIconTextures, MAP_BADGE, MAP_MARK } from './icons';
+import { installTooltips, hideTooltip } from './panels/tooltip';
+import { RESOURCES } from '../sim/resources';
 
 function el<T extends HTMLElement>(id: string): T {
   const e = document.getElementById(id);
@@ -123,8 +126,13 @@ export async function startApp(): Promise<void> {
   let view: { kind: ViewKind; id: string; tab: string } | null = null;
   let workAssign = computeWorkAssignment(state);
   const modal = new ModalShell(el('modal'), el('modal-backdrop'));
+  installTooltips(el('tooltip'));
   const tiles = el<HTMLDivElement>('tiles');
   let mouseX = -1, mouseY = -1;
+
+  // the map's icon textures (resources, things on hexes, tier marks) — rasterised once from the shared icon set
+  await preloadIconTextures([...RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), 'mill', 'wharf', 'castle1', 'castle2', 'castle3', 'station'], MAP_BADGE);
+  await preloadIconTextures(SL.TIER_ICON, MAP_MARK);
 
   const renderer = new MapRenderer(state.map);
   const settlementLayer = new SettlementLayer();
@@ -255,6 +263,7 @@ export async function startApp(): Promise<void> {
   }
   function closeView(): void {
     view = null;
+    hideTooltip();
     modal.hide();
     refreshLayer();
   }

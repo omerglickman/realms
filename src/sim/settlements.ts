@@ -26,6 +26,8 @@ export interface TierDef {
 
 export interface BuildingDef {
   id: string;
+  /** icon id in src/ui/icons.ts (Session 13b) */
+  icon?: string;
   name: string;
   family: string;
   /** mandatory buildings: the one tier they belong to */

@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.5a — 2026-11-05 — Status: ACTIVE (Phase 1 in progress — sessions 5–13 done; working agreement revised in Session 12b)**
+**Version 0.5b — 2026-11-06 — Status: ACTIVE (Phase 1 in progress — sessions 5–13 done; working agreement revised in Session 12b)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -19,6 +19,7 @@ This document says *how* we build the game described in DESIGN.md, in what order
 |---|---|---|---|
 | **DESIGN.md** | Project + repo | What the game is (the contract). Rules and decisions only — findings and implementation notes go in the DEVLOG | Claude edits only to record Omer's decisions or to add clearly-marked proposals |
 | **ROADMAP.md** | Project + repo | How we build it, phases, tech, conventions, working agreement | Claude updates phase status; structural changes need Omer's OK |
+| **UI-DESIGN.md** | Project + repo | What the game looks like: palette, type, icon set, components, zoom levels (Omer's suggestion, Session 13b) — read when a session touches `src/ui/` | Claude amends it with a dated change-log entry whenever a UI decision is made |
 | **DEVLOG.md** | Project + repo | A **Current state** block (overwritten each session; under ~6 KB; present tense, by feature, no session history) + one entry per session with the detail, the findings and the measurements | Claude, every session, no exceptions |
 | **DEVLOG-archive.md** | Project + repo | Older session entries | Moved in batches (below) |
 | **CLAUDE.md** | repo | The session protocol in short, the commands, the close checklist | Claude, with Omer's OK for protocol changes |
@@ -47,7 +48,7 @@ The Project docs in the claude.ai Project ("Strategy Game") are the **canonical*
 8. Build passes; tests pass. If not, say so loudly in the DEVLOG entry.
 9. Commit and push with a clear message.
 10. DEVLOG.md: overwrite the Current state block; append a session entry (template in DEVLOG.md) with what was done, how, the findings and measurements, what broke, next steps. Update ARCHITECTURE.md in place if a module's job changed. Record Omer's decisions in DESIGN.md the same session.
-11. Mirror DESIGN.md / ROADMAP.md / DEVLOG.md (and DEVLOG-archive.md when it changed) to the Project and the repo.
+11. Mirror DESIGN.md / ROADMAP.md / DEVLOG.md (and UI-DESIGN.md / DEVLOG-archive.md when they changed) to the Project and the repo.
 12. Deliver the playable build to Omer (A.5).
 
 ### A.4 Where the code lives (DECIDED 2026-11-03)
@@ -243,6 +244,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.5b (2026-11-06, Session 13b): UI-DESIGN.md added to the document table (A.2).
 - 0.5a (2026-11-05, Session 13): the UI overhaul noted in the Phase 1 checklist.
 - 0.5 (2026-11-05, Session 12b): working agreement revised for shorter sessions — CLAUDE.md and ARCHITECTURE.md in the repo, Project docs kept small and read selectively, `npm run smoke`, one feature cluster per session (A.2, A.3, B.2, B.4).
 - 0.4j (2026-11-05): Session 12 — private economy, money, caps, pull on prosperity done; Phase 1 checklist updated.

@@ -7,6 +7,7 @@ import { totalPopulation } from '../../sim/demography';
 import { monthsLeft, moneyCost } from '../../sim/buildings';
 import { MATERIAL_IDS, type Materials } from '../../sim/materials';
 import { clustersOf } from '../../sim/clusters';
+import { ICON_PATHS, icon } from '../icons';
 
 export const fmt = (n: number): string => Math.round(n).toLocaleString('en-US');
 export const fmt1 = (n: number): string => n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -149,39 +150,8 @@ export function kv(rows: [string, string][]): string {
   return `<table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</table>`;
 }
 
-// ---- icons: original line glyphs, 24×24, stroke = currentColor ----
-
-const I = (body: string, solid = false): string => `<svg class="ico${solid ? ' solid' : ''}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
-
-export const ICON = {
-  coin: I('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5"/><path d="M12 9.5v5M10.5 11h3"/>'),
-  people: I('<circle cx="8.5" cy="8" r="3"/><circle cx="16" cy="9" r="2.5"/><path d="M3 19c0-3.3 2.5-5.5 5.5-5.5S14 15.7 14 19M14 18.5c.3-2.4 1.7-4 4-4 1.9 0 3.5 1.4 3.5 4"/>'),
-  wheat: I('<path d="M12 21V8"/><path d="M12 8c-2.5-.5-4-2.5-4-5 2.5.5 4 2.5 4 5zM12 8c2.5-.5 4-2.5 4-5-2.5.5-4 2.5-4 5z"/><path d="M12 12.5c-2.5-.5-4-2.5-4-5 2.5.5 4 2.5 4 5zM12 12.5c2.5-.5 4-2.5 4-5-2.5.5-4 2.5-4 5z"/><path d="M12 17c-2.5-.5-4-2.5-4-5 2.5.5 4 2.5 4 5zM12 17c2.5-.5 4-2.5 4-5-2.5.5-4 2.5-4 5z"/>'),
-  timber: I('<path d="M6 7h11"/><path d="M6 17h11"/><ellipse cx="17" cy="12" rx="3" ry="5"/><path d="M6 7c-1.7 0-3 2.2-3 5s1.3 5 3 5"/><ellipse cx="17" cy="12" rx="1.2" ry="2"/>'),
-  stone: I('<path d="M4 15l3-8 8-2 5 5-2 7-9 2z"/><path d="M7 7l5 4 7-1M12 11l-3 8"/>'),
-  goods: I('<rect x="4" y="8" width="16" height="12" rx="1"/><path d="M4 12h16M12 8v12M7 8l2-4h6l2 4"/>'),
-  hammer: I('<path d="M14 4l6 6-2 2-6-6z"/><path d="M12 6l2 2-9 9-2-2z"/><path d="M13 11l-2-2"/>'),
-  granary: I('<path d="M4 20V10l8-6 8 6v10z"/><path d="M4 20h16M10 20v-6h4v6M4 13h16"/>'),
-  sun: I('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'),
-  house: I('<path d="M5 11l7-6 7 6v9H5z"/><path d="M10 20v-5h4v5"/>'),
-  tree: I('<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="12" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M12 7.5v4M12 11.5l-7 4M12 11.5v4M12 11.5l7 4"/>'),
-  scroll: I('<path d="M6 4h11a3 3 0 0 1 3 3v1h-4"/><path d="M6 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7"/><path d="M8 10h7M8 14h7"/>'),
-  crown: I('<path d="M4 17h16l1-9-5 4-4-6-4 6-5-4z"/><path d="M4 20h16"/>'),
-  warn: I('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/>'),
-  skull: I('<path d="M12 3a7 7 0 0 0-7 7c0 2.6 1.3 4.3 3 5.4V19h8v-3.6c1.7-1.1 3-2.8 3-5.4a7 7 0 0 0-7-7z"/><circle cx="9.5" cy="10.5" r="1.3"/><circle cx="14.5" cy="10.5" r="1.3"/><path d="M11 15l1-1.5 1 1.5M10 19v2M14 19v2"/>'),
-  walk: I('<circle cx="13" cy="4.5" r="2"/><path d="M10 21l2-7-2.5-2 1-5 3 1.5 2 3 2.5 1M10 9l-3 4M13 14l3 3 1 4"/>'),
-  calendar: I('<rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4M7 14h3M12 14h3M7 18h3"/>'),
-  map: I('<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>'),
-  gear: I('<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'),
-  book: I('<path d="M4 5a2 2 0 0 1 2-2h5v16H6a2 2 0 0 0-2 2z"/><path d="M20 5a2 2 0 0 0-2-2h-5v16h5a2 2 0 0 1 2 2z"/>'),
-  hand: I('<path d="M7 11V6a1.5 1.5 0 0 1 3 0v5M10 10V4.5a1.5 1.5 0 0 1 3 0V10M13 10V6a1.5 1.5 0 0 1 3 0v6"/><path d="M16 12l2-2.5a1.4 1.4 0 0 1 2.2 1.7L17 17c-1 2-2.5 4-6 4-3.5 0-5-2.5-5-5v-5"/>'),
-  arrowUp: I('<path d="M12 19V5M6 11l6-6 6 6"/>'),
-  fish: I('<path d="M3 12c3-4 7-6 11-6 2.5 0 4.5 1 6 3-1.5 2-3.5 3-6 3-4 0-8-2-11-6z"/><path d="M3 12c3 4 7 6 11 6M17 9l4-3v12l-4-3"/><circle cx="7" cy="11" r=".8"/>'),
-  cow: I('<path d="M5 9h14l-1 9H6z"/><path d="M8 18v3M16 18v3M5 9L3 5M19 9l2-4M9 9V6M15 9V6"/>'),
-  deer: I('<path d="M12 21v-8l-4-3V5M12 13l4-3V5M8 7h2M14 7h2"/><circle cx="12" cy="8" r="2"/>'),
-  grid: I('<path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>'),
-  close: I('<path d="M6 6l12 12M18 6L6 18"/>'),
-};
+// ---- icons: see src/ui/icons.ts (one source for the DOM and the map) ----
+export const ICON: Record<string, string> = Object.fromEntries(Object.keys(ICON_PATHS).map((k) => [k, icon(k)]));
 
 /** Icon for a food job kind. */
 export function jobIcon(kind: string): string {

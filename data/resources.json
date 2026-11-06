@@ -6,6 +6,7 @@
       "name": "Game",
       "color": "#c47a3a",
       "glyph": "triangle",
+      "icon": "game",
       "spawn": {
         "forest": 150,
         "woodland": 80,
@@ -22,6 +23,7 @@
       "name": "Stone",
       "color": "#d8d8d8",
       "glyph": "square",
+      "icon": "stone",
       "spawn": {
         "hills": 90,
         "mountains": 110,
@@ -38,6 +40,7 @@
       "name": "Iron",
       "color": "#50505e",
       "glyph": "diamond",
+      "icon": "iron",
       "spawn": {
         "hills": 45,
         "mountains": 85
@@ -53,6 +56,7 @@
       "name": "Fish",
       "color": "#8fd8ff",
       "glyph": "diamond",
+      "icon": "fish",
       "spawn": {
         "sea": 90,
         "lake": 220,
@@ -70,6 +74,7 @@
       "name": "Furs",
       "color": "#a0522d",
       "glyph": "hex",
+      "icon": "furs",
       "spawn": {
         "forest": 65,
         "tundra": 120,
@@ -86,6 +91,7 @@
       "name": "Salt",
       "color": "#ffffff",
       "glyph": "cross",
+      "icon": "salt",
       "spawn": {
         "swamp": 110,
         "hills": 18,
@@ -102,6 +108,7 @@
       "name": "Wine",
       "color": "#8e3b8e",
       "glyph": "circle",
+      "icon": "wine",
       "spawn": {
         "river": 45,
         "hills": 35,
@@ -118,6 +125,7 @@
       "name": "Silver",
       "color": "#eef0ff",
       "glyph": "star",
+      "icon": "silver",
       "spawn": {
         "mountains": 28,
         "hills": 5

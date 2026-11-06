@@ -87,8 +87,8 @@ export function wireSettlement(root: HTMLElement, state: GameState, s: Settlemen
     popInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });
     root.querySelector<HTMLButtonElement>('#sp-remove')?.addEventListener('click', () => host.onRemove(s.id));
   }
-  root.querySelectorAll<HTMLButtonElement>('[data-build]').forEach((b) => b.addEventListener('click', () => { if (!b.disabled) host.onBuild(s.id, b.dataset.build!); }));
-  root.querySelectorAll<HTMLButtonElement>('[data-cancel-build]').forEach((b) => b.addEventListener('click', () => host.onCancelBuild(s.id)));
+  root.querySelectorAll<HTMLElement>('[data-build]').forEach((b) => b.addEventListener('click', () => host.onBuild(s.id, b.dataset.build!)));
+  root.querySelectorAll<HTMLButtonElement>('[data-cancel-build]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); host.onCancelBuild(s.id); }));
 }
 
 // ---------------------------------------------------------------- pages
@@ -341,42 +341,61 @@ function economyPage(ctx: Ctx): string {
 
 // ---- Buildings ----
 
-function costChips(def: ReturnType<typeof buildingDef>, check: ReturnType<typeof canBuild>): string {
+type Check = ReturnType<typeof canBuild>;
+
+function costChips(def: ReturnType<typeof buildingDef>, check: Check | null, full: boolean): string {
   const money = moneyCost(def);
   const chips: string[] = [];
-  if (money > 0) chips.push(`<span class="${check.lackingMoney ? 'short' : ''}">${ICON.coin} ${fmt(money)}</span>`);
+  if (money > 0) chips.push(`<span class="${check?.lackingMoney ? 'short' : ''}" title="coins">${ICON.coin} ${fmt(money)}</span>`);
   for (const k of MATERIAL_IDS) {
     const v = def.cost?.[k] ?? 0;
-    if (v > 0) chips.push(`<span class="${check.lacking && check.lacking[k] > 0 ? 'short' : ''}">${k === 'timber' ? ICON.timber : k === 'stone' ? ICON.stone : ICON.goods} ${fmt(v)}</span>`);
+    if (v > 0) chips.push(`<span class="${check?.lacking && check.lacking[k] > 0 ? 'short' : ''}" title="${k}">${k === 'timber' ? ICON.timber : k === 'stone' ? ICON.stone : ICON.goods} ${fmt(v)}</span>`);
   }
-  chips.push(`<span>${ICON.calendar} ${def.buildMonths ?? 0} mo</span>`);
-  chips.push(`<span>${ICON.hammer} ${fmt(def.buildHands ?? 0)} build</span>`);
-  if (def.hands) chips.push(`<span>${ICON.hand} ${fmt(def.hands)} run</span>`);
+  if (full) {
+    chips.push(`<span title="months to build">${ICON.calendar} ${def.buildMonths ?? 0} mo</span>`);
+    chips.push(`<span title="builders">${ICON.hammer} ${fmt(def.buildHands ?? 0)} build</span>`);
+    if (def.hands) chips.push(`<span title="hands to run it">${ICON.hand} ${fmt(def.hands)} run</span>`);
+  }
   return chips.join('');
+}
+
+/** A building cube (Session 13b): icon, name, family, cost chips; the explanation lives in its tooltip. */
+function cube(cls: string, def: ReturnType<typeof buildingDef>, body: string, tip: string, attrs = ''): string {
+  return `<div class="cube ${cls}" data-tip="1" ${attrs}><div class="ci">${ICON[def.icon ?? 'house'] ?? ICON.house}</div><div class="cn">${esc(def.name)}</div><div class="cf">${esc(def.family)}</div>${body}<div class="tip">${tip}</div></div>`;
 }
 
 function buildingsPage(ctx: Ctx): string {
   const { state, s, plan, worked } = ctx;
-  const builtCards = plan.buildings.map((b) => {
+  const tipH = (h: string, sub: string) => `<div class="tiph">${esc(h)}</div><div class="dim">${esc(sub)}</div>`;
+  const cubes: string[] = [];
+  // the running project first
+  if (s.build) {
+    const def = buildingDef(s.build.building);
+    const left = projectText(s)!;
+    cubes.push(cube('project', def, `<div class="cg">${gauge(s.build.progress, { cls: 'mid' })}</div><div class="cb"><button class="btn small" data-cancel-build="1">Cancel</button></div>`,
+      tipH(def.name, 'under construction') + `<p>${esc(left)} · ${fmt(plan.constructionHands)} of ${fmt(def.buildHands ?? 0)} hands on the site${plan.constructionFraction < 0.999 ? ` <span class="warn">(building at ${Math.round(100 * plan.constructionFraction)} % speed)</span>` : ''}.</p><p>${esc(def.blurb ?? '')}</p><div class="dim">Cancel refunds everything paid.</div>`));
+  }
+  // standing buildings
+  for (const b of plan.buildings) {
     const def = buildingDef(b.id);
-    return `<div class="card built"><div class="ch"><span class="cn">${esc(def.name)}</span><span class="cf">${def.mandatory ? 'since founding' : esc(def.family)}</span></div>
-      <div class="blurb">${esc(def.blurb ?? (def.family === 'hall' ? 'Where government happens: administration quality is the hall\'s staffing; an understaffed hall lowers tax and goods.' : def.family === 'granary' ? 'Stores the harvest: fully staffed it holds 24 months and spoils 0.5 % a month; unstaffed 15 months and 1.5 %.' : ''))}</div>
-      <div class="cfoot">${gauge(b.fraction, { title: `${fmt(b.hands)} of ${fmt(def.hands)} hands` })}<span class="staff num">${fmt(b.hands)} / ${fmt(def.hands)} hands</span></div></div>`;
-  }).join('');
+    const blurb = def.blurb ?? (def.family === 'hall' ? 'Where government happens: administration quality is the hall\'s staffing; an understaffed hall lowers tax and goods.' : def.family === 'granary' ? 'Stores the harvest: fully staffed it holds 24 months and spoils 0.5 % a month; unstaffed 15 months and 1.5 %.' : '');
+    cubes.push(cube('built', def, `<div class="cg">${gauge(b.fraction)}</div><div class="cs num">${fmt(b.hands)} / ${fmt(def.hands)} hands</div>`,
+      tipH(def.name, def.mandatory ? 'since founding' : 'built') + `<p>${esc(blurb)}</p><div class="dim">Staffed ${Math.round(100 * b.fraction)} % — ${fmt(b.hands)} of ${fmt(def.hands)} hands; effects scale with staffing.</div>`));
+  }
+  // available, then unavailable
   const options = buildableFor(s.tier).filter((b) => !s.buildings.includes(b.id)).map((def) => ({ def, check: canBuild(state, s, def.id, worked) }));
   const taxPerHand = plan.taxableHands > 0 ? plan.taxPerYear / plan.taxableHands : 0;
-  const optionCards = options.map(({ def, check }) => {
-    const blocked = !check.ok && !s.build;
+  const avail = options.filter((o) => o.check.ok && !s.build);
+  const off = options.filter((o) => !(o.check.ok && !s.build));
+  const optionCube = ({ def, check }: typeof options[number], ok: boolean) => {
     const dent = plan.privateHands > 0 && def.buildHands ? ` The ${fmt(def.buildHands)} builders pay no tax while they work (−${fmt(def.buildHands * taxPerHand)} coins a year).` : '';
-    return `<div class="card ${blocked ? 'off' : ''}"><div class="ch"><span class="cn">${esc(def.name)}</span><span class="cf">${esc(def.family)}</span></div>
-      <div class="cost">${costChips(def, check)}</div>
-      <div class="blurb">${esc(def.blurb ?? '')}${esc(dent)}</div>
-      ${!check.ok && !s.build ? `<div class="why">${esc(check.reason ?? '')}</div>` : ''}
-      <div class="cfoot"><span class="spacer" style="flex:1"></span><button class="btn primary small" data-build="${def.id}" ${check.ok && !s.build ? '' : 'disabled'} title="${s.build ? 'one project at a time' : check.ok ? 'Pay now, build over the coming months' : esc(check.reason ?? '')}">Start</button></div></div>`;
-  }).join('');
-  return `${projectCard(ctx) ? `<h3>Under construction</h3>${projectCard(ctx)}` : ''}
-    <h3>Standing <small>${plan.buildings.length} buildings · ${fmt(plan.staffedHands)} hands</small></h3>
-    <div class="cards">${builtCards}</div>
-    <h3>Build <small>one project at a time · paid when started · cancel refunds everything</small></h3>
-    ${options.length ? `<div class="cards">${optionCards}</div>` : '<p class="note">Nothing left to build at this tier.</p>'}`;
+    const reason = s.build ? 'One project at a time — wait for the current one or cancel it.' : check.reason ?? '';
+    return cube(ok ? 'avail' : 'off', def, `<div class="cc">${costChips(def, check, false)}</div>`,
+      tipH(def.name, `${def.family} · from ${def.minTier ?? 'village'}`) + `<div class="cost">${costChips(def, check, true)}</div><p>${esc(def.blurb ?? '')}${esc(dent)}</p>` + (ok ? '<div class="dim">Click to start — paid now, built over the coming months.</div>' : `<div class="why">${esc(reason)}</div>`),
+      ok ? `data-build="${def.id}"` : '');
+  };
+  for (const o of avail) cubes.push(optionCube(o, true));
+  for (const o of off) cubes.push(optionCube(o, false));
+  return `<div class="cubes">${cubes.join('')}</div>
+    <p class="note">${plan.buildings.length} standing · ${avail.length} can be started${s.build ? ' once the current project is done' : ''} · ${off.length} not now. Hover a cube for what it does; click a green one to start it. One project at a time; the cost is paid when it starts and refunded in full if cancelled.</p>`;
 }

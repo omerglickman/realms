@@ -50,15 +50,15 @@ async def main() -> int:
         await pg.click('#modal .m-body a[data-focus]'); await pg.wait_for_timeout(500)
         t = await panel(); print('SETTLEMENT:', *lines(t, 'hands', 'coins'), sep='\n  ')
         await tab('buildings')
-        ok = await pg.eval_on_selector_all('#modal button[data-build]', 'bs => bs.filter(b => !b.disabled).map(b => b.dataset.build)')
+        ok = await pg.eval_on_selector_all('#modal .cube.avail', 'bs => bs.map(b => b.dataset.build)')
         print('buildable:', ok)
         if ok:
-            await pg.click(f'#modal button[data-build={ok[0]}]'); await pg.wait_for_timeout(400)
-            t = await panel(); assert 'under construction' in t.lower(), 'project did not start'
+            await pg.click(f'#modal .cube.avail[data-build={ok[0]}]'); await pg.wait_for_timeout(400)
+            assert await pg.query_selector('#modal .cube.project'), 'project did not start'
             for _ in range(40):
                 await pg.keyboard.press('Space'); await pg.wait_for_timeout(250)
-                if 'under construction' not in (await panel()).lower(): break
-            t = await panel(); print('BUILT:', *lines(t, 'Standing'), sep='\n  ')
+                if not await pg.query_selector('#modal .cube.project'): break
+            t = await panel(); print('BUILT:', *lines(t, 'standing'), sep='\n  ')
             await pg.screenshot(path='/tmp/smoke_settlement.png')
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         await pg.keyboard.press('k'); await pg.wait_for_timeout(400)

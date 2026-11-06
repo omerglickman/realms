@@ -8,7 +8,7 @@
 // Settlements are few, so this is a plain (unchunked) set of Graphics redrawn
 // whenever the state or the zoom changes. Purely visual: never changes state.
 
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
 import type { GameState } from '../../sim/state';
 import { TIERS, influenceCells, workedCellsBySettlement, computeWorkAssignment, type Settlement } from '../../sim/settlements';
 import { clustersOf, clusterInfluenceCells } from '../../sim/clusters';
@@ -16,6 +16,11 @@ import { factionColor } from '../../sim/factions';
 import { colorToNumber } from '../../sim/terrain';
 import { offsetToPixel, hexCorners, offsetToAxial, axialToOffset, AXIAL_DIRECTIONS, SQRT3 } from '../../sim/hex';
 import { HEX_SIZE } from './mapRenderer';
+import { TERRAIN, terrainIndex } from '../../sim/terrain';
+import { getTerrain } from '../../sim/map';
+import { isFishable } from '../../sim/water';
+import { iconTexture, MAP_BADGE, MAP_MARK } from '../icons';
+import { showMarker, showName } from '../zoomLevels';
 
 /** For each axial direction, the two corner indices (of hexCorners) of the edge facing it. Built once by geometry. */
 const EDGE_CORNERS: [number, number][] = (() => {
@@ -106,13 +111,19 @@ export class SettlementLayer {
   private work = new Graphics();
   private edges = new Graphics();
   private markers = new Graphics();
+  private markerIcons = new Container();
+  private hexBadges = new Container();
   private labels = new Container();
   private labelById = new Map<string, Text>();
+  private iconById = new Map<string, Sprite>();
   private showZones = true;
 
   constructor() {
-    this.root.addChild(this.zones, this.clusters, this.hatch, this.work, this.edges, this.markers, this.labels);
+    this.root.addChild(this.zones, this.clusters, this.hatch, this.work, this.edges, this.hexBadges, this.markers, this.markerIcons, this.labels);
   }
+
+  /** Tier icon ids (src/ui/icons.ts) by rank. */
+  static readonly TIER_ICON = ['village', 'town', 'city', 'metropolis'];
 
   setZonesVisible(v: boolean): void { this.showZones = v; this.zones.visible = v; this.clusters.visible = v; }
   get zonesVisible(): boolean { return this.showZones; }
@@ -221,24 +232,63 @@ export class SettlementLayer {
       }
     }
 
-    // ---- markers ----
-    this.markers.clear();
-    for (const s of list) {
-      const p = offsetToPixel(s.col, s.row, HEX_SIZE);
-      const color = colorToNumber(factionColor(state.factions, s.faction));
-      const r = SettlementLayer.markerRadius(s, view.zoom);
-      this.drawMarker(s, p.x, p.y, r);
-      this.markers.fill(color);
-      this.markers.stroke({ width: Math.max(1, 1.2 / view.zoom), color: 0x000000, alpha: 0.8 });
-      if (s.id === view.selected || s.id === view.hover) {
-        this.drawMarker(s, p.x, p.y, r + Math.max(2, 2.5 / view.zoom));
-        this.markers.stroke({ width: Math.max(1.2, 1.6 / view.zoom), color: 0xffffff, alpha: s.id === view.selected ? 1 : 0.7 });
+    // ---- things built on hexes: a Mill on the settlement's river hex, a Wharf on its fishing hex (Session 13b) ----
+    this.hexBadges.removeChildren().forEach((ch) => ch.destroy());
+    const riverIdx = terrainIndex('river');
+    const badgeD = HEX_SIZE * 0.8;
+    const markersOn = (s: Settlement) => showMarker(TIERS[s.tier].rank, view.zoom);
+    if (showMarker(0, view.zoom)) {
+      const workedAll = workedCellsBySettlement(state);
+      for (const s of list) {
+        const cells = workedAll.get(s.id) ?? [];
+        const place = (icon: string, cell: number | undefined) => {
+          if (cell === undefined) return;
+          const p = px(cell);
+          const sp = new Sprite(iconTexture(icon, MAP_BADGE));
+          sp.anchor.set(0.5);
+          sp.width = badgeD; sp.height = badgeD;
+          sp.position.set(p.x + HEX_SIZE * 0.32, p.y - HEX_SIZE * 0.3);
+          this.hexBadges.addChild(sp);
+        };
+        if (s.buildings.includes('mill')) place('mill', cells.find((c) => getTerrain(map, c % w, Math.floor(c / w)) === riverIdx));
+        if (s.buildings.includes('wharf')) place('wharf', cells.find((c) => TERRAIN[getTerrain(map, c % w, Math.floor(c / w))].id !== 'river' && isFishable(map, c)) ?? cells.find((c) => isFishable(map, c)));
       }
     }
 
-    // ---- labels (constant screen size; hidden when zoomed far out) ----
+    // ---- markers: a faction-colour disc with the tier's icon (Session 13b); hover/selection ring ----
+    this.markers.clear();
+    const seenIcons = new Set<string>();
+    for (const s of list) {
+      if (!markersOn(s)) continue;
+      const p = offsetToPixel(s.col, s.row, HEX_SIZE);
+      const color = colorToNumber(factionColor(state.factions, s.faction));
+      const r = SettlementLayer.markerRadius(s, view.zoom);
+      this.markers.circle(p.x, p.y, r);
+      this.markers.fill(color);
+      this.markers.stroke({ width: Math.max(1, 1.2 / view.zoom), color: 0x000000, alpha: 0.8 });
+      if (s.id === view.selected || s.id === view.hover) {
+        this.markers.circle(p.x, p.y, r + Math.max(2, 2.5 / view.zoom));
+        this.markers.stroke({ width: Math.max(1.2, 1.6 / view.zoom), color: 0xffffff, alpha: s.id === view.selected ? 1 : 0.7 });
+      }
+      seenIcons.add(s.id);
+      let sp = this.iconById.get(s.id);
+      const tex = iconTexture(SettlementLayer.TIER_ICON[TIERS[s.tier].rank], MAP_MARK);
+      if (!sp) {
+        sp = new Sprite(tex);
+        sp.anchor.set(0.5);
+        this.markerIcons.addChild(sp);
+        this.iconById.set(s.id, sp);
+      } else if (sp.texture !== tex) sp.texture = tex;
+      const d = r * 1.6;
+      sp.width = d; sp.height = d;
+      sp.position.set(p.x, p.y);
+    }
+    for (const [id, sp] of this.iconById) {
+      if (!seenIcons.has(id)) { sp.destroy(); this.iconById.delete(id); }
+    }
+
+    // ---- labels (constant screen size; which tiers are named depends on the zoom level) ----
     const seen = new Set<string>();
-    const show = view.zoom >= 0.45;
     for (const s of list) {
       seen.add(s.id);
       let t = this.labelById.get(s.id);
@@ -253,7 +303,7 @@ export class SettlementLayer {
       const r = SettlementLayer.markerRadius(s, view.zoom);
       t.position.set(p.x, p.y + r + 4 / view.zoom);
       t.scale.set(1 / view.zoom);
-      t.visible = show || TIERS[s.tier].rank >= 2; // cities stay labelled when zoomed out
+      t.visible = showName(TIERS[s.tier].rank, view.zoom);
     }
     for (const [id, t] of this.labelById) {
       if (!seen.has(id)) { t.destroy(); this.labelById.delete(id); }
@@ -283,22 +333,5 @@ export class SettlementLayer {
       }
     }
     return out;
-  }
-
-  private drawMarker(s: Settlement, x: number, y: number, r: number): void {
-    switch (TIERS[s.tier].rank) {
-      case 0: this.markers.circle(x, y, r); break;
-      case 1: this.markers.circle(x, y, r); break;
-      case 2: this.markers.poly([x, y - r, x + r, y, x, y + r, x - r, y]); break; // diamond
-      default: {
-        const pts: number[] = [];
-        for (let i = 0; i < 10; i++) {
-          const a = -Math.PI / 2 + (i * Math.PI) / 5;
-          const rr = i % 2 === 0 ? r : r * 0.5;
-          pts.push(x + rr * Math.cos(a), y + rr * Math.sin(a));
-        }
-        this.markers.poly(pts);
-      }
-    }
   }
 }

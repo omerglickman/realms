@@ -15,6 +15,8 @@ export interface ResourceDef {
   name: string;
   color: string;
   glyph: Glyph;
+  /** icon id in src/ui/icons.ts (Session 13b); the glyph is the fallback */
+  icon?: string;
   /** per-mille chance per hex, keyed by terrain id */
   spawn: Record<string, number>;
   coastalOnly?: boolean;

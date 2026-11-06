@@ -4,6 +4,7 @@
 // hands back the body for wiring. Re-rendering keeps the scroll position.
 
 import { esc } from './format';
+import { hideTooltip } from './tooltip';
 
 export interface ModalTab { id: string; label: string }
 
@@ -47,6 +48,7 @@ export class ModalShell {
     const prevBody = this.root.querySelector<HTMLElement>('.m-body');
     const scroll = key === this.lastKey && prevBody ? prevBody.scrollTop : 0;
     this.lastKey = key;
+    hideTooltip();
     this.root.classList.toggle('wide', !!spec.wide);
     this.root.innerHTML = `
       <div class="m-head">

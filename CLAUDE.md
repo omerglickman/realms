@@ -5,7 +5,7 @@ Omer designs; Claude implements. The full working agreement is ROADMAP.md Part A
 ## Start (every session)
 
 1. Read **DEVLOG.md "Current state"** from the Project (`project_read claude/DEVLOG.md`) — where we are and the next step. The session entries below it are history; read the latest only if the current state points at it.
-2. Read **this file** and skim **ARCHITECTURE.md** (repo) for the modules the session will touch.
+2. Read **this file** and skim **ARCHITECTURE.md** (repo) for the modules the session will touch. If the session touches `src/ui/` or adds anything the player will see, read **UI-DESIGN.md** (Project + repo) — the palette, type, icons, components and zoom levels — and amend it when a UI decision is made.
 3. Read **DESIGN.md by section** (`project_search`, or `project_read` and jump to the §) for the rules the session implements. Read it whole only in a design session.
 4. ROADMAP.md: only at a phase boundary or when the working agreement is in question.
 5. Clone `omerglickman/realms`, then `npm install && npm test && npm run build` — all green before touching anything.
@@ -36,7 +36,7 @@ npx tsx src/headless/inspect.ts scenarios/start.json     # list a scenario's set
 1. Tests and build green (or say so loudly in the DEVLOG entry).
 2. Commit with a `phase1: …` style message and push `main` (fetch first; the clone is shallow).
 3. DEVLOG.md: **overwrite** the Current state block (keep it under ~6 KB — present tense, by feature, no session history inside it) and **append** a session entry (template in DEVLOG.md). Update ARCHITECTURE.md in place if a module's job changed. Record any decision Omer made in DESIGN.md the same session (DECIDED + date); keep findings and implementation chatter out of DESIGN.md — they go in the DEVLOG entry.
-4. Mirror DEVLOG.md / DESIGN.md / ROADMAP.md to the Project (`project_write` with `local_path`; the tool needs the file read in full first — so keep them small). Every fifth session, or when DEVLOG.md passes ~45 KB, move all but the last three entries to DEVLOG-archive.md.
+4. Mirror DEVLOG.md / DESIGN.md / ROADMAP.md (and UI-DESIGN.md when it changed) to the Project (`project_write` with `local_path`; the tool needs the file read in full first — so keep them small). Every fifth session, or when DEVLOG.md passes ~45 KB, move all but the last three entries to DEVLOG-archive.md.
 5. Deliver `realms.html` to Omer (SendUserFile) with a short summary: what changed, findings, what needs his decision.
 
 ## Git

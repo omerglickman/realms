@@ -40,7 +40,7 @@ export function renderHud(root: HTMLElement, state: GameState, host: HudHost): v
   const stock = f?.stock ?? { timber: 0, stone: 0, goods: 0 };
 
   const tile = (id: string, icon: string, label: string, num: string, sub: string, tip: string, alert = false) =>
-    `<div class="tile${alert ? ' alert' : ''}" data-tab="${id}">${icon}<div class="tv"><div class="tl">${label}</div><div class="tn">${num}</div>${sub ? `<div class="ts">${sub}</div>` : ''}</div><div class="tip">${tip}</div></div>`;
+    `<div class="tile${alert ? ' alert' : ''}" data-tab="${id}" data-tip="1">${icon}<div class="tv"><div class="tl">${label}</div><div class="tn">${num}</div>${sub ? `<div class="ts">${sub}</div>` : ''}</div><div class="tip">${tip}</div></div>`;
   const tipH = (h: string) => `<div class="tiph">${h}</div>`;
 
   const tiles = [
@@ -59,17 +59,19 @@ export function renderHud(root: HTMLElement, state: GameState, host: HudHost): v
       (r.lastYear ? `<br>Last year: ${fmt(r.lastYear.produced)} grown, ${fmt(r.lastYear.consumed)} eaten, ${fmt(r.lastYear.hungerDeaths)} starved.` : '') +
       `<br>This year so far: ${fmt(r.year.produced)} grown, ${fmt(r.year.consumed)} eaten${starvedThis > 0.5 ? `, <b class="warn">${fmt(starvedThis)} starved</b>` : ''}.` + `<br><span class="dim">Click for the realm's food.</span>`,
       starvedThis > 0.5),
-    ...MATERIAL_IDS.map((k) => {
-      const icon = k === 'timber' ? ICON.timber : k === 'stone' ? ICON.stone : ICON.goods;
-      const lostY = f?.year.lost[k] ?? 0;
-      const inY = f?.year.overflowIn[k] ?? 0;
-      const full = Number.isFinite(cap[k]) && stock[k] >= cap[k] - 0.5;
-      return tile('stockpile', icon, k, `<b>${fmt(stock[k])}</b><span class="ts"> / ${Number.isFinite(cap[k]) ? fmt(cap[k]) : '∞'}</span>`,
-        lostY > 0.5 ? `<span class="down">${fmt(lostY)} lost</span> this year` : inY > 0.5 ? `+${fmt(inY)} this year` : full ? 'full' : '',
-        tipH(`The realm's ${k}`) + `What the clusters hold above their own caps flows here; above the realm's cap it is lost. You ship it from here to any cluster.<br>` +
-        gauge(Number.isFinite(cap[k]) && cap[k] > 0 ? stock[k] / cap[k] : 0, { cls: full ? 'mid' : '' }) +
-        `This year: +${fmt(inY)} arrived, ${fmt(lostY)} lost.` + `<br><span class="dim">Click for the stockpile and shipping.</span>`);
-    }),
+    // one compact tile for the realm's stockpile: three icon + number pairs, caps underneath (Session 13b)
+    (() => {
+      const icons: Record<string, string> = { timber: ICON.timber, stone: ICON.stone, goods: ICON.goods };
+      const lost = MATERIAL_IDS.reduce((t, k) => t + (f?.year.lost[k] ?? 0), 0);
+      const arrived = MATERIAL_IDS.reduce((t, k) => t + (f?.year.overflowIn[k] ?? 0), 0);
+      const anyFull = MATERIAL_IDS.some((k) => Number.isFinite(cap[k]) && stock[k] >= cap[k] - 0.5);
+      const num = MATERIAL_IDS.map((k) => `<span class="mat" title="${k}">${icons[k]}<b>${fmt(stock[k])}</b></span>`).join('');
+      const sub = lost > 0.5 ? `<span class="down">${fmt(lost)} lost</span> this year` : arrived > 0.5 ? `+${fmt(arrived)} this year` : anyFull ? 'at the cap' : `caps ${MATERIAL_IDS.map((k) => Number.isFinite(cap[k]) ? fmt(cap[k]) : '∞').join(' / ')}`;
+      const tip = tipH('The realm\'s stockpile') + `What the clusters hold above their own caps flows here; above the realm's cap it is lost. You ship it from here to any cluster.` +
+        `<table class="kv">${MATERIAL_IDS.map((k) => `<tr><th>${icons[k]} ${k}</th><td>${fmt(stock[k])} <span class="dim">/ ${Number.isFinite(cap[k]) ? fmt(cap[k]) : '∞'}</span>${gauge(Number.isFinite(cap[k]) && cap[k] > 0 ? stock[k] / cap[k] : 0, { cls: stock[k] >= cap[k] - 0.5 ? 'mid' : '' })}<span class="dim">+${fmt(f?.year.overflowIn[k] ?? 0)} arrived, ${fmt(f?.year.lost[k] ?? 0)} lost this year</span></td></tr>`).join('')}</table>` +
+        `<span class="dim">Click for the stockpile and shipping.</span>`;
+      return tile('stockpile', '', 'Stockpile', num, sub, tip, lost > 0.5);
+    })(),
   ];
   root.innerHTML = tiles.join('');
   root.querySelectorAll<HTMLElement>('.tile').forEach((t) => t.addEventListener('click', () => host.onRealm(t.dataset.tab!)));
