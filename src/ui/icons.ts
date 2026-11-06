@@ -16,13 +16,13 @@ export const ICON_PATHS: Record<string, string> = {
   stone: '<path d="M4 15l3-8 8-2 5 5-2 7-9 2z"/><path d="M7 7l5 4 7-1M12 11l-3 8"/>',
   goods: '<rect x="4" y="8" width="16" height="12" rx="1"/><path d="M4 12h16M12 8v12M7 8l2-4h6l2 4"/>',
   // ---- map resources (data/resources.json `icon`) ----
-  game: '<path d="M12 21v-7l-4-3V5M12 14l4-3V5M8 7h2M14 7h2M8 5H6M16 5h2"/><circle cx="12" cy="9.5" r="2.2"/>',
-  iron: '<path d="M5 19l9-9"/><path d="M11 7c2.5-2.5 6.5-3 9-1-2 2.5-2.5 6.5-1 9"/><path d="M14 10l3-3"/>',
-  fish: '<path d="M3 12c3-4 7-6 11-6 2.5 0 4.5 1 6 3-1.5 2-3.5 3-6 3-4 0-8-2-11-6z"/><path d="M3 12c3 4 7 6 11 6M17 9l4-3v12l-4-3"/><circle cx="7" cy="11" r=".8"/>',
+  game: '<path d="M9 11c0-1.5 1.3-2.5 3-2.5s3 1 3 2.5v5c0 2-1.3 3.5-3 3.5S9 18 9 16z"/><path d="M10.5 14h.5M13 14h.5"/><path d="M10 10L7 6M7 6L5 5M7 6L6 3M7 6l2-2"/><path d="M14 10l3-4M17 6l2-1M17 6l1-3M17 6l-2-2"/>',
+  iron: '<path d="M3 16l3-7h12l3 7z"/><path d="M3 16h18M8 12.5h3"/>',
+  fish: '<path d="M3 12c2.5-4 6-6 10-6s6 3 7 6c-1 3-3 6-7 6S5.5 16 3 12z"/><path d="M17 12l5-4-1.5 4 1.5 4z"/><circle cx="8" cy="10.5" r="1"/>',
   furs: '<path d="M7 4l2 2h6l2-2 2 3-2 3v5l2 3-2 3-2-2H9l-2 2-2-3 2-3V10L5 7z"/><path d="M12 8v8"/>',
   salt: '<path d="M4 18c2-6 5-9 8-9s6 3 8 9z"/><path d="M4 18h16"/><path d="M10 13.5h.01M14 14.5h.01M12 11h.01"/>',
   wine: '<circle cx="9" cy="12" r="2.2"/><circle cx="15" cy="12" r="2.2"/><circle cx="12" cy="16" r="2.2"/><circle cx="12" cy="9" r="2.2"/><path d="M12 7V3M12 3c2 0 3.5 1 4 2.5"/>',
-  silver: '<path d="M3 16l3-7h12l3 7z"/><path d="M3 16h18M8 12.5h3"/>',
+  silver: '<circle cx="12" cy="12" r="8.5"/><path d="M12 6.8l1.29 3.42 3.66.18-2.86 2.28 1 3.52L12 14.2l-3.06 2 .97-3.52-2.86-2.28 3.66-.18z"/>',
   // ---- settlements (on a faction-colour disc) ----
   village: '<path d="M5 12l7-6 7 6v8H5z"/><path d="M10 20v-5h4v5"/>',
   town: '<path d="M3 20v-7l4-3 4 3v7M11 20V9l3-5 3 5v11M17 20v-6l4-3v9M3 20h18"/><path d="M6 15v2M14 11v2"/>',
@@ -96,8 +96,9 @@ export interface IconStyle {
   size?: number;
 }
 
-/** The two map styles (UI-DESIGN.md §4): a parchment badge with an ink icon; a bare parchment-coloured icon for faction discs. */
-export const MAP_BADGE: IconStyle = { stroke: '#2b1d12', strokeWidth: 1.9, badge: { fill: '#f1e7cf', border: '#2b1d12' } };
+/** The map styles (UI-DESIGN.md §4): a parchment badge with an ink icon for a resource that is worked ("tapped"); a greyed badge for one nobody works yet; a bare parchment-coloured icon for faction discs. */
+export const MAP_BADGE: IconStyle = { stroke: '#2b1d12', strokeWidth: 1.9, badge: { fill: '#f5e7c2', border: '#2b1d12' } };
+export const MAP_BADGE_IDLE: IconStyle = { stroke: '#6b5f4e', strokeWidth: 1.9, badge: { fill: '#d9d2c3', border: '#6b5f4e' } };
 export const MAP_MARK: IconStyle = { stroke: '#f6eed8', strokeWidth: 2.1 };
 
 const styleKey = (id: string, st: IconStyle) => `${id}|${st.stroke}|${st.strokeWidth ?? 1.6}|${st.badge ? st.badge.fill + st.badge.border : ''}|${st.size ?? 64}`;

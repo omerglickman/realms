@@ -8,7 +8,7 @@ import { Container, Graphics, Rectangle } from 'pixi.js';
 import type { MapData } from '../../sim/map';
 import { TERRAIN, colorToNumber } from '../../sim/terrain';
 import { RESOURCES, type Glyph } from '../../sim/resources';
-import { iconTexture, MAP_BADGE } from '../icons';
+import { iconTexture, MAP_BADGE, MAP_BADGE_IDLE } from '../icons';
 import { showResources as resourcesAtZoom } from '../zoomLevels';
 import { Sprite } from 'pixi.js';
 import { offsetToPixel, hexCorners, hexWidth, hexRowStep } from '../../sim/hex';
@@ -60,6 +60,8 @@ export class MapRenderer {
   private showResources = true;
   private resZoomOk = true;
   private resourceColors: number[];
+  /** hexes worked by a settlement: their resource badges draw in the 'tapped' style (Session 13c) */
+  private worked = new Set<number>();
   /** milliseconds spent building chunks during the last cull() call */
   lastBuildMs = 0;
 
@@ -115,6 +117,16 @@ export class MapRenderer {
 
   get gridVisible(): boolean {
     return this.showGrid;
+  }
+
+  /** Tell the renderer which hexes are worked; chunks whose resource hexes changed state are rebuilt. */
+  setWorkedCells(cells: Set<number>): void {
+    const w = this.map.width;
+    const changed = new Set<number>();
+    for (const i of cells) if (!this.worked.has(i)) changed.add(i);
+    for (const i of this.worked) if (!cells.has(i)) changed.add(i);
+    this.worked = cells;
+    for (const i of changed) if (this.map.resource[i] >= 0) this.invalidateHex(i % w, Math.floor(i / w));
   }
 
   /** Mark a chunk dirty (after terrain edits) so it is rebuilt on next cull. */
@@ -203,7 +215,7 @@ export class MapRenderer {
         const p = offsetToPixel(col, row, HEX_SIZE);
         const def = RESOURCES[r];
         if (def.icon) {
-          const sp = new Sprite(iconTexture(def.icon, MAP_BADGE));
+          const sp = new Sprite(iconTexture(def.icon, this.worked.has(row * map.width + col) ? MAP_BADGE : MAP_BADGE_IDLE));
           sp.anchor.set(0.5);
           sp.width = diameter; sp.height = diameter;
           sp.position.set(p.x, p.y);

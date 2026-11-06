@@ -30,7 +30,7 @@ import testmapJson from '../../maps/testmap.json';
 import startJson from '../../scenarios/start.json';
 import { loadScenarioFile } from '../sim/scenario';
 import { esc } from './panels/format';
-import { preloadIconTextures, MAP_BADGE, MAP_MARK } from './icons';
+import { preloadIconTextures, MAP_BADGE, MAP_BADGE_IDLE, MAP_MARK } from './icons';
 import { installTooltips, hideTooltip } from './panels/tooltip';
 import { RESOURCES } from '../sim/resources';
 
@@ -132,6 +132,7 @@ export async function startApp(): Promise<void> {
 
   // the map's icon textures (resources, things on hexes, tier marks) — rasterised once from the shared icon set
   await preloadIconTextures([...RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), 'mill', 'wharf', 'castle1', 'castle2', 'castle3', 'station'], MAP_BADGE);
+  await preloadIconTextures(RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), MAP_BADGE_IDLE);
   await preloadIconTextures(SL.TIER_ICON, MAP_MARK);
 
   const renderer = new MapRenderer(state.map);
@@ -232,6 +233,7 @@ export async function startApp(): Promise<void> {
     if (selectedId && !state.settlements[selectedId]) selectedId = null;
     if (hoverId && !state.settlements[hoverId]) hoverId = null;
     workAssign = computeWorkAssignment(state);
+    renderer.setWorkedCells(new Set(workAssign.keys()));
     updateMapInfo();
     refreshLayer();
     renderHud(tiles, state, { onRealm: (tab) => openView('realm', '', tab) });

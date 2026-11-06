@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — UI Design
 
-**Version 1.1 — 2026-11-06 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13 and 13b. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
+**Version 1.2 — 2026-11-06 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13 and 13b. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
 
 Omer's brief (2026-11-05): the bottom lines (funds, people, resources) always visible in a clear place that hides little of the map; everything else in hover summaries or modals that present resources, buildings, economic activity and demographics in an orderly, friendly way, with graphics; headers in a hand resembling Carolingian minuscule; a medieval palette. Design left to Claude; Omer amends.
 
@@ -55,7 +55,7 @@ One set, `src/ui/icons.ts`: original line glyphs on a 24 × 24 grid, 1.6-px roun
 | Group | Ids | Where |
 |---|---|---|
 | Bottom lines | `coin` `people` `wheat` `timber` `stone` `goods` | the strip, stat tiles, cost chips |
-| Map resources | `game` `stone` `iron` `fish` `furs` `salt` `wine` `silver` — the `icon` field of `data/resources.json` | on the hex as a **badge** (ink icon on a parchment disc with an ink border, ⌀ 0.92 hex), in the hex readout, in ledgers. The old coloured glyph is the fallback for a resource without an icon. |
+| Map resources | `game` (an antlered head) `stone` `iron` (an ingot) `fish` `furs` `salt` `wine` `silver` (a star in a circle) — the `icon` field of `data/resources.json` | on the hex as a **badge** (⌀ 0.92 hex): a resource that a settlement works ("tapped") is an ink icon on warm parchment `#f5e7c2` with an ink border; one nobody works yet is greyed — `#6b5f4e` lines on `#d9d2c3` (`MAP_BADGE` / `MAP_BADGE_IDLE`; the renderer is told the worked hexes and redraws the chunks that change). Same icons in the hex readout and the ledgers. The old coloured glyph is the fallback for a resource without an icon. |
 | Settlement tiers | `village` (hut) `town` (houses + church) `city` (walls and towers) `metropolis` (towers around a spire) | the map **marker**: a disc in the faction colour (radius by tier: 0.42 / 0.60 / 0.78 / 0.95 hex, never under 5 screen px) with the icon in parchment on it (⌀ 1.6 × radius); hover ring white 70 %, selection ring white |
 | Built on hexes | `mill` (house with a wheel) `wharf` (pier and boat) — and, for later, `castle1` `castle2` `castle3` (tower / tower with wall / keep), `station` (road station) | badge style, ⌀ 0.8 hex, offset to the upper right of the hex centre so a resource badge stays readable. A Mill is drawn on the settlement's worked **river** hex, a Wharf on its worked fishing hex (shore or lake first). Castles and stations are defined now and used when the entities exist. |
 | Buildings | `granary` `chapel` `market` `workshop` `warehouse` `range` `stables` `drill` `walls` `barracks` `ironworks` `citadel` plus the tier icons for halls — the `icon` field of `data/buildings.json` | the building cubes |
@@ -121,5 +121,6 @@ Other map marks (unchanged from Sessions 7–10): influence zones as a light fac
 
 ## Change log
 
+- 1.2 (2026-11-06, Session 13c): iron is the ingot, silver a star in a circle, a simpler fish and an antlered head for game (Omer); map resource badges distinguish tapped from untapped.
 - 1.1 (2026-11-06, Session 13b): §4 the icon set extended to every resource, the tiers, mill / wharf on hexes, future castles and stations, the buildings; map resources as badges, tier icons on faction discs; §5 the stockpile tile, the responsive strip, the shared tooltip, the building cubes; §6 the four zoom levels; §3 both hands kept.
 - 1.0 (2026-11-05, Session 13): first version — the Session 13 overhaul as built.
