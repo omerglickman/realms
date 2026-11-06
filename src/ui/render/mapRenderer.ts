@@ -15,11 +15,32 @@ import { offsetToAxial, axialToOffset, AXIAL_DIRECTIONS } from '../../sim/hex';
 import { Sprite } from 'pixi.js';
 import { offsetToPixel, hexCorners, hexWidth, hexRowStep } from '../../sim/hex';
 
-/** Shoreline look (UI-DESIGN.md §6): the band's depth into the water hex as a fraction of the centre distance, the lighter line's depth, and the two sand colours. */
-const SHORE_BAND = 0.26;
-const SHORE_LINE = 0.09;
-const SHORE_SAND = 0xd9c48c;
-const SHORE_FOAM = 0xefe2b6;
+/** Shoreline look (UI-DESIGN.md §6; IMPERIUM's values): depth of the whole fringe into the water hex as a
+ *  fraction of the hex radius, the dark tide band's width within it, the meander amplitude, the two colours. */
+const SHORE_SAND = 0.30;
+const SHORE_BAND = 0.12;
+const SHORE_AMP = 0.05;
+const SHORE_SAND_COLOR = 0xd9b16a;
+const SHORE_TIDE = 0xb8894a;
+
+/** Which axial direction each hex edge faces (edge i runs from corner i to corner i+1 of `hexCorners`),
+ *  derived from the geometry itself so no convention is assumed. */
+const EDGE_DIR: number[] = (() => {
+  const c = hexCorners(0, 0, 1);
+  const here = offsetToPixel(2, 2, 1);
+  const a = offsetToAxial(2, 2);
+  return Array.from({ length: 6 }, (_, i) => {
+    const mx = (c[2 * i] + c[(2 * i + 2) % 12]) / 2, my = (c[2 * i + 1] + c[(2 * i + 3) % 12]) / 2;
+    let best = 0, bestDot = -Infinity;
+    AXIAL_DIRECTIONS.forEach((d, k) => {
+      const o = axialToOffset(a.q + d.q, a.r + d.r);
+      const np = offsetToPixel(o.col, o.row, 1);
+      const dot = (np.x - here.x) * mx + (np.y - here.y) * my;
+      if (dot > bestDot) { bestDot = dot; best = k; }
+    });
+    return best;
+  });
+})();
 
 export const HEX_SIZE = 12; // world units (pixels at zoom 1), centre to corner
 export const CHUNK = 32; // hexes per chunk side
@@ -220,40 +241,66 @@ export class MapRenderer {
       }
     }
     grid.stroke({ width: 0.5, color: 0x000000, alpha: 0.18 });
-    // shoreline (Session 13d, Omer): on every water hex, a sand band along each edge that touches land —
-    // a wide pale band inset into the water plus a thinner, lighter line right at the edge
+    // shoreline (Session 13d; ported from IMPERIUM's collectShoreFringe, Omer 2026-11-06): on every
+    // water hex, each edge facing land gets a light sand band from the edge inward (depth SHORE_SAND − SHORE_BAND)
+    // over a darker tide band (depth SHORE_SAND) whose sea-side boundary meanders — a seeded sine, zero at
+    // the vertices so neighbouring hexes agree — plus bridge wedges at each vertex toward the adjacent
+    // edges, so coves close and no blue crack opens at a corner. Dark first, light on top.
     const SEA = terrainIndex('sea'), LAKE = terrainIndex('lake');
     const isWater = (t: number) => t === SEA || t === LAKE;
-    const bands: number[][] = [];
-    const lines: number[][] = [];
+    const light: number[][] = [];
+    const dark: number[][] = [];
+    const S = HEX_SIZE + 0.35;
+    const D = SHORE_SAND * S, Wd = SHORE_BAND * S, Dl = Math.max(0, D - Wd), amp = SHORE_AMP * S;
+    const K = 6;
     for (let row = r0; row < r1; row++) {
       for (let col = c0; col < c1; col++) {
         const t = map.terrain[row * map.width + col];
         if (!isWater(t)) continue;
         const a = offsetToAxial(col, row);
         const p = offsetToPixel(col, row, HEX_SIZE);
-        const corners = hexCorners(p.x, p.y, HEX_SIZE + 0.35);
+        const corners = hexCorners(p.x, p.y, S);
+        const facing = [false, false, false, false, false, false];
         for (let i = 0; i < 6; i++) {
-          // edge i (corner i → corner i+1) faces the neighbour in AXIAL_DIRECTIONS[i]
-          const d = AXIAL_DIRECTIONS[i];
+          const d = AXIAL_DIRECTIONS[EDGE_DIR[i]];
           const o = axialToOffset(a.q + d.q, a.r + d.r);
           if (o.col < 0 || o.row < 0 || o.col >= map.width || o.row >= map.height) continue;
-          if (isWater(map.terrain[o.row * map.width + o.col])) continue;
-          const x0 = corners[2 * i], y0 = corners[2 * i + 1];
-          const x1 = corners[(2 * i + 2) % 12], y1 = corners[(2 * i + 3) % 12];
-          const inset = (x: number, y: number, k: number) => [x + (p.x - x) * k, y + (p.y - y) * k];
-          const [bx0, by0] = inset(x0, y0, SHORE_BAND), [bx1, by1] = inset(x1, y1, SHORE_BAND);
-          bands.push([x0, y0, x1, y1, bx1, by1, bx0, by0]);
-          const [lx0, ly0] = inset(x0, y0, SHORE_LINE), [lx1, ly1] = inset(x1, y1, SHORE_LINE);
-          lines.push([x0, y0, x1, y1, lx1, ly1, lx0, ly0]);
+          facing[i] = !isWater(map.terrain[o.row * map.width + o.col]);
+        }
+        if (!facing.some(Boolean)) continue;
+        const cn = (i: number): [number, number] => [corners[(i % 6) * 2], corners[(i % 6) * 2 + 1]];
+        const unit = (fx: number, fy: number, tx: number, ty: number): [number, number] => { const dx = tx - fx, dy = ty - fy, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
+        for (let i = 0; i < 6; i++) {
+          if (!facing[i]) continue;
+          const [ax, ay] = cn(i), [bx, by] = cn(i + 1);
+          const mx = (ax + bx) / 2, my = (ay + by) / 2;
+          let nx = p.x - mx, ny = p.y - my; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+          // the dark tide band: edge → meandered depth D
+          const seed = ((col * 73856093) ^ (row * 19349663) ^ (i * 83492791)) >>> 0, phase = (seed % 628) / 100;
+          const darkPoly: number[] = [ax, ay, bx, by];
+          for (let k = K; k >= 0; k--) {
+            const tt = k / K, px = ax + (bx - ax) * tt, py = ay + (by - ay) * tt;
+            const off = D + amp * Math.sin(Math.PI * tt) * Math.sin(Math.PI * 2 * 1.25 * tt + phase);
+            darkPoly.push(px + nx * off, py + ny * off);
+          }
+          dark.push(darkPoly);
+          light.push([ax, ay, bx, by, bx + nx * Dl, by + ny * Dl, ax + nx * Dl, ay + ny * Dl]);
+          // bridges to the adjacent edges at the same depth (a point the neighbour computes identically)
+          const [pax, pay] = cn(i + 5), [qcx, qcy] = cn(i + 2);
+          const [tax, tay] = unit(ax, ay, pax, pay);
+          const [tbx, tby] = unit(bx, by, qcx, qcy);
+          dark.push([ax, ay, ax + nx * D, ay + ny * D, ax + tax * D, ay + tay * D]);
+          dark.push([bx, by, bx + nx * D, by + ny * D, bx + tbx * D, by + tby * D]);
+          light.push([ax, ay, ax + nx * Dl, ay + ny * Dl, ax + tax * Dl, ay + tay * Dl]);
+          light.push([bx, by, bx + nx * Dl, by + ny * Dl, bx + tbx * Dl, by + tby * Dl]);
         }
       }
     }
-    if (bands.length) {
-      for (const b of bands) shore.poly(b);
-      shore.fill({ color: SHORE_SAND, alpha: 0.95 });
-      for (const l of lines) shore.poly(l);
-      shore.fill({ color: SHORE_FOAM, alpha: 0.9 });
+    if (dark.length) {
+      for (const d of dark) shore.poly(d);
+      shore.fill(SHORE_TIDE);
+      for (const l of light) shore.poly(l);
+      shore.fill(SHORE_SAND_COLOR);
     }
 
     // resources: one badge sprite per hex — the resource's icon in ink on a parchment disc (Session 13b);

@@ -109,7 +109,7 @@ Camera zoom 1 ≈ one hex 42 px wide; the start position fits a 1500-px window a
 
 The hex grid hides below 0.5. Thresholds are starting values; tune them in `ZOOM_LEVELS`.
 
-**Shoreline (Omer, Session 13d):** on every sea or lake hex, each edge that touches land carries a sand band inset into the water hex — `SHORE_SAND` `#d9c48c` to 26 % of the way to the hex centre, with a lighter line `SHORE_FOAM` `#efe2b6` to 9 % at the edge (constants at the top of `mapRenderer.ts`). Rivers are land, so they get no strip; lakes do. Drawn per chunk between the terrain fill and the grid; editing a hex redraws its neighbours' chunks too.
+**Shoreline (Omer, Session 13d; IMPERIUM's construction, ported from its `collectShoreFringe`):** on every sea or lake hex, each edge that faces land carries a fringe drawn inside the water hex: a **light sand band** `#d9b16a` from the edge inward to 18 % of the hex radius, over a **darker tide band** `#b8894a` reaching 30 %, whose sea-side boundary **meanders** (a seeded sine, amplitude 5 %, zero at the vertices so neighbouring hexes agree). At each vertex a small bridge wedge runs to the adjacent edge at the same depth, so coves close and no blue crack opens at a corner. Rivers are land, so they get no fringe; lakes do. Constants `SHORE_SAND` / `SHORE_BAND` / `SHORE_AMP` and the two colours at the top of `mapRenderer.ts`; the edge → neighbour mapping (`EDGE_DIR`) is derived from the hex geometry, never assumed. Drawn per chunk between the terrain fill and the grid; editing a hex redraws its neighbours' chunks too.
 
 Other map marks (unchanged from Sessions 7–10): influence zones as a light faction fill with a solid border; cluster outlines inset and lighter; the hovered / selected settlement's worked hexes outlined white with its influence edge dotted; in settle mode every worked hex hatched.
 
@@ -123,7 +123,7 @@ Other map marks (unchanged from Sessions 7–10): influence zones as a light fac
 
 ## Change log
 
-- 1.3 (2026-11-06, Session 13d): §6 shoreline bands on water hexes that touch land.
+- 1.3 (2026-11-06, Session 13d): §6 the shoreline fringe on water hexes that touch land (IMPERIUM's two-tone meandering construction).
 - 1.2 (2026-11-06, Session 13c): iron is the ingot, silver a star in a circle, a simpler fish and an antlered head for game (Omer); map resource badges distinguish tapped from untapped.
 - 1.1 (2026-11-06, Session 13b): §4 the icon set extended to every resource, the tiers, mill / wharf on hexes, future castles and stations, the buildings; map resources as badges, tier icons on faction discs; §5 the stockpile tile, the responsive strip, the shared tooltip, the building cubes; §6 the four zoom levels; §3 both hands kept.
 - 1.0 (2026-11-05, Session 13): first version — the Session 13 overhaul as built.
