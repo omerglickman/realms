@@ -36,7 +36,7 @@ npx tsx src/headless/inspect.ts scenarios/start.json     # list a scenario's set
 1. Tests and build green (or say so loudly in the DEVLOG entry).
 2. Commit with a `phase1: …` style message and push `main` (fetch first; the clone is shallow).
 3. DEVLOG.md: **overwrite** the Current state block (keep it under ~6 KB — present tense, by feature, no session history inside it) and **append** a session entry (template in DEVLOG.md). Update ARCHITECTURE.md in place if a module's job changed. Record any decision Omer made in DESIGN.md the same session (DECIDED + date); keep findings and implementation chatter out of DESIGN.md — they go in the DEVLOG entry.
-4. Mirror DEVLOG.md / DESIGN.md / ROADMAP.md (and UI-DESIGN.md when it changed) to the Project (`project_write` with `local_path`; the tool needs the file read in full first — so keep them small). Every fifth session, or when DEVLOG.md passes ~45 KB, move all but the last three entries to DEVLOG-archive.md.
+4. Mirror DEVLOG.md / DESIGN.md / ROADMAP.md (and UI-DESIGN.md when it changed) to the Project (`project_write` with `local_path`; the tool needs the file read in full first — so keep them small). Every fifth session, or when DEVLOG.md passes ~45 KB, move all but the last three entries to the current archive volume (DEVLOG-archive-N.md; a new volume when it would pass ~45 KB).
 5. Deliver `realms.html` to Omer (SendUserFile) with a short summary: what changed, findings, what needs his decision.
 
 ## Git

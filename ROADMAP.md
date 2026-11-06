@@ -21,11 +21,11 @@ This document says *how* we build the game described in DESIGN.md, in what order
 | **ROADMAP.md** | Project + repo | How we build it, phases, tech, conventions, working agreement | Claude updates phase status; structural changes need Omer's OK |
 | **UI-DESIGN.md** | Project + repo | What the game looks like: palette, type, icon set, components, zoom levels (Omer's suggestion, Session 13b) — read when a session touches `src/ui/` | Claude amends it with a dated change-log entry whenever a UI decision is made |
 | **DEVLOG.md** | Project + repo | A **Current state** block (overwritten each session; under ~6 KB; present tense, by feature, no session history) + one entry per session with the detail, the findings and the measurements | Claude, every session, no exceptions |
-| **DEVLOG-archive.md** | Project + repo | Older session entries | Moved in batches (below) |
+| **DEVLOG-archive.md**, **-2.md**, … | Project + repo | Older session entries, in volumes of under ~45 KB each (a new volume when the last one is full) | Moved in batches (below) |
 | **CLAUDE.md** | repo | The session protocol in short, the commands, the close checklist | Claude, with Omer's OK for protocol changes |
 | **ARCHITECTURE.md** | repo | Module map, turn order, data files, state versions — updated **in place**, never by session | Claude, whenever a module's job changes |
 
-**Archive rule (Omer, 2026-11-05):** every fifth session (15, 20, 25…), and sooner if DEVLOG.md passes ~45 KB, the closing step moves every entry except the last three sessions into DEVLOG-archive.md, unedited and in order. The Current state block is always complete on its own.
+**Archive rule (Omer, 2026-11-05):** every fifth session (15, 20, 25…), and sooner if DEVLOG.md passes ~45 KB, the closing step moves every entry except the last three sessions into the current archive volume (DEVLOG-archive-N.md), unedited and in order; a volume that would pass ~45 KB is closed and a new one started, so every doc can still be read and mirrored whole. The Current state block is always complete on its own.
 
 **Why the split (Session 12b):** mirroring a doc to the Project requires reading it in full, so every kilobyte in the three Project docs is read at least twice a session. The Project docs therefore stay small and are read selectively (A.3); the repo docs carry the detail a session needs only when it touches a module.
 
@@ -244,7 +244,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
-- 0.5b (2026-11-06, Session 13b): UI-DESIGN.md added to the document table (A.2).
+- 0.5b (2026-11-06, Session 13b): UI-DESIGN.md added to the document table (A.2); archive split into volumes under ~45 KB.
 - 0.5a (2026-11-05, Session 13): the UI overhaul noted in the Phase 1 checklist.
 - 0.5 (2026-11-05, Session 12b): working agreement revised for shorter sessions — CLAUDE.md and ARCHITECTURE.md in the repo, Project docs kept small and read selectively, `npm run smoke`, one feature cluster per session (A.2, A.3, B.2, B.4).
 - 0.4j (2026-11-05): Session 12 — private economy, money, caps, pull on prosperity done; Phase 1 checklist updated.

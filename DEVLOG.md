@@ -23,7 +23,7 @@ Every chat session appends an entry here at the end, **even if the work is unfin
   1. **Omer's feedback on the Session 13/13b UI** — what reads well, what is missing, Lugrasimo vs Uncial Antiqua (Settings), whether the modals should instead be side panels, the zoom thresholds; small UI fixes as he asks.
   2. Then tuning against the headless curves and the **Phase 1 acceptance review** (a faction with a city and villages survives and grows over 20 years; a lone city starves; Omer can read why from the ledgers).
   3. **Government & Institutions design session** (DESIGN §4.3) — a future session, not next: administration quality, the tax regime policy (the tithe becomes a policy), the Town Charter, the realm cap, `data/institutions.json`.
-  4. Housekeeping: every fifth session (15, 20…) or when this file passes ~45 KB, move all but the last three entries to DEVLOG-archive.md.
+  4. Housekeeping: every fifth session (15, 20…) or when this file passes ~45 KB, move all but the last three entries to the current archive volume (DEVLOG-archive-2.md; a new volume when it would pass ~45 KB).
 - **Open questions for Omer:** DESIGN §5.2 — the draft terrain yield rows (he asked what the question means; see Session 12c); culture groups and naming (later).
 
 ---
@@ -52,7 +52,7 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 ## Archive
 
-Sessions 0–12b (planning, Phase 0, the headless Phase 1 model, the ×3 scale, the faction decisions, settlements on the map, the UI pass, the starting position and the realism knobs, the cluster/tithe decisions, clusters and the tithe, the granary brake, buildings and materials, the private economy, the reorganization) live in **DEVLOG-archive.md**. Entries are moved there in batches when this file grows past ~45 KB; the Current state block above is always complete on its own. The per-module inventories that used to live in the Current state block ("What works (Session N)") were folded into the repo's **ARCHITECTURE.md** on 2026-11-05 (Session 12b); the session entries below keep the detail.
+Sessions 0–12b (planning, Phase 0, the headless Phase 1 model, the ×3 scale, the faction decisions, settlements on the map, the UI pass, the starting position and the realism knobs, the cluster/tithe decisions, clusters and the tithe, the granary brake, buildings and materials, the private economy, the reorganization) live in **DEVLOG-archive.md** (Sessions 0–9c) and **DEVLOG-archive-2.md** (Sessions 10–12b). Entries are moved there in batches when this file grows past ~45 KB, into volumes of under ~45 KB each; the Current state block above is always complete on its own. The per-module inventories that used to live in the Current state block ("What works (Session N)") were folded into the repo's **ARCHITECTURE.md** on 2026-11-05 (Session 12b); the session entries below keep the detail.
 
 ---
 
