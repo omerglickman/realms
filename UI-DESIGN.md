@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — UI Design
 
-**Version 1.2 — 2026-11-06 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13 and 13b. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
+**Version 1.3 — 2026-11-06 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13 and 13b. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
 
 Omer's brief (2026-11-05): the bottom lines (funds, people, resources) always visible in a clear place that hides little of the map; everything else in hover summaries or modals that present resources, buildings, economic activity and demographics in an orderly, friendly way, with graphics; headers in a hand resembling Carolingian minuscule; a medieval palette. Design left to Claude; Omer amends.
 
@@ -109,6 +109,8 @@ Camera zoom 1 ≈ one hex 42 px wide; the start position fits a 1500-px window a
 
 The hex grid hides below 0.5. Thresholds are starting values; tune them in `ZOOM_LEVELS`.
 
+**Shoreline (Omer, Session 13d):** on every sea or lake hex, each edge that touches land carries a sand band inset into the water hex — `SHORE_SAND` `#d9c48c` to 26 % of the way to the hex centre, with a lighter line `SHORE_FOAM` `#efe2b6` to 9 % at the edge (constants at the top of `mapRenderer.ts`). Rivers are land, so they get no strip; lakes do. Drawn per chunk between the terrain fill and the grid; editing a hex redraws its neighbours' chunks too.
+
 Other map marks (unchanged from Sessions 7–10): influence zones as a light faction fill with a solid border; cluster outlines inset and lighter; the hovered / selected settlement's worked hexes outlined white with its influence edge dotted; in settle mode every worked hex hatched.
 
 ## 7. Open UI questions
@@ -121,6 +123,7 @@ Other map marks (unchanged from Sessions 7–10): influence zones as a light fac
 
 ## Change log
 
+- 1.3 (2026-11-06, Session 13d): §6 shoreline bands on water hexes that touch land.
 - 1.2 (2026-11-06, Session 13c): iron is the ingot, silver a star in a circle, a simpler fish and an antlered head for game (Omer); map resource badges distinguish tapped from untapped.
 - 1.1 (2026-11-06, Session 13b): §4 the icon set extended to every resource, the tiers, mill / wharf on hexes, future castles and stations, the buildings; map resources as badges, tier icons on faction discs; §5 the stockpile tile, the responsive strip, the shared tooltip, the building cubes; §6 the four zoom levels; §3 both hands kept.
 - 1.0 (2026-11-05, Session 13): first version — the Session 13 overhaul as built.

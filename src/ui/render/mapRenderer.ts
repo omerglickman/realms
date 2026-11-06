@@ -10,8 +10,16 @@ import { TERRAIN, colorToNumber } from '../../sim/terrain';
 import { RESOURCES, type Glyph } from '../../sim/resources';
 import { iconTexture, MAP_BADGE, MAP_BADGE_IDLE } from '../icons';
 import { showResources as resourcesAtZoom } from '../zoomLevels';
+import { terrainIndex } from '../../sim/terrain';
+import { offsetToAxial, axialToOffset, AXIAL_DIRECTIONS } from '../../sim/hex';
 import { Sprite } from 'pixi.js';
 import { offsetToPixel, hexCorners, hexWidth, hexRowStep } from '../../sim/hex';
+
+/** Shoreline look (UI-DESIGN.md §6): the band's depth into the water hex as a fraction of the centre distance, the lighter line's depth, and the two sand colours. */
+const SHORE_BAND = 0.26;
+const SHORE_LINE = 0.09;
+const SHORE_SAND = 0xd9c48c;
+const SHORE_FOAM = 0xefe2b6;
 
 export const HEX_SIZE = 12; // world units (pixels at zoom 1), centre to corner
 export const CHUNK = 32; // hexes per chunk side
@@ -22,6 +30,7 @@ interface Chunk {
   container: Container;
   fill: Graphics;
   res: Container;
+  shore: Graphics;
   grid: Graphics;
   built: boolean;
   bounds: Rectangle; // world-space bounds
@@ -133,6 +142,13 @@ export class MapRenderer {
   invalidateHex(col: number, row: number): void {
     const c = this.chunkAt(col, row);
     if (c) c.built = false;
+    // a terrain edit changes the shoreline of the six neighbours, which may sit in another chunk
+    const a = offsetToAxial(col, row);
+    for (const d of AXIAL_DIRECTIONS) {
+      const o = axialToOffset(a.q + d.q, a.r + d.r);
+      const n = this.chunkAt(o.col, o.row);
+      if (n && n !== c) n.built = false;
+    }
   }
 
   invalidateAll(): void {
@@ -158,24 +174,26 @@ export class MapRenderer {
         const container = new Container();
         const fill = new Graphics();
         const res = new Container();
+        const shore = new Graphics();
         const grid = new Graphics();
         grid.visible = this.showGrid && this.gridZoomOk;
         res.visible = this.showResources && this.resZoomOk;
-        container.addChild(fill, grid, res);
+        container.addChild(fill, shore, grid, res);
         container.visible = false;
         this.root.addChild(container);
         const x0 = cx * CHUNK * w - w;
         const y0 = cy * CHUNK * step - HEX_SIZE;
         const bounds = new Rectangle(x0, y0, (CHUNK + 1.5) * w, (CHUNK + 1) * step + HEX_SIZE);
-        this.chunks.push({ cx, cy, container, fill, res, grid, built: false, bounds });
+        this.chunks.push({ cx, cy, container, fill, shore, res, grid, built: false, bounds });
       }
     }
   }
 
   private buildChunk(c: Chunk): void {
-    const { fill, grid, res } = c;
+    const { fill, grid, res, shore } = c;
     fill.clear();
     grid.clear();
+    shore.clear();
     const map = this.map;
     const c0 = c.cx * CHUNK, r0 = c.cy * CHUNK;
     const c1 = Math.min(map.width, c0 + CHUNK), r1 = Math.min(map.height, r0 + CHUNK);
@@ -202,6 +220,42 @@ export class MapRenderer {
       }
     }
     grid.stroke({ width: 0.5, color: 0x000000, alpha: 0.18 });
+    // shoreline (Session 13d, Omer): on every water hex, a sand band along each edge that touches land —
+    // a wide pale band inset into the water plus a thinner, lighter line right at the edge
+    const SEA = terrainIndex('sea'), LAKE = terrainIndex('lake');
+    const isWater = (t: number) => t === SEA || t === LAKE;
+    const bands: number[][] = [];
+    const lines: number[][] = [];
+    for (let row = r0; row < r1; row++) {
+      for (let col = c0; col < c1; col++) {
+        const t = map.terrain[row * map.width + col];
+        if (!isWater(t)) continue;
+        const a = offsetToAxial(col, row);
+        const p = offsetToPixel(col, row, HEX_SIZE);
+        const corners = hexCorners(p.x, p.y, HEX_SIZE + 0.35);
+        for (let i = 0; i < 6; i++) {
+          // edge i (corner i → corner i+1) faces the neighbour in AXIAL_DIRECTIONS[i]
+          const d = AXIAL_DIRECTIONS[i];
+          const o = axialToOffset(a.q + d.q, a.r + d.r);
+          if (o.col < 0 || o.row < 0 || o.col >= map.width || o.row >= map.height) continue;
+          if (isWater(map.terrain[o.row * map.width + o.col])) continue;
+          const x0 = corners[2 * i], y0 = corners[2 * i + 1];
+          const x1 = corners[(2 * i + 2) % 12], y1 = corners[(2 * i + 3) % 12];
+          const inset = (x: number, y: number, k: number) => [x + (p.x - x) * k, y + (p.y - y) * k];
+          const [bx0, by0] = inset(x0, y0, SHORE_BAND), [bx1, by1] = inset(x1, y1, SHORE_BAND);
+          bands.push([x0, y0, x1, y1, bx1, by1, bx0, by0]);
+          const [lx0, ly0] = inset(x0, y0, SHORE_LINE), [lx1, ly1] = inset(x1, y1, SHORE_LINE);
+          lines.push([x0, y0, x1, y1, lx1, ly1, lx0, ly0]);
+        }
+      }
+    }
+    if (bands.length) {
+      for (const b of bands) shore.poly(b);
+      shore.fill({ color: SHORE_SAND, alpha: 0.95 });
+      for (const l of lines) shore.poly(l);
+      shore.fill({ color: SHORE_FOAM, alpha: 0.9 });
+    }
+
     // resources: one badge sprite per hex — the resource's icon in ink on a parchment disc (Session 13b);
     // the data file's glyph/colour remain the fallback for a resource without an icon
     res.removeChildren().forEach((ch) => ch.destroy());
