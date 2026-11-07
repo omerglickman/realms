@@ -5,7 +5,7 @@
 
 import type { GameState } from '../../sim/state';
 import { calendar } from '../../sim/state';
-import { TIERS, growthTrend, childrenOf, workedCellsBySettlement, buildingDef, type Settlement } from '../../sim/settlements';
+import { TIERS, tierIndex, growthTrend, childrenOf, workedCellsBySettlement, buildingDef, type Settlement } from '../../sim/settlements';
 import { totalPopulation, workingHands, recruitableMen, fertileWomen, DEMOGRAPHY, BANDS, granaryBrakeFactor } from '../../sim/demography';
 import { planLabour, granaryTerms, monthsUntilHarvest, forecastBeforeHarvest, monthlyProduction, taxRate, titheShare, type LabourPlan } from '../../sim/economy';
 import { buildableFor, canBuild, moneyCost } from '../../sim/buildings';
@@ -18,6 +18,7 @@ import type { ModalSpec } from './modal';
 import { UNIT_TYPES, unitTypeDef, raiseCheck, defaultSize, defaultProvisionMonths, isForming, unitCell, type Unit } from '../../sim/units';
 import { idx } from '../../sim/map';
 import { unitState } from './unitCard';
+import { canUpgrade, upgradeStep } from '../../sim/upgrades';
 
 export interface SettlementHost {
   onRename(id: string, name: string): void;
@@ -29,6 +30,8 @@ export interface SettlementHost {
   onRaise(id: string, type: string): void;
   onCancelRaise(unitId: string): void;
   onSelectUnit(unitId: string): void;
+  onUpgrade(id: string): void;
+  onCancelUpgrade(id: string): void;
 }
 
 export const SETTLEMENT_TABS = [
@@ -75,7 +78,7 @@ export function settlementSpec(state: GameState, s: Settlement, tab: string, edi
   const foot = editing ? `<span class="dim">Editor:</span> <label>Set people <input id="sp-pop" type="number" min="1" step="100" value="${Math.round(ctx.pop)}" /></label> <button id="sp-pop-apply" class="btn small">Apply</button><span class="spacer"></span><button id="sp-remove" class="btn small danger">Remove settlement</button>` : undefined;
   return {
     title: `<input id="sp-name" type="text" value="${esc(s.name)}" ${editing ? '' : 'readonly'} />`,
-    badge: tierName(s),
+    badge: s.upgrade ? `${tierName(s)} → ${TIERS[s.upgrade.to].name}` : tierName(s),
     stripe: state.factions[s.faction ?? '']?.color ?? '#4a2f1a',
     sub: subBits.join(' · '),
     right: `${cal.monthName}, year ${cal.year}`,
@@ -102,6 +105,8 @@ export function wireSettlement(root: HTMLElement, state: GameState, s: Settlemen
   root.querySelectorAll<HTMLElement>('[data-raise]').forEach((b) => b.addEventListener('click', () => host.onRaise(s.id, b.dataset.raise!)));
   root.querySelectorAll<HTMLButtonElement>('[data-cancel-raise]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); host.onCancelRaise(b.dataset.cancelRaise!); }));
   root.querySelectorAll<HTMLElement>('[data-unit]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); host.onSelectUnit(b.dataset.unit!); }));
+  root.querySelector<HTMLButtonElement>('[data-upgrade]')?.addEventListener('click', () => host.onUpgrade(s.id));
+  root.querySelector<HTMLButtonElement>('[data-cancel-upgrade]')?.addEventListener('click', (e) => { e.stopPropagation(); host.onCancelUpgrade(s.id); });
 }
 
 // ---------------------------------------------------------------- pages
@@ -158,6 +163,35 @@ function projectCard(ctx: Ctx): string {
     <div class="cfoot">${gauge(s.build.progress, { cls: 'mid' })}<button class="btn small" data-cancel-build="1" title="Cancel for a full refund">Cancel</button></div></div>`;
 }
 
+/** The tier-upgrade card (DESIGN §3.2b rule 10, Session 15b): the running rise with Cancel, or the next step with its cost and Start. */
+function upgradeCard(ctx: Ctx): string {
+  const { state, s } = ctx;
+  if (s.faction !== state.playerFaction) return '';
+  if (s.upgrade) {
+    const step = upgradeStep(s.tier);
+    const months = step ? step.months : 12;
+    const left = Math.max(0, Math.ceil((1 - s.upgrade.progress) * months - 1e-9));
+    return `<div class="card project"><div class="ch"><span class="cn">${ICON.arrowUp} Rising to ${esc(TIERS[s.upgrade.to].name.toLowerCase())}</span><span class="cf">upgrade</span></div>
+      <div class="blurb">${Math.round(100 * s.upgrade.progress)} % done, ~${left} month${left === 1 ? '' : 's'} left · the hall grows; at completion the zones, hall and granary are a ${esc(TIERS[s.upgrade.to].name.toLowerCase())}'s.</div>
+      <div class="cfoot">${gauge(s.upgrade.progress, { cls: 'mid' })}<button class="btn small" data-cancel-upgrade="1" title="Cancel for a full refund">Cancel</button></div></div>`;
+  }
+  const check = canUpgrade(state, s);
+  if (!check.step) return '';
+  const step = check.step;
+  const to = TIERS[tierIndex(step.to)];
+  const chips = [
+    `<span class="${check.lackingMoney ? 'short' : ''}" title="coins from the treasury">${ICON.coin} ${fmt(step.money)}</span>`,
+    `<span class="${check.lacking && check.lacking.timber > 0 ? 'short' : ''}" title="timber from the cluster's stockpile">${ICON.timber} ${fmt(step.timber)}</span>`,
+    `<span class="${check.lacking && check.lacking.stone > 0 ? 'short' : ''}" title="stone from the cluster's stockpile">${ICON.stone} ${fmt(step.stone)}</span>`,
+    `<span title="months">${ICON.calendar} ${step.months} mo</span>`,
+    `<span class="${check.shortPeople > 0 ? 'short' : ''}" title="the population gate">${ICON.people} ${fmt(to.popMin)}</span>`,
+  ].join('');
+  return `<div class="card ${check.ok ? 'built' : 'off'}"><div class="ch"><span class="cn">${ICON.arrowUp} Become a ${esc(to.name.toLowerCase())}</span><span class="cf">${step.placeholder ? 'draft — prerequisites not designed yet' : 'upgrade'}</span></div>
+    <div class="cost">${chips}</div>
+    <div class="blurb">A ${esc(to.name.toLowerCase())} works ${to.workRings} ring${to.workRings === 1 ? '' : 's'} and its influence reaches ${to.influenceRings}; its hall and granary grow with it. The gate is ${fmt(to.popMin)} people; the money and materials are paid now and refunded if cancelled.</div>
+    <div class="cfoot">${check.ok ? `<span class="spacer"></span><button class="btn small primary" data-upgrade="1">Begin</button>` : `<span class="why">${esc(check.reason ?? '')}</span>`}</div></div>`;
+}
+
 function overviewPage(ctx: Ctx): string {
   const { state, s, plan, worked } = ctx;
   const children = childrenOf(state, s.id);
@@ -189,6 +223,7 @@ function overviewPage(ctx: Ctx): string {
   return `<div class="stats">${stats}</div>
     ${warnings.length ? `<p class="warn">${warnings.join('<br>')}</p>` : ''}
     ${projectCard(ctx)}
+    ${upgradeCard(ctx)}
     ${kv(rows)}`;
 }
 
@@ -267,26 +302,41 @@ function calendarSvg(ctx: Ctx): string {
 
 function hexRows(ctx: Ctx): string {
   const { state, plan, worked } = ctx;
-  const byCell = new Map<number, string[]>();
+  // per hex: the jobs as chips (worked ones first, unworked greyed) and how much of it is worked at all
+  const byCell = new Map<number, { html: string; worked: number; full: number }[]>();
+  const push = (cell: number, worked: number, full: number, html: string) => {
+    const arr = byCell.get(cell) ?? [];
+    arr.push({ html, worked, full });
+    byCell.set(cell, arr);
+  };
   for (const j of plan.jobs) {
-    const arr = byCell.get(j.cell) ?? [];
-    arr.push(`<span title="${jobName(j.kind)}: ${fmt(j.hands)} hands feed ${fmt(j.fedPerYear)} a year at full labour">${jobIcon(j.kind)} ${fmt(j.fedPerYear * j.fraction)}<span class="dim">/${fmt(j.fedPerYear)}</span></span>`);
-    byCell.set(j.cell, arr);
+    const now = j.fedPerYear * j.fraction;
+    push(j.cell, now, j.fedPerYear, `<span class="job ${now > 0.5 ? '' : 'idle'}" title="${jobName(j.kind)}: ${fmt(j.hands)} hands feed ${fmt(j.fedPerYear)} a year at full labour${now > 0.5 ? '' : ' — nobody works it'}">${jobIcon(j.kind)} ${fmt(now)}<span class="dim">/${fmt(j.fedPerYear)}</span></span>`);
   }
   for (const g of plan.gather) {
-    const arr = byCell.get(g.cell) ?? [];
-    arr.push(`<span title="${jobName(g.kind)}: ${fmt(g.hands)} hands gather ${fmt(g.perYear)} a year">${jobIcon(g.kind)} ${fmt(g.perYear * g.fraction)}<span class="dim">/${fmt(g.perYear)}</span></span>`);
-    byCell.set(g.cell, arr);
+    const now = g.perYear * g.fraction;
+    push(g.cell, now, g.perYear, `<span class="job ${now > 0.5 ? '' : 'idle'}" title="${jobName(g.kind)}: ${fmt(g.hands)} hands gather ${fmt(g.perYear)} a year${now > 0.5 ? '' : ' — nobody gathers it'}">${jobIcon(g.kind)} ${fmt(now)}<span class="dim">/${fmt(g.perYear)}</span></span>`);
   }
   const w = state.map.width;
-  const rows = worked.map((cell) => {
+  const scored = worked.map((cell) => {
+    const jobs = (byCell.get(cell) ?? []).sort((a, b) => b.worked - a.worked || b.full - a.full);
+    const workedSum = jobs.reduce((t, j) => t + j.worked, 0);
+    const anyWorked = jobs.some((j) => j.worked > 0.5);
+    const allWorked = jobs.length > 0 && jobs.every((j) => j.worked > 0.5);
+    return { cell, jobs, workedSum, anyWorked, allWorked };
+  });
+  // worked hexes first (most food first), then partly worked, then the hexes nobody works
+  scored.sort((a, b) => Number(b.anyWorked) - Number(a.anyWorked) || Number(b.allWorked) - Number(a.allWorked) || b.workedSum - a.workedSum || a.cell - b.cell);
+  const rows = scored.map(({ cell, jobs, anyWorked, allWorked }) => {
     const col = cell % w, row = Math.floor(cell / w);
     const t = TERRAIN[getTerrain(state.map, col, row)];
     const res = resourceByIndex(getResource(state.map, col, row));
-    const jobs = byCell.get(cell) ?? [];
-    return `<tr><td><span class="chip" style="background:${t.color}"></span>${esc(t.name)}${res ? ` <span class="dim">· ${esc(res.name)}</span>` : ''}</td><td class="dimrow">${t.fertility ? `fertility ${t.fertility}` : ''}${t.pasture ? ` · pasture ${t.pasture}` : ''}${t.timber ? ` · timber ${t.timber}` : ''}</td><td>${jobs.length ? jobs.join(' &nbsp; ') : '<span class="dim">nothing to work</span>'}</td><td class="dimrow r">(${col}, ${row})</td></tr>`;
+    const mark = !anyWorked ? '<span class="idletag">not worked</span>' : !allWorked ? '<span class="idletag part">partly</span>' : '';
+    return `<tr class="${anyWorked ? '' : 'idlerow'}"><td><span class="chip" style="background:${t.color}"></span>${esc(t.name)}${res ? ` <span class="dim">· ${esc(res.name)}</span>` : ''}</td><td class="dimrow">${t.fertility ? `fertility ${t.fertility}` : ''}${t.pasture ? ` · pasture ${t.pasture}` : ''}${t.timber ? ` · timber ${t.timber}` : ''}</td><td>${jobs.length ? jobs.map((j) => j.html).join(' &nbsp; ') : '<span class="dim">nothing to work</span>'} ${mark}</td><td class="dimrow r">(${col}, ${row})</td></tr>`;
   });
-  return `<table class="data"><tr><th>Hex</th><th>Yields</th><th>Worked · fed or gathered a year (now / full)</th><th class="r">at</th></tr>${rows.join('')}</table>`;
+  const idle = scored.filter((x) => !x.anyWorked).length, part = scored.filter((x) => x.anyWorked && !x.allWorked).length;
+  return `<table class="data hexes"><tr><th>Hex</th><th>Yields</th><th>Worked · fed or gathered a year (now / full)</th><th class="r">at</th></tr>${rows.join('')}</table>
+    <p class="note">Worked hexes first, the best land at the top; a greyed figure is a job nobody works${part ? ` — ${part} hex${part === 1 ? '' : 'es'} partly worked` : ''}${idle ? `, ${idle} not worked at all` : ''}.</p>`;
 }
 
 function landPage(ctx: Ctx): string {

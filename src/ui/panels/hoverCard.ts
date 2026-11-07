@@ -27,6 +27,7 @@ export function renderHoverCard(root: HTMLElement, state: GameState, s: Settleme
     ${row(parent ? 'Under' : 'Parent', parent ? `${esc(parent.name)} <span class="dim">(${tierName(parent)})</span>` : TIERS[s.tier].rank < 2 ? '<span class="dim">none in range</span>' : '<span class="dim">independent</span>')}
     ${c && c.root !== s.id && (parent === null || parent.id !== c.root) ? row('Cluster', esc(state.settlements[c.root].name)) : ''}
     ${s.build ? row('Building', esc(projectText(s)!)) : ''}
+    ${s.upgrade ? row('Rising to', `${esc(TIERS[s.upgrade.to].name.toLowerCase())} <span class="dim">(${Math.round(100 * s.upgrade.progress)} %)</span>`) : ''}
     ${Math.abs(s.harvestFactor - 1) > 0.005 ? row('Harvest', `${Math.round(100 * s.harvestFactor)} % of normal`) : ''}
     ${s.report.epidemic ? '<div class="warnline">⚠ epidemic this year</div>' : ''}
     ${s.report.hungerDeaths > 0.5 ? `<div class="warnline">⚠ ${fmt(s.report.hungerDeaths)} starved last month</div>` : ''}

@@ -67,6 +67,29 @@ export interface BuildProject {
   startedTurn: number;
 }
 
+/** A tier upgrade step (DESIGN §3.2b rule 10; data/settlements.json `upgrades`). */
+export interface UpgradeDef {
+  from: string;
+  to: string;
+  money: number;
+  timber: number;
+  stone: number;
+  months: number;
+  /** the step's prerequisites are not designed yet (city → metropolis) */
+  placeholder?: boolean;
+}
+export const UPGRADES: readonly UpgradeDef[] = ((settlementData as unknown as { upgrades?: { steps: UpgradeDef[] } }).upgrades?.steps) ?? [];
+
+/** A running tier upgrade: the hall grows over the step's months. */
+export interface UpgradeProject {
+  /** tier index being upgraded to */
+  to: number;
+  progress: number;
+  paid: { id: string; amount: Materials }[];
+  paidMoney: number;
+  startedTurn: number;
+}
+
 export function tierIndex(id: string): number {
   const i = TIERS.findIndex((t) => t.id === id);
   if (i < 0) throw new Error(`Unknown settlement tier "${id}"`);
@@ -185,6 +208,8 @@ export interface Settlement {
   stock: Materials;
   /** the building under construction, if any (one project at a time) */
   build: BuildProject | null;
+  /** a running tier upgrade (Session 15b), or null */
+  upgrade: UpgradeProject | null;
   /** explicit parent chosen by the player; null = automatic (DESIGN §3.3) */
   parentOverride: string | null;
   /** resolved parent for this turn (automatic or override); null = none */
@@ -271,6 +296,7 @@ export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
     buildings: [def.hall, def.granary],
     stock: emptyMaterials(),
     build: null,
+    upgrade: null,
     parentOverride: null,
     parent: null,
     yearMonths: 0,

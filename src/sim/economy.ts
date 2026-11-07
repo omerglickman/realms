@@ -28,6 +28,7 @@ import { MATERIALS, MATERIAL_IDS, clusterStock, clusterCap, realmCap, takeFromCl
 import { sumEffects, hasStone, type BuildingEffects } from './buildings';
 import { clustersOf } from './clusters';
 import { emptyFactionYear } from './factions';
+import { upgradeMonth } from './upgrades';
 export { isShore };
 import { DEMOGRAPHY, workingHands, totalPopulation, applyHunger, takeSlice, addPopulation, yearlyUpdate, granaryBrakeFactor } from './demography';
 import { seedRng, nextFloat, nextGaussian, nextU32 } from './rng';
@@ -457,6 +458,8 @@ export function economyMonth(state: GameState, month: number): void {
         logEvent(state, 'built', `${s.name} finished its ${def.name}.`);
       }
     }
+    // a tier upgrade (Session 15b): the hall grows month by month, no builders needed
+    upgradeMonth(state, s);
 
     const g = granaryTerms(plan.granaryStaffing, plan.effects);
     r.spoiled = s.food * g.spoilage;

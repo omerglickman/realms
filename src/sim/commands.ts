@@ -10,7 +10,8 @@ import { logEvent } from './state';
 import type { MapData } from './map';
 import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
-import { makeSettlement, settlementIdAt, buildingDef, type FoundOptions, type Settlement, type BuildProject } from './settlements';
+import { makeSettlement, settlementIdAt, buildingDef, type FoundOptions, type Settlement, type BuildProject, type UpgradeProject } from './settlements';
+import { startUpgrade, revertTier, completeUpgrade } from './upgrades';
 import { totalPopulation, createPopulation, type Population } from './demography';
 import { canBuild, moneyCost } from './buildings';
 import { payFromCluster, refund, addMaterials, MATERIAL_IDS, type Materials } from './materials';
@@ -183,7 +184,43 @@ export interface SendFoodCommand {
   amount: number;
 }
 
+/** Start a tier upgrade (DESIGN §3.2b rule 10, Session 15b): pays at once. Inverse: cancelUpgrade. */
+export interface UpgradeSettlementCommand {
+  type: 'upgradeSettlement';
+  id: string;
+}
+
+/** Cancel a running upgrade with a full refund. Inverse: restoreUpgrade. */
+export interface CancelUpgradeCommand {
+  type: 'cancelUpgrade';
+  id: string;
+}
+
+export interface RestoreUpgradeCommand {
+  type: 'restoreUpgrade';
+  id: string;
+  project: UpgradeProject;
+}
+
+/** Editor / debug: finish a running upgrade now. Inverse: revertUpgrade. */
+export interface FinishUpgradeCommand {
+  type: 'finishUpgrade';
+  id: string;
+}
+
+export interface RevertUpgradeCommand {
+  type: 'revertUpgrade';
+  id: string;
+  fromTier: number;
+  project: UpgradeProject;
+}
+
 export type Command =
+  | UpgradeSettlementCommand
+  | CancelUpgradeCommand
+  | RestoreUpgradeCommand
+  | FinishUpgradeCommand
+  | RevertUpgradeCommand
   | RaiseUnitCommand
   | CancelRaiseCommand
   | OrderUnitCommand
@@ -314,6 +351,48 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       s.build = cmd.project;
       return { type: 'cancelBuilding', id: cmd.id };
     }
+    case 'upgradeSettlement': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      startUpgrade(state, s);
+      return { type: 'cancelUpgrade', id: cmd.id };
+    }
+    case 'cancelUpgrade': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      if (!s.upgrade) throw new Error(`${s.name} is not being upgraded`);
+      const project = s.upgrade;
+      refund(state, project.paid, s.id);
+      payMoney(state, s, -project.paidMoney);
+      s.upgrade = null;
+      return { type: 'restoreUpgrade', id: cmd.id, project };
+    }
+    case 'restoreUpgrade': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      for (const p of cmd.project.paid) {
+        const m = state.settlements[p.id] ?? s;
+        addMaterials(m.stock, p.amount, -1);
+        for (const k of MATERIAL_IDS) if (m.stock[k] < 0) m.stock[k] = 0;
+      }
+      payMoney(state, s, cmd.project.paidMoney);
+      s.upgrade = cmd.project;
+      return { type: 'cancelUpgrade', id: cmd.id };
+    }
+    case 'finishUpgrade': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      if (!s.upgrade) throw new Error(`${s.name} is not being upgraded`);
+      const fromTier = s.tier, project = { ...s.upgrade };
+      completeUpgrade(state, s);
+      return { type: 'revertUpgrade', id: cmd.id, fromTier, project };
+    }
+    case 'revertUpgrade': {
+      const s = state.settlements[cmd.id];
+      if (!s) throw new Error(`No settlement "${cmd.id}"`);
+      revertTier(s, cmd.fromTier, cmd.project);
+      return { type: 'finishUpgrade', id: cmd.id };
+    }
     case 'transferMaterials': {
       const src = stockOf(state, cmd.from), dst = stockOf(state, cmd.to);
       const moved: Partial<Materials> = {};
@@ -440,7 +519,8 @@ export function isNoop(cmd: Command): boolean {
 /** Does this command touch settlements (so zone/marker layers must redraw)? */
 export function commandTouchesSettlements(cmd: Command): boolean {
   return cmd.type === 'foundSettlement' || cmd.type === 'removeSettlement' || cmd.type === 'restoreSettlement' || cmd.type === 'renameSettlement' || cmd.type === 'editSettlement' || cmd.type === 'replaceMap'
-    || cmd.type === 'settleUnit' || cmd.type === 'unsettle' || cmd.type === 'raiseUnit' || cmd.type === 'cancelRaise' || cmd.type === 'disbandUnit' || cmd.type === 'undisband';
+    || cmd.type === 'settleUnit' || cmd.type === 'unsettle' || cmd.type === 'raiseUnit' || cmd.type === 'cancelRaise' || cmd.type === 'disbandUnit' || cmd.type === 'undisband'
+    || cmd.type === 'finishUpgrade' || cmd.type === 'revertUpgrade';
 }
 
 /** Does this command touch units (so the unit layer must redraw)? */

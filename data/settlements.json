@@ -10,6 +10,14 @@
     "_comment": "DECIDED by Omer 2026-11-05: a settlement whose population falls below abandonBelow people is removed at the end of that month; whoever is left walks to the parent (if any). Later an 'abandoned settlement' entity may mark the site for easy resettling. The threshold is a draft (×3 scale): cohorts are real numbers and never reach exactly zero.",
     "abandonBelow": 30
   },
+  "upgrades": {
+    "_comment": "Tier upgrades (DESIGN §3.2b rule 10, DECIDED 2026-11-07; numbers draft). A settlement at or above the next tier's popMin gate may be upgraded by the player: the money leaves the treasury and the materials the cluster's stockpile when ordered, the hall grows over `months`, and at completion the tier, its zones, hall and granary change. The city → metropolis step is a PLACEHOLDER (Session 15b, Omer's request to test new clusters): its real prerequisites (roads, an institution — metropolisUpgrade below) wait for Phase 2 session 2 and §4.3.",
+    "steps": [
+      { "from": "village", "to": "town", "money": 10000, "timber": 300, "stone": 150, "months": 12 },
+      { "from": "town", "to": "city", "money": 40000, "timber": 600, "stone": 600, "months": 24 },
+      { "from": "city", "to": "metropolis", "money": 100000, "timber": 1500, "stone": 1500, "months": 36, "placeholder": true }
+    ]
+  },
   "metropolisUpgrade": {
     "_comment": "PROPOSED (DESIGN §3.3): prerequisites for upgrading a city to a metropolis. Not implemented until roads and institutions exist.",
     "popAtLeast": 36000,

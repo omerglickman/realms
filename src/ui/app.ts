@@ -491,6 +491,8 @@ export async function startApp(): Promise<void> {
         onCancelBuild: (id) => act({ type: 'cancelBuilding', id }),
         onRaise: (id, type) => openRaise(id, type),
         onCancelRaise: (unitId) => cancelRaise(unitId),
+        onUpgrade: (id) => act({ type: 'upgradeSettlement', id }),
+        onCancelUpgrade: (id) => act({ type: 'cancelUpgrade', id }),
         onSelectUnit: (unitId) => { selectUnit(unitId); const u = state.units[unitId]; if (u) { const p = offsetToPixel(u.col, u.row, HEX_SIZE); camera.centerOn(p.x, p.y); refreshLayer(); } },
       }, editor.active);
       wireLinks(root, links);

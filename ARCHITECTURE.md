@@ -26,7 +26,7 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `mapgen.ts` | the noise draft generator (new drafts only — the test map is a file) |
 | `terrain.ts` / `resources.ts` | `TERRAIN` (fertility/pasture/timber 0–4, passability), `RESOURCES` with spawn weights and spacing |
 | `water.ts` | `isShore` (sea touching land), `isFishable` |
-| `settlements.ts` | `Settlement`, `TIERS`, `BUILDINGS` + `buildingDef`, `BuildProject`, `SettlementReport` (last month), `YearTotals` (running year / `lastYear`), work & influence zones, contested-hex assignment (`workedCellsBySettlement`), parent resolution, `settlementsByRank`, `abandonBelow` |
+| `settlements.ts` | `Settlement`, `TIERS`, `BUILDINGS` + `buildingDef`, `BuildProject`, `UPGRADES` + `UpgradeProject` (Session 15b), `SettlementReport` (last month), `YearTotals` (running year / `lastYear`), work & influence zones, contested-hex assignment (`workedCellsBySettlement`), parent resolution, `settlementsByRank`, `abandonBelow` |
 | `demography.ts` | cohort `Population` (sex × 5 bands), `workingHands`, `yearlyUpdate` (births, deaths, aging, crowding, epidemic, Poisson sampling, granary brake `granaryBrakeFactor`), `applyHunger`, `takeSlice`/`addPopulation` |
 | `economy.ts` | labour plan (`planLabour`: buildings → fields with the partial-staffing curve `staffingOutput` (Session 14; `StaffedJob.staffing` vs `fraction`) → construction → gathering; private hands, tax, goods, admin quality), food jobs per hex, `monthlyProduction`, granary terms, `reserveFood`/`forecastBeforeHarvest`, tithe (`titheShare`), `economyMonth`, `abandonEmptySettlements`, `demographyYear` (pull factor), `PRIVATE`/`taxRate` |
 | `materials.ts` | `Materials` {timber, stone, goods}; `clusterStock`, `clusterCap`/`realmCap` (+ `setStockCaps`), `payFromCluster` (own stock first, exact record) / `refund`, `takeFromCluster` (proportional) |
@@ -34,9 +34,10 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `clusters.ts` | derived clusters from parent links: `clustersOf`, `clusterOf`, `clusterRootOf`, `clusterMembers`, `clusterInfluenceCells`, `realmReport` — never stored |
 | `factions.ts` | `Faction` (treasury, stock, yearly ledger `FactionYear`), `initialFactions`, colours |
 | `noise.ts` | the realism knobs read live from data (sampling, epidemic, harvest variance, pull factor): `noise()`, `setNoise`, `NO_NOISE` |
-| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`); units (Session 14): `raiseUnit` ⇄ `cancelRaise`, `orderUnit` (its own inverse; validates the route), `settleUnit` ⇄ `unsettle`, `disbandUnit` ⇄ `undisband` (or a move order home), `sendFood` (same cluster; own inverse; logs an event); `commandTouchesUnits` |
+| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`); units (Session 14): `raiseUnit` ⇄ `cancelRaise`, `orderUnit` (its own inverse; validates the route), `settleUnit` ⇄ `unsettle`, `disbandUnit` ⇄ `undisband` (or a move order home), `sendFood` (same cluster; own inverse; logs an event); `commandTouchesUnits`; tier upgrades (Session 15b): `upgradeSettlement` ⇄ `cancelUpgrade` ⇄ `restoreUpgrade`, `finishUpgrade` ⇄ `revertUpgrade` |
 | `units.ts` | Phase 2 (DESIGN §3.2b): `Unit` (type, faction, hex + river bank, cohorts, provisions, provisionMonths, home, order, report), `UNIT_TYPES` from `data/units.json`; sizes and defaults (`destinationHands`, `defaultSize`, `defaultProvisionMonths`); raising with a muster (`musterSources`, `raiseCheck`, `raiseUnit`, `cancelRaise`, `takeMen`); settling (`canFoundAt`, `canSettle`, `settleUnit`, `villageName`); disbanding (`disbandTarget`, `disbandInto`); the field (`coveringSettlement`, `forage`); `unitsMonth` |
 | `pathfinding.ts` | A* over (hex, bank) nodes: `stepCost` (terrain `moveCost`; mountains = the month's points; lake/sea impassable), `riverBanks` (runs of land between water / map-edge neighbours; exactly two → banks; a settlement bridges — `isBridged`), `stepsFrom`, `findRoute` → `Route {nodes, cost, months}`, `stepsThisMonth` / `walkMonths` (a step needs its full cost, a unit that has not moved yet may always take one) |
+| `upgrades.ts` | tier upgrades (DESIGN §3.2b rule 10, Session 15b): `upgradeStep`, `canUpgrade` (gate, money, cluster materials), `startUpgrade`, `upgradeMonth` (fixed months, no builders; called from `economyMonth`), `completeUpgrade` (tier, hall, granary), `revertTier` |
 | `scenario.ts` | scenario file ↔ `GameState`, `rebaseAsStart` |
 | `turn.ts` | `endTurn`: units, then economy, then December's demography |
 
@@ -58,7 +59,7 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `panels/raiseDialog.ts` | the raise dialog (Session 15): `RaiseDraft`, `newRaiseDraft` / `distribute` (spare hands first, raising settlement first), `draftSpec`; size slider with the destination reckoning, provisions, destination + village name, muster rows, cost chips, Raise gated by `raiseCheck` |
 | `panels/modal.ts` | the modal shell (`ModalShell.show(key, spec, host)`, `wireLinks`) |
 | `panels/tooltip.ts` | the one shared tooltip (`data-tip` + a hidden `.tip` child) |
-| `panels/settlementModal.ts` | the settlement ledger: Overview · People (age pyramid, growth line, crowding / granary brake) · Land & Food (harvest calendar, every worked hex) · Economy (hands stack, tax, stockpile, gathering) · Buildings (cubes: built → project → available → unavailable, tooltips, click to start) · Recruitment (Session 15: unit cubes mustering → available → unavailable, `unitCostChips`, parties here / afield); editor footer (rename / people / remove) |
+| `panels/settlementModal.ts` | the settlement ledger: Overview · People (age pyramid, growth line, crowding / granary brake) · Land & Food (harvest calendar, every worked hex) · Economy (hands stack, tax, stockpile, gathering) · Buildings (cubes: built → project → available → unavailable, tooltips, click to start) · Recruitment (Session 15: unit cubes mustering → available → unavailable, `unitCostChips`, parties here / afield); the upgrade card on Overview and the hex table's worked-first order with idle marks (Session 15b); editor footer (rename / people / remove) |
 | `panels/clusterModal.ts` | the cluster ledger: Overview · Members · Food (+ `sendFoodForm` / `wireSendFood`, Session 15) · Stockpile (+ the Send form helpers `sendForm` / `wireSend`, `stockBars`, `yearFoodText`) |
 | `panels/realmModal.ts` | the realm ledger: Overview · Clusters · People · Food · Treasury · Stockpile |
 | `fonts/` | bundled woff2 fonts (SIL OFL): Lugrasimo, Almendra, Uncial Antiqua (header hands), Alegreya (body) |
@@ -90,7 +91,7 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 |---|---|
 | `economy.json` | `modelScale` 3; farming/herding/fishing/hunting yields and hands; harvest shares + variance; granary; sharing (reserve, `titheShare`); `privateEconomy` (tax and goods per private hand; `salesSharePerYear` 0 — only a Market sells); `materials` (gathering yields, `cap`, `realmCap`) |
 | `demography.json` | bands, rates, crowding, `granaryBrake`, hunger, migration (+ `trickle` = the pull factor), `noise` |
-| `settlements.json` | tiers (rings, gates), abandonment, metropolis prerequisites (proposed) |
+| `settlements.json` | tiers (rings, gates), abandonment, `upgrades.steps` (money, timber, stone, months per step; the metropolis step a placeholder), metropolis prerequisites (proposed) |
 | `buildings.json` | mandatory halls/granaries per tier; buildable buildings (cost incl. money, months, hands, requires, effects, stockCap) |
 | `factions.json` | the player faction (placeholder name/colour) |
 | `units.json` | unit types (settlers enabled; work-band, levy data only), provisions rule, foraging shares, the partial-staffing curve, muster / disband reach, settle rule, naming placeholder |
@@ -98,4 +99,4 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 
 ## Save/state versions
 
-v1 map+clock · v2 settlements · v3 factions, pop history · v4 stocks, projects · v5 faction ledger, `paidMoney` · v6 units. `deserializeState` migrates forward; a test covers it.
+v1 map+clock · v2 settlements · v3 factions, pop history · v4 stocks, projects · v5 faction ledger, `paidMoney` · v6 units · v7 `settlement.upgrade`. `deserializeState` migrates forward; a test covers it.

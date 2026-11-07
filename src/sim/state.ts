@@ -12,7 +12,7 @@ import { emptyMaterials } from './materials';
 import type { Unit } from './units';
 
 /** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). v6: + units (Phase 2, Session 14). */
-export const STATE_VERSION = 6;
+export const STATE_VERSION = 7;
 
 export interface GameState {
   version: number;
@@ -119,6 +119,11 @@ export function deserializeState(json: string): GameState {
     // Session 14 (Phase 2): units on the map
     s.units = {};
     s.version = 6;
+  }
+  if (s.version === 6) {
+    // Session 15b: tier upgrades as a running project on the settlement
+    for (const t of Object.values(s.settlements ?? {})) (t as { upgrade?: unknown }).upgrade = null;
+    s.version = 7;
   }
   if (s.version !== STATE_VERSION) {
     throw new Error(`Save version ${s.version} not supported (expected ${STATE_VERSION})`);

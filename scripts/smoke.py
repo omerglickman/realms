@@ -85,6 +85,19 @@ async def main() -> int:
             await pg.click('#unitcard [data-act=disband]'); await pg.wait_for_timeout(400)
             assert await pg.is_hidden('#unitcard'), 'the party did not disband on its own settlement'
             print('EVENT:', await pg.inner_text('#info-event'))
+        # ---- tier upgrade (Session 15b): a village of the big cluster, if it is at the gate ----
+        await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
+        await tab('clusters'); await pg.click('#modal .m-body a[data-cluster]'); await pg.wait_for_timeout(300)
+        await tab('members')
+        links = await pg.query_selector_all('#modal .m-body a[data-focus]')
+        await links[-1].click(); await pg.wait_for_timeout(400)
+        await tab('overview')
+        t = await panel(); print('UPGRADE CARD:', *lines(t, 'Become a', 'Rising to', 'needs', 'short of'), sep='\n  ')
+        if await pg.query_selector('#modal [data-upgrade]'):
+            await pg.click('#modal [data-upgrade]'); await pg.wait_for_timeout(300)
+            assert await pg.query_selector('#modal [data-cancel-upgrade]'), 'upgrade did not start'
+            print('UPGRADE:', await pg.inner_text('#info-event'))
+        await tab('land'); await pg.screenshot(path='/tmp/smoke_land.png')
         # ---- send food between two members of a cluster ----
         await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
         await tab('clusters'); await pg.click('#modal .m-body a[data-cluster]'); await pg.wait_for_timeout(300)
