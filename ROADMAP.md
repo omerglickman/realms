@@ -187,12 +187,12 @@ Goal: a game loop — people leave settlements as units, move, and change the la
 
 Session plan (one feature cluster each; each ends with a build):
 
-1. **Units and movement** — the unit entity (faction, hex, people as cohorts, provisions), commands (raise, move, disband), movement points with terrain costs from `data/terrain.json`, A* on hexes, units drawn on the map and a unit card; **settlers** as the first type: raised from a settlement's spare/private hands with dependants, walk, found a village (`foundSettlement` exists). Headless: a scripted settler-spamming builder.
+1. **Units and movement** — the unit entity (faction, hex, people as cohorts, provisions, movement points, home, order), commands (raise with muster, move, settle, disband), movement points with terrain costs from `data/terrain.json` (mountains one hex a month; river hexes as two bank nodes, crossed only by a bridge or a settlement), A* to a destination over several months, foraging outside the borders; **settlers** as the first type (destination-based default size, calendar default for provisions), founding via `foundSettlement`; UI per UI-DESIGN 1.5: the **Recruitment** tab and raise dialog, shield markers with the gliding move animation, the unit card with Move / Settle / Disband and the route preview, **Send food** in the cluster ledger. Headless: a scripted settler-spamming builder → the 40-year sprawl curve. *Likely two sessions: 1a the sim (units, pathfinding, settlers, headless) and 1b the UI (tab, dialog, markers, animation, card).*
 2. **Work-bands and roads** — work-bands build on the hex they stand on from `data/infrastructure.json`: roads first (movement, and food sharing by distance replacing the instant-shipping placeholder; the metropolis prerequisite), then quarries / lumber camps on resource hexes, forts (border + garrison point), watchtowers if cheap.
 3. **Levies and tier upgrades** — one generic **levy** unit (men 15–44 from a settlement; raise / move / upkeep in coins and food / disband home) with no roster, facilities or combat (Phase 4); **upgrading village → town → city as a player command** with the population gate + money + materials + months (administrative capacity added when §4.3 exists).
 4. (if needed) Groups (stack, split, move together), hierarchical pathfinding, tuning of the Phase 1 + 2 numbers against the headless curves with Omer.
 
-Kickoff: the Phase 2 design questions are drafted as PROPOSED in DESIGN §3.2b; Omer rules on them at the start of session 1. Every Phase 2 session keeps a **"§4.3 hooks"** list in its DEVLOG entry — each number or rule that the Government & Institutions session must later own (administration quality, the tithe as a policy, the realm cap, upkeep, capacity costs…).
+Kickoff: done — DESIGN §3.2b is DECIDED in full (2026-11-07) and the Phase 2 UI is in UI-DESIGN 1.5; session 1 starts on the code. Every Phase 2 session keeps a **"§4.3 hooks"** list in its DEVLOG entry — each number or rule that the Government & Institutions session must later own (administration quality, the tithe as a policy, the realm cap, upkeep, capacity costs…).
 
 Moved out of Phase 2 (2026-11-07): fog of war (meaningless with one faction) and the Web Worker (needed only when AI turns are slow) → Phase 5. Administrative capacity, government forms and the first institutions → the design session below, then Phase 3.
 
@@ -250,6 +250,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.6a (2026-11-07, Session 13f): Phase 2 session 1 scope made concrete from the decided §3.2b and UI-DESIGN 1.5; may split into 1a sim / 1b UI.
 - 0.6 (2026-11-07, Session 13f): Phase 1 signed off (tuning deferred); the Government & Institutions design session moved from before Phase 2 to after it; Phase 2 rewritten as a session plan without administrative capacity; fog of war and the Web Worker moved to Phase 5.
 - 0.5b (2026-11-06, Session 13b): UI-DESIGN.md added to the document table (A.2); archive split into volumes under ~45 KB.
 - 0.5a (2026-11-05, Session 13): the UI overhaul noted in the Phase 1 checklist.
