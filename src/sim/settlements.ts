@@ -388,7 +388,11 @@ export function workedCellsBySettlement(state: GameState): Map<string, number[]>
 /**
  * Subordination (DESIGN §3.3): the parent is the higher-tier settlement of the
  * same faction whose influence zone covers this settlement's centre — highest
- * tier first, then nearest. An explicit parentOverride wins if still valid.
+ * tier first, then nearest. An explicit parentOverride wins if still valid; an
+ * override may name a settlement of the SAME tier (Omer, 2026-11-07): a village
+ * that grows into a town stays under its old parent, and the player may choose
+ * which of a cluster's top-tier settlements leads. Equal tiers are never joined
+ * automatically — only by an override.
  */
 export function resolveParent(state: GameState, s: Settlement): string | null {
   const myRank = TIERS[s.tier].rank;
@@ -397,9 +401,11 @@ export function resolveParent(state: GameState, s: Settlement): string | null {
   for (const o of Object.values(state.settlements)) {
     if (o.id === s.id || o.faction !== s.faction) continue;
     const rank = TIERS[o.tier].rank;
-    if (rank <= myRank) continue;
+    if (rank < myRank) continue;
     const dist = axialDistance(c, settlementAxial(o));
-    if (dist <= TIERS[o.tier].influenceRings) candidates.push({ id: o.id, rank, dist });
+    if (dist > TIERS[o.tier].influenceRings) continue;
+    if (rank === myRank) { if (o.id === s.parentOverride) return o.id; continue; }
+    candidates.push({ id: o.id, rank, dist });
   }
   if (s.parentOverride && candidates.some((c) => c.id === s.parentOverride)) return s.parentOverride;
   if (candidates.length === 0) return null;
@@ -407,8 +413,24 @@ export function resolveParent(state: GameState, s: Settlement): string | null {
   return candidates[0].id;
 }
 
+/** Can `parentId` be `s`'s parent by override (same faction, rank not lower, influence covers the centre)? */
+export function canOverrideParent(state: GameState, s: Settlement, parentId: string): boolean {
+  const o = state.settlements[parentId];
+  if (!o || o.id === s.id || o.faction !== s.faction) return false;
+  if (TIERS[o.tier].rank < TIERS[s.tier].rank) return false;
+  return axialDistance(settlementAxial(s), settlementAxial(o)) <= TIERS[o.tier].influenceRings;
+}
+
 export function resolveAllParents(state: GameState): void {
-  for (const s of Object.values(state.settlements)) s.parent = resolveParent(state, s);
+  const all = Object.values(state.settlements).sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const s of all) s.parent = resolveParent(state, s);
+  // equal-tier overrides can form a ring (A under B under A): break it at the lowest id, which becomes the root
+  for (const s of all) {
+    const seen = new Set<string>([s.id]);
+    let p = s.parent;
+    while (p && !seen.has(p)) { seen.add(p); p = state.settlements[p]?.parent ?? null; }
+    if (p === s.id) { s.parentOverride = null; s.parent = resolveParent(state, s); }
+  }
 }
 
 /** Settlements ordered by tier rank ascending (villages first), then id — the order the economy processes them. */

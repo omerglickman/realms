@@ -81,14 +81,22 @@ export function completeUpgrade(state: GameState, s: Settlement): void {
   s.buildings.unshift(to.hall, to.granary);
   s.tier = s.upgrade.to;
   s.upgrade = null;
+  // Omer 2026-11-07: the settlement stays in its cluster under its old parent even when it now matches its tier
+  if (s.parent && TIERS[state.settlements[s.parent].tier].rank <= TIERS[s.tier].rank) s.parentOverride = s.parent;
   logEvent(state, 'upgraded', `${s.name} is now a ${to.name.toLowerCase()}.`);
 }
 
 /** Undo a completed upgrade exactly (for the command layer): the previous tier and buildings come back. */
-export function revertTier(s: Settlement, fromTier: number, project: UpgradeProject): void {
+export function revertTier(s: Settlement, fromTier: number, project: UpgradeProject, parentOverride: string | null): void {
   const to = TIERS[s.tier], from = TIERS[fromTier];
   s.buildings = s.buildings.filter((b) => b !== to.hall && b !== to.granary);
   s.buildings.unshift(from.hall, from.granary);
   s.tier = fromTier;
   s.upgrade = project;
+  s.parentOverride = parentOverride;
+}
+
+/** The members of `root`'s cluster that share its tier — the candidates for leadership (DESIGN §3.3, Omer 2026-11-07). */
+export function clusterPeers(state: GameState, root: Settlement, members: string[]): Settlement[] {
+  return members.map((id) => state.settlements[id]).filter((m) => m.tier === root.tier);
 }

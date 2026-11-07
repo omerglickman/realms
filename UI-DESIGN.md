@@ -76,7 +76,7 @@ Adding an icon: draw it in the same grid and stroke, add it to `ICON_PATHS`, ref
 
 **Ledgers** (`#modal`): 900 px wide (1040 for wide tables), parchment with an oak border and an inset gold rule, a faction-colour stripe by the title, the date at the right, tabs in the script hand (active one vermilion), a scrolling body that keeps its scroll position across the monthly re-render, an optional footer (the editor's name / people / remove controls).
 - **Settlement:** Overview · People · Land & Food · Economy · Buildings · **Recruitment** (Phase 2; Omer 2026-11-07 — works and looks like Buildings, for units; below).
-- **Cluster:** Overview · Members · Food (**+ Send food** between members, Phase 2 — the Stockpile page's Send form reused for grain, member → member) · Stockpile.
+- **Cluster:** Overview (+ a **Leadership** block when several members share the top tier — Make leader / Split off, Session 15c) · Members · Food (**+ Send food** between members, Phase 2 — the Stockpile page's Send form reused for grain, member → member) · Stockpile.
 - **Realm:** Overview · Clusters · People · Food · Treasury · Stockpile.
 - Also: Settings (header hand), Keys & help, New draft (the generator form).
 
@@ -131,6 +131,7 @@ Other map marks (unchanged from Sessions 7–10): influence zones as a light fac
 
 ## Change log
 
+- 1.6b (2026-11-07, Session 15c): §5 the cluster ledger's Leadership block.
 - 1.6a (2026-11-07, Session 15b): §5 the upgrade card; the hex table's worked-first order and idle marks (Omer).
 - 1.6 (2026-11-07, Session 15): the Phase 2 UI as built — §5 the raise dialog's final layout (size → provisions → destination → muster), the unit card's states and the card/ledger exclusion, Cancel of a muster; §6 one shield per hex with a count, the vermilion dot, the preview line; §7 two questions added.
 - 1.5 (2026-11-07, Session 13f): Phase 2 UI decided ahead of building — §4 unit icons and the shield marker; §5 the **Recruitment** tab as cubes with a raise dialog (size, muster, provisions, destination), the unit card and its orders, Send food in the cluster ledger; §6 units at every zoom, the gliding movement animation.

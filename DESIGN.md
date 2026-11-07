@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.5b — 2026-11-07 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
+**Version 0.5c — 2026-11-07 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -171,7 +171,7 @@ Four tiers: **Village**, **Town**, **City**, **Metropolis**. Every settlement ha
 
 **Abandonment (DECIDED 2026-11-05):** a settlement whose population falls below a threshold (30 people, draft, `data/settlements.json` `abandonment.abandonBelow`) is removed at the end of that month; whoever is left walks to its parent, its granary is lost, and the event is logged. *(PROPOSED for later: an "abandoned village/town/city" entity with 0 population that marks the site and makes resettling easy.)*
 
-**Cluster (DECIDED 2026-11-05, Omer's concept):** a cluster is an **unparented settlement together with every settlement subordinate to it, transitively** (its towns, their villages, its own villages). A lone village is a cluster of one. Food flows only inside a cluster, so the cluster is the real demographic and food unit of the realm; it is also the natural unit for the tithe (§4.2), for future provinces, governors and public order. It is a **derived view**, never stored — computed from the parent links, so it cannot drift from the subordination rule. A town under a city is a member of the city's cluster, not a cluster of its own. UI: a cluster outline on the map, a cluster panel (people by tier, the year's food balance, tithe, migration, hunger, members); the realm report is the sum over clusters.
+**Cluster (DECIDED 2026-11-05, Omer's concept):** a cluster is an **unparented settlement together with every settlement subordinate to it, transitively** (its towns, their villages, its own villages). A lone village is a cluster of one. Food flows only inside a cluster, so the cluster is the real demographic and food unit of the realm; it is also the natural unit for the tithe (§4.2), for future provinces, governors and public order. It is a **derived view**, never stored — computed from the parent links, so it cannot drift from the subordination rule. A town under a city is a member of the city's cluster, not a cluster of its own. **Upgrades and leadership (DECIDED 2026-11-07, Omer):** a settlement that grows to its parent's tier **stays in the cluster, subordinate to its old parent** (the link becomes explicit; equal tiers are never joined by the automatic rule, only kept or chosen). When a cluster holds **more than one settlement of its highest tier**, the crown may in the cluster ledger **name which of them leads** (the others go under it, within its influence) or **split one off** into a cluster of its own, taking the villages nearer to it. UI: a cluster outline on the map, a cluster panel (people by tier, the year's food balance, tithe, migration, hunger, members); the realm report is the sum over clusters.
 
 **Contested hexes (DECIDED 2026-11-04):** each hex is worked by exactly one settlement. Where work zones overlap, the **higher tier wins**; ties go to the nearer centre; the player may reassign any hex by hand.
 
@@ -434,6 +434,8 @@ Every DECIDED item above carries its date; the change log below lists what each 
 ---
 
 ## Change log
+
+- 0.5c (2026-11-07, Session 15c): §3.3 — an upgraded settlement stays under its old parent; a cluster with several top-tier settlements may choose its leader or split (Omer).
 
 - 0.5b (2026-11-07, Session 13f): the §3.2b sub-points confirmed — continuous staffing curve, foraging 20 % / 30 %, river banks + settlements as bridges, muster from neighbouring settlements, Send food between cluster members by hand; §5.12 and §5.16 resolved. (Recruitment tab, unit markers and movement animation: UI-DESIGN 1.5.)
 - 0.5a (2026-11-07, Session 13f): Omer's verdicts on §3.2b — all twelve rules DECIDED (player-chosen sizes, hand-removal order, partial-staffing curve, provisions + foraging, mountains one hex a month, rivers crossed by bridge only, road-from-X-to-Y, levy disband = walk home, road food sharing deferred); §2.3, §3.4, §4.2 amended; §5.12 resolved, §5.14–16 opened.

@@ -4,7 +4,8 @@ import { terrainIndex } from '../src/sim/terrain';
 import { createGameState, serializeState, deserializeState, STATE_VERSION, type GameState } from '../src/sim/state';
 import { endTurn } from '../src/sim/turn';
 import { applyCommand } from '../src/sim/commands';
-import { TIERS, UPGRADES, tierIndex, influenceCells, type Settlement, setAbandonBelow } from '../src/sim/settlements';
+import { TIERS, UPGRADES, tierIndex, influenceCells, resolveAllParents, type Settlement, setAbandonBelow } from '../src/sim/settlements';
+import { clustersOf } from '../src/sim/clusters';
 import { setNoise, NO_NOISE } from '../src/sim/noise';
 import { setStockCaps } from '../src/sim/materials';
 import { canUpgrade, upgradeStep } from '../src/sim/upgrades';
@@ -109,5 +110,61 @@ describe('tier upgrades (DESIGN §3.2b rule 10)', () => {
     for (const t of Object.values(old.settlements) as { upgrade?: unknown }[]) delete t.upgrade;
     const migrated = deserializeState(JSON.stringify(old));
     expect(Object.values(migrated.settlements)[0].upgrade).toBeNull();
+  });
+});
+
+describe('subordination after an upgrade and cluster leadership (DESIGN §3.3, Omer 2026-11-07)', () => {
+  function pair() {
+    const { state, f } = world();
+    f.treasury = 500_000;
+    applyCommand(state, { type: 'foundSettlement', settlement: { name: 'Head', tier: 'town', col: 8, row: 8, population: 9000, faction: state.playerFaction } });
+    applyCommand(state, { type: 'foundSettlement', settlement: { name: 'Sub', tier: 'village', col: 10, row: 8, population: 2000, faction: state.playerFaction } });
+    const head = Object.values(state.settlements).find((s) => s.name === 'Head')!;
+    const sub = Object.values(state.settlements).find((s) => s.name === 'Sub')!;
+    for (const s of [head, sub]) { s.stock.timber = 5000; s.stock.stone = 5000; }
+    endTurn(state);
+    expect(sub.parent).toBe(head.id);
+    return { state, head, sub };
+  }
+
+  it('a village that becomes a town stays under its old parent town', () => {
+    const { state, head, sub } = pair();
+    applyCommand(state, { type: 'upgradeSettlement', id: sub.id });
+    for (let i = 0; i < 13; i++) endTurn(state);
+    expect(sub.tier).toBe(tierIndex('town'));
+    expect(sub.parentOverride).toBe(head.id);
+    expect(sub.parent).toBe(head.id);
+    expect(clustersOf(state).length).toBe(1);
+  });
+
+  it('equal tiers never join automatically; the player may make the other town lead, or split', () => {
+    const { state, head, sub } = pair();
+    applyCommand(state, { type: 'upgradeSettlement', id: sub.id });
+    const rev = applyCommand(state, { type: 'finishUpgrade', id: sub.id });
+    expect(sub.parent).toBe(head.id);
+    // split: Sub heads a cluster of its own; nothing re-joins it automatically
+    const inv = applyCommand(state, { type: 'setParents', changes: [{ id: sub.id, parent: null }] });
+    expect(sub.parent).toBeNull();
+    expect(clustersOf(state).length).toBe(2);
+    endTurn(state);
+    expect(sub.parent).toBeNull();
+    applyCommand(state, inv);
+    expect(sub.parent).toBe(head.id);
+    // make Sub the leader: Head goes under Sub, Sub is freed; no ring
+    applyCommand(state, { type: 'setParents', changes: [{ id: sub.id, parent: null }, { id: head.id, parent: sub.id }] });
+    expect(sub.parent).toBeNull();
+    expect(head.parent).toBe(sub.id);
+    expect(clustersOf(state)[0].root).toBe(sub.id);
+    // a ring (both override each other) is broken at the lowest id
+    sub.parentOverride = head.id; head.parentOverride = sub.id;
+    resolveAllParents(state);
+    const roots = [head, sub].filter((s) => s.parent === null);
+    expect(roots.length).toBe(1);
+    expect(clustersOf(state).length).toBe(1);
+    // a village cannot lead a town; a town out of range cannot lead
+    expect(() => applyCommand(state, { type: 'setParents', changes: [{ id: head.id, parent: 'nobody' }] })).toThrow();
+    // undo of a finished upgrade restores the override it had before
+    applyCommand(state, rev);
+    expect(sub.tier).toBe(tierIndex('village'));
   });
 });

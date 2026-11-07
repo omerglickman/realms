@@ -10,7 +10,7 @@ import { logEvent } from './state';
 import type { MapData } from './map';
 import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
-import { makeSettlement, settlementIdAt, buildingDef, type FoundOptions, type Settlement, type BuildProject, type UpgradeProject } from './settlements';
+import { makeSettlement, settlementIdAt, buildingDef, canOverrideParent, resolveAllParents, type FoundOptions, type Settlement, type BuildProject, type UpgradeProject } from './settlements';
 import { startUpgrade, revertTier, completeUpgrade } from './upgrades';
 import { totalPopulation, createPopulation, type Population } from './demography';
 import { canBuild, moneyCost } from './buildings';
@@ -213,9 +213,22 @@ export interface RevertUpgradeCommand {
   id: string;
   fromTier: number;
   project: UpgradeProject;
+  parentOverride: string | null;
+}
+
+/**
+ * Set explicit parents (DESIGN §3.3, Omer 2026-11-07): "make X the leader" of a
+ * cluster puts every other top-tier member under X and frees X; "split off X"
+ * clears X's override so it heads a cluster of its own. Self-inverse with the
+ * previous values.
+ */
+export interface SetParentsCommand {
+  type: 'setParents';
+  changes: { id: string; parent: string | null }[];
 }
 
 export type Command =
+  | SetParentsCommand
   | UpgradeSettlementCommand
   | CancelUpgradeCommand
   | RestoreUpgradeCommand
@@ -383,15 +396,29 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       const s = state.settlements[cmd.id];
       if (!s) throw new Error(`No settlement "${cmd.id}"`);
       if (!s.upgrade) throw new Error(`${s.name} is not being upgraded`);
-      const fromTier = s.tier, project = { ...s.upgrade };
+      const fromTier = s.tier, project = { ...s.upgrade }, parentOverride = s.parentOverride;
       completeUpgrade(state, s);
-      return { type: 'revertUpgrade', id: cmd.id, fromTier, project };
+      resolveAllParents(state);
+      return { type: 'revertUpgrade', id: cmd.id, fromTier, project, parentOverride };
     }
     case 'revertUpgrade': {
       const s = state.settlements[cmd.id];
       if (!s) throw new Error(`No settlement "${cmd.id}"`);
-      revertTier(s, cmd.fromTier, cmd.project);
+      revertTier(s, cmd.fromTier, cmd.project, cmd.parentOverride);
+      resolveAllParents(state);
       return { type: 'finishUpgrade', id: cmd.id };
+    }
+    case 'setParents': {
+      const before: { id: string; parent: string | null }[] = [];
+      for (const ch of cmd.changes) {
+        const s = state.settlements[ch.id];
+        if (!s) throw new Error(`No settlement "${ch.id}"`);
+        if (ch.parent !== null && !canOverrideParent(state, s, ch.parent)) throw new Error(`${state.settlements[ch.parent]?.name ?? ch.parent} cannot lead ${s.name}`);
+        before.push({ id: s.id, parent: s.parentOverride });
+        s.parentOverride = ch.parent;
+      }
+      resolveAllParents(state);
+      return { type: 'setParents', changes: before };
     }
     case 'transferMaterials': {
       const src = stockOf(state, cmd.from), dst = stockOf(state, cmd.to);
@@ -520,7 +547,7 @@ export function isNoop(cmd: Command): boolean {
 export function commandTouchesSettlements(cmd: Command): boolean {
   return cmd.type === 'foundSettlement' || cmd.type === 'removeSettlement' || cmd.type === 'restoreSettlement' || cmd.type === 'renameSettlement' || cmd.type === 'editSettlement' || cmd.type === 'replaceMap'
     || cmd.type === 'settleUnit' || cmd.type === 'unsettle' || cmd.type === 'raiseUnit' || cmd.type === 'cancelRaise' || cmd.type === 'disbandUnit' || cmd.type === 'undisband'
-    || cmd.type === 'finishUpgrade' || cmd.type === 'revertUpgrade';
+    || cmd.type === 'finishUpgrade' || cmd.type === 'revertUpgrade' || cmd.type === 'setParents';
 }
 
 /** Does this command touch units (so the unit layer must redraw)? */

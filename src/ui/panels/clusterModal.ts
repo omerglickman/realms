@@ -4,12 +4,13 @@
 
 import type { GameState } from '../../sim/state';
 import { calendar } from '../../sim/state';
-import { TIERS, type Settlement, type YearTotals } from '../../sim/settlements';
+import { TIERS, canOverrideParent, type Settlement, type YearTotals } from '../../sim/settlements';
+import { clusterPeers } from '../../sim/upgrades';
 import { totalPopulation } from '../../sim/demography';
 import { type Cluster, type ClusterNode } from '../../sim/clusters';
 import { clusterStock, clusterCap, MATERIAL_IDS, type Materials } from '../../sim/materials';
 import { titheShare } from '../../sim/economy';
-import { fmt, fmt1, signed, esc, tierGlyph, tierBreakdown, tierLabel, popByTierText, foodMonths, projectText, gauge, hbar, stack, stat, kv, ICON } from './format';
+import { fmt, fmt1, signed, esc, tierGlyph, tierName, tierBreakdown, tierLabel, popByTierText, foodMonths, projectText, gauge, hbar, stack, stat, kv, ICON } from './format';
 import type { ModalSpec } from './modal';
 
 export const CLUSTER_TABS = [
@@ -25,6 +26,42 @@ export interface SendHost {
 
 export interface SendFoodHost {
   onSendFood(from: string, to: string, amount: number): void;
+}
+
+export interface LeadershipHost {
+  onSetParents(changes: { id: string; parent: string | null }[]): void;
+}
+
+/** The Leadership block (DESIGN §3.3, Omer 2026-11-07): when several members share the cluster's top tier, choose which leads or split one off. */
+function leadershipBlock(state: GameState, c: Cluster): string {
+  const root = state.settlements[c.root];
+  const peers = clusterPeers(state, root, c.members);
+  if (peers.length < 2) return '';
+  const rows = peers.map((p) => {
+    const isRoot = p.id === c.root;
+    const others = peers.filter((o) => o.id !== p.id);
+    const unreachable = others.filter((o) => !canOverrideParent(state, o, p.id));
+    const lead = isRoot ? '<span class="dim">leads now</span>'
+      : unreachable.length ? `<button class="btn small" disabled title="${esc(unreachable.map((o) => o.name).join(', '))} ${unreachable.length === 1 ? 'lies' : 'lie'} beyond its influence">Make leader</button>`
+      : `<button class="btn small" data-lead="${p.id}" title="Every other ${tierName(p).toLowerCase()} of the cluster goes under ${esc(p.name)}">Make leader</button>`;
+    const split = isRoot ? '' : `<button class="btn small danger" data-split="${p.id}" title="${esc(p.name)} heads a cluster of its own, with the villages nearer to it">Split off</button>`;
+    return `<tr><td>${tierGlyph(p.tier)}<a href="#" data-focus="${p.id}">${esc(p.name)}</a>${isRoot ? ' <span class="dim">(leader)</span>' : p.parent ? ` <span class="dim">under ${esc(state.settlements[p.parent]?.name ?? '')}</span>` : ''}</td><td class="r">${fmt(totalPopulation(p.pop))}</td><td class="r">${fmt1(foodMonths(p))}</td><td class="r">${lead} ${split}</td></tr>`;
+  }).join('');
+  const tn = tierName(root).toLowerCase();
+  return `<h3>Leadership <small>${peers.length} ${tn.endsWith('y') ? tn.slice(0, -1) + 'ies' : tn + 's'} in one cluster</small></h3>
+    <table class="data"><tr><th>Settlement</th><th class="r">people</th><th class="r">food (mo)</th><th class="r"></th></tr>${rows}</table>
+    <p class="note">A settlement that grows to its parent's tier stays in the cluster under it. The crown may name another of them the leader — the rest go under it and the tithe and surplus flow its way — or split one off into a cluster of its own; equal tiers never rejoin by themselves.</p>`;
+}
+
+export function wireLeadership(root: HTMLElement, state: GameState, c: Cluster, host: LeadershipHost): void {
+  const rs = state.settlements[c.root];
+  if (!rs) return;
+  const peers = clusterPeers(state, rs, c.members);
+  root.querySelectorAll<HTMLButtonElement>('[data-lead]').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.lead!;
+    host.onSetParents([{ id, parent: null }, ...peers.filter((p) => p.id !== id).map((p) => ({ id: p.id, parent: id }))]);
+  }));
+  root.querySelectorAll<HTMLButtonElement>('[data-split]').forEach((b) => b.addEventListener('click', () => host.onSetParents([{ id: b.dataset.split!, parent: null }])));
 }
 
 /** The Send food form (DESIGN §3.2b rule 6, DECIDED 2026-11-07 — by hand, never automatic): grain from one member of the cluster to another. */
@@ -150,6 +187,7 @@ function overviewPage(state: GameState, c: Cluster, privateHands: number): strin
   return `<div class="stats">${stats}</div>
     <h3>People by tier</h3>${stack(TIERS.map((_, i) => ({ label: tierLabel(i, members), value: t.popByTier[i], cls: `c${4 - i}` })).reverse())}
     <h3>The year</h3>${kv(rows)}
+    ${c.faction === state.playerFaction ? leadershipBlock(state, c) : ''}
     <p class="note">A cluster is an independent settlement with everything subordinate to it. Food flows only inside a cluster: villages tithe ${Math.round(100 * titheShare())} % of what they grow to their parent as they grow it, and send their surplus up after the harvest; migrants and the yearly pull go the same way.</p>`;
 }
 

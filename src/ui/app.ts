@@ -16,7 +16,7 @@ import { renderHud } from './panels/hud';
 import { renderHoverCard } from './panels/hoverCard';
 import { ModalShell, wireLinks, type ModalSpec } from './panels/modal';
 import { settlementSpec, wireSettlement } from './panels/settlementModal';
-import { clusterSpec, wireSend, wireSendFood } from './panels/clusterModal';
+import { clusterSpec, wireSend, wireSendFood, wireLeadership } from './panels/clusterModal';
 import { realmSpec } from './panels/realmModal';
 import { clusterOf, clusterRootOf } from '../sim/clusters';
 import { factionStockKey, type Command, type CancelRaiseCommand } from '../sim/commands';
@@ -504,6 +504,7 @@ export async function startApp(): Promise<void> {
       wireLinks(root, links);
       wireSend(root, { onSend: (to, amount) => sendMaterials(to, amount) });
       wireSendFood(root, { onSendFood: (from, to, amount) => act({ type: 'sendFood', from, to, amount }) });
+      wireLeadership(root, state, c, { onSetParents: (changes) => { const lead = changes.find((x) => x.parent === null); act({ type: 'setParents', changes }); if (lead) openView('cluster', lead.id, 'overview'); } });
     } else if (view.kind === 'realm') {
       spec = realmSpec(state, view.tab);
       const root = modal.show(`realm:${view.tab}`, spec, modalHost);
