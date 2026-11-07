@@ -22,6 +22,13 @@ const SHORE_BAND = 0.12;
 const SHORE_AMP = 0.05;
 const SHORE_SAND_COLOR = 0xd9b16a;
 const SHORE_TIDE = 0xb8894a;
+/** River banks use grassland's colour for the light band and this much darker for the meandering inner band. */
+const BANK_DARKEN = 0.22;
+
+function darken(color: number, k: number): number {
+  const r = Math.round(((color >> 16) & 255) * (1 - k)), g = Math.round(((color >> 8) & 255) * (1 - k)), b = Math.round((color & 255) * (1 - k));
+  return (r << 16) | (g << 8) | b;
+}
 
 /** Which axial direction each hex edge faces (edge i runs from corner i to corner i+1 of `hexCorners`),
  *  derived from the geometry itself so no convention is assumed. */
@@ -98,6 +105,9 @@ export class MapRenderer {
   constructor(map: MapData) {
     this.map = map;
     this.terrainColors = TERRAIN.map((t) => colorToNumber(t.color));
+    // Omer (Session 13e): a river hex is drawn as water — lake blue with grassland banks (the fringe below) —
+    // whatever colour the data file gives it (that colour still serves the editor palette and the ledgers' chips).
+    this.terrainColors[terrainIndex('river')] = this.terrainColors[terrainIndex('lake')];
     this.resourceColors = RESOURCES.map((r) => colorToNumber(r.color));
     this.rebuildChunks();
   }
@@ -246,10 +256,11 @@ export class MapRenderer {
     // over a darker tide band (depth SHORE_SAND) whose sea-side boundary meanders — a seeded sine, zero at
     // the vertices so neighbouring hexes agree — plus bridge wedges at each vertex toward the adjacent
     // edges, so coves close and no blue crack opens at a corner. Dark first, light on top.
-    const SEA = terrainIndex('sea'), LAKE = terrainIndex('lake');
-    const isWater = (t: number) => t === SEA || t === LAKE;
-    const light: number[][] = [];
-    const dark: number[][] = [];
+    const SEA = terrainIndex('sea'), LAKE = terrainIndex('lake'), RIVER = terrainIndex('river');
+    const isWater = (t: number) => t === SEA || t === LAKE || t === RIVER;
+    // two fringes: sand on sea and lake shores, grassland banks on rivers (UI-DESIGN.md §6)
+    const light: number[][] = [], dark: number[][] = [];
+    const bankLight: number[][] = [], bankDark: number[][] = [];
     const S = HEX_SIZE + 0.35;
     const D = SHORE_SAND * S, Wd = SHORE_BAND * S, Dl = Math.max(0, D - Wd), amp = SHORE_AMP * S;
     const K = 6;
@@ -268,6 +279,7 @@ export class MapRenderer {
           facing[i] = !isWater(map.terrain[o.row * map.width + o.col]);
         }
         if (!facing.some(Boolean)) continue;
+        const lightOut = t === RIVER ? bankLight : light, darkOut = t === RIVER ? bankDark : dark;
         const cn = (i: number): [number, number] => [corners[(i % 6) * 2], corners[(i % 6) * 2 + 1]];
         const unit = (fx: number, fy: number, tx: number, ty: number): [number, number] => { const dx = tx - fx, dy = ty - fy, l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; };
         for (let i = 0; i < 6; i++) {
@@ -283,16 +295,16 @@ export class MapRenderer {
             const off = D + amp * Math.sin(Math.PI * tt) * Math.sin(Math.PI * 2 * 1.25 * tt + phase);
             darkPoly.push(px + nx * off, py + ny * off);
           }
-          dark.push(darkPoly);
-          light.push([ax, ay, bx, by, bx + nx * Dl, by + ny * Dl, ax + nx * Dl, ay + ny * Dl]);
+          darkOut.push(darkPoly);
+          lightOut.push([ax, ay, bx, by, bx + nx * Dl, by + ny * Dl, ax + nx * Dl, ay + ny * Dl]);
           // bridges to the adjacent edges at the same depth (a point the neighbour computes identically)
           const [pax, pay] = cn(i + 5), [qcx, qcy] = cn(i + 2);
           const [tax, tay] = unit(ax, ay, pax, pay);
           const [tbx, tby] = unit(bx, by, qcx, qcy);
-          dark.push([ax, ay, ax + nx * D, ay + ny * D, ax + tax * D, ay + tay * D]);
-          dark.push([bx, by, bx + nx * D, by + ny * D, bx + tbx * D, by + tby * D]);
-          light.push([ax, ay, ax + nx * Dl, ay + ny * Dl, ax + tax * Dl, ay + tay * Dl]);
-          light.push([bx, by, bx + nx * Dl, by + ny * Dl, bx + tbx * Dl, by + tby * Dl]);
+          darkOut.push([ax, ay, ax + nx * D, ay + ny * D, ax + tax * D, ay + tay * D]);
+          darkOut.push([bx, by, bx + nx * D, by + ny * D, bx + tbx * D, by + tby * D]);
+          lightOut.push([ax, ay, ax + nx * Dl, ay + ny * Dl, ax + tax * Dl, ay + tay * Dl]);
+          lightOut.push([bx, by, bx + nx * Dl, by + ny * Dl, bx + tbx * Dl, by + tby * Dl]);
         }
       }
     }
@@ -301,6 +313,13 @@ export class MapRenderer {
       shore.fill(SHORE_TIDE);
       for (const l of light) shore.poly(l);
       shore.fill(SHORE_SAND_COLOR);
+    }
+    if (bankDark.length) {
+      const grass = this.terrainColors[terrainIndex('grassland')];
+      for (const d of bankDark) shore.poly(d);
+      shore.fill(darken(grass, BANK_DARKEN));
+      for (const l of bankLight) shore.poly(l);
+      shore.fill(grass);
     }
 
     // resources: one badge sprite per hex — the resource's icon in ink on a parchment disc (Session 13b);
