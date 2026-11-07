@@ -9,6 +9,9 @@
 // --builder 1 (Session 11): a crude scripted builder queues, every January, the first affordable building from a
 // per-tier priority list in every settlement with no project — to exercise materials, money, effects and the pull factor.
 // --caps 0 (Session 12) switches the stockpile caps off; --tax X overrides the coins per private hand per year.
+// --settlers 1 (Session 14, Phase 2): the settler-spammer — every cluster raises settlers from its spare hands as fast as
+// people, coins and timber allow and founds villages within --reach hexes; 2 = reckless (also takes 10 % of everyone).
+// The sprawl curve it prints is the opening exhibit of the Government & Institutions design session.
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -25,6 +28,7 @@ import { applyCommand, factionStockKey } from '../sim/commands';
 import { canBuild, hasStone } from '../sim/buildings';
 import { clusterStock, clusterCap, setStockCaps, stockCapsOn } from '../sim/materials';
 import { clustersOf } from '../sim/clusters';
+import { spamSettlers, fieldReport, emptyStats } from './settlers';
 
 function arg(name: string, def: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -83,6 +87,9 @@ function runBuilder(st: GameState): void {
     }
   }
 }
+const SETTLERS = Number(arg('settlers', '0'));
+const REACH = Number(arg('reach', '10'));
+const spam = emptyStats();
 if (process.argv.includes('--tithe')) setTitheShare(Number(arg('tithe', '0')));
 else if (PRESET === 'baseline') setTitheShare(0);
 const TITHE = titheShare();
@@ -93,7 +100,8 @@ const { state, name } = loadScenarioFile(JSON.parse(readFileSync(FILE, 'utf8')))
 if (SEED) state.rng = seedRng(SEED);
 const cal0 = calendar(state.turn);
 console.log(`scenario "${name}" from ${cal0.monthName}, year ${cal0.year} · ${Object.keys(state.settlements).length} settlements · preset ${PRESET}${SEED ? ` · seed ${SEED}` : ''}`);
-console.log(`knobs: sampling ${knobs.vitalSampling} · harvest sd ${knobs.harvestSd} (regional ${knobs.harvestRegionalShare}) · epidemic ${knobs.epidemicChance}×${knobs.epidemicDeathMultiplier} · pull ${knobs.trickleShare} above ${knobs.trickleMinIdle} idle ±${knobs.trickleSpread}${knobs.trickleRequireFedParent ? ' (fed parent only)' : ''}${knobs.trickleRequireProsperous ? ` (prosperous parent only: ≥ ${knobs.trickleProsperousSpare} spare months)` : ''} · tithe ${TITHE} · granary brake ${BRAKE ? 'on' : 'off'} · stockpile caps ${stockCapsOn() ? 'on' : 'off'} · tax ${taxRate()} coins/private hand/yr · builder ${BUILDER ? 'on' : 'off'}`);
+console.log(`knobs: sampling ${knobs.vitalSampling} · harvest sd ${knobs.harvestSd} (regional ${knobs.harvestRegionalShare}) · epidemic ${knobs.epidemicChance}×${knobs.epidemicDeathMultiplier} · pull ${knobs.trickleShare} above ${knobs.trickleMinIdle} idle ±${knobs.trickleSpread}${knobs.trickleRequireFedParent ? ' (fed parent only)' : ''}${knobs.trickleRequireProsperous ? ` (prosperous parent only: ≥ ${knobs.trickleProsperousSpare} spare months)` : ''} · tithe ${TITHE} · granary brake ${BRAKE ? 'on' : 'off'} · stockpile caps ${stockCapsOn() ? 'on' : 'off'} · tax ${taxRate()} coins/private hand/yr · builder ${BUILDER ? 'on' : 'off'} · settlers ${SETTLERS ? (SETTLERS === 2 ? 'reckless' : 'spare hands') + ` within ${REACH}` : 'off'}`);
+const startTurn = state.turn;
 
 const list = (): Settlement[] => Object.values(state.settlements);
 const rankOf = (s: Settlement) => TIERS[s.tier].rank;
@@ -114,7 +122,7 @@ const hungerBy: Record<string, number> = {}, famineBy: Record<string, number> = 
 const hungerByRank = [0, 0, 0, 0];
 let yHunger: Record<string, number> = {}, yFamine: Record<string, number> = {};
 
-interface YearRow { year: number; total: number; byGroup: number[]; hunger: number; epidemics: number; trickle: number; famineMig: number; harvest: number; timber: number; stone: number; goods: number; privateHands: number; buildings: number; treasury: number; tax: number; sales: number; spent: number; fTimber: number; fStone: number; lost: number }
+interface YearRow { year: number; settlements: number; founded: number; fieldUnits: number; fieldPeople: number; raised: number; total: number; byGroup: number[]; hunger: number; epidemics: number; trickle: number; famineMig: number; harvest: number; timber: number; stone: number; goods: number; privateHands: number; buildings: number; treasury: number; tax: number; sales: number; spent: number; fTimber: number; fStone: number; lost: number }
 const rows: YearRow[] = [];
 let hunger = 0, epidemics = 0, trickle = 0, famineMig = 0, harvestSum = 0, harvestN = 0;
 const builtBefore = () => Object.values(state.settlements).reduce((t, s) => t + s.buildings.length - 2, 0);
@@ -127,6 +135,7 @@ for (let y = 1; y <= YEARS; y++) {
   yHunger = {}; yFamine = {};
   do {
     if (BUILDER && calendar(state.turn).month === 0) runBuilder(state);
+    if (SETTLERS) spamSettlers(state, { reach: REACH, recklessShare: SETTLERS === 2 ? 0.1 : 0 }, spam);
     endTurn(state);
     for (const s of list()) {
       hunger += s.report.hungerDeaths; famineMig += s.report.migrantsOut;
@@ -149,7 +158,8 @@ for (let y = 1; y <= YEARS; y++) {
   const stockAll = all.reduce((t, s) => ({ timber: t.timber + s.stock.timber, stone: t.stone + s.stock.stone, goods: t.goods + s.stock.goods }), { timber: 0, stone: 0, goods: 0 });
   built = builtBefore();
   const ly = f?.lastYear;
-  rows.push({ year: y, total: pop(all), byGroup: groups.map(([, f]) => pop(all.filter(f))), hunger, epidemics, trickle, famineMig, harvest: harvestN ? harvestSum / harvestN : 1,
+  const field = fieldReport(state);
+  rows.push({ year: y, settlements: all.length, founded: all.filter((s) => s.foundedTurn > startTurn).length, fieldUnits: field.units, fieldPeople: field.people, raised: spam.raised, total: pop(all), byGroup: groups.map(([, f]) => pop(all.filter(f))), hunger, epidemics, trickle, famineMig, harvest: harvestN ? harvestSum / harvestN : 1,
     timber: stockAll.timber, stone: stockAll.stone, goods: stockAll.goods, privateHands: sum(all, (s) => s.report.privateHands), buildings: built, treasury: f?.treasury ?? 0,
     tax: ly?.tax ?? 0, sales: ly?.sales ?? 0, spent: ly?.spent ?? 0, fTimber: f?.stock.timber ?? 0, fStone: f?.stock.stone ?? 0, lost: ly ? ly.lost.timber + ly.lost.stone + ly.lost.goods : 0 });
 }
@@ -158,13 +168,25 @@ const ms = performance.now() - t0;
 // ---- yearly table (every 5 years + last) ----
 console.log(`\n  year    total  ${groups.map(([g]) => g.padStart(14)).join('')}   hunger  epid  trickle  famine-mig  harvest`);
 const show = (r: YearRow) => console.log(`${String(r.year).padStart(6)} ${Math.round(r.total).toLocaleString('en-US').padStart(8)}  ${r.byGroup.map((x) => Math.round(x).toLocaleString('en-US').padStart(14)).join('')}  ${String(Math.round(r.hunger)).padStart(7)} ${String(r.epidemics).padStart(5)} ${String(Math.round(r.trickle)).padStart(8)} ${String(Math.round(r.famineMig)).padStart(11)}  ${r.harvest.toFixed(2).padStart(7)}`);
-const startRow: YearRow = { year: 0, total: Object.values(start).reduce((t, x) => t + x, 0), byGroup: groups.map(([, f]) => list().filter(f).reduce((t, s) => t + start[s.id], 0)), hunger: 0, epidemics: 0, trickle: 0, famineMig: 0, harvest: 1, timber: 0, stone: 0, goods: 0, privateHands: 0, buildings: 0, treasury: 0, tax: 0, sales: 0, spent: 0, fTimber: 0, fStone: 0, lost: 0 };
+const startRow: YearRow = { year: 0, settlements: Object.keys(start).length, founded: 0, fieldUnits: 0, fieldPeople: 0, raised: 0, total: Object.values(start).reduce((t, x) => t + x, 0), byGroup: groups.map(([, f]) => list().filter(f).reduce((t, s) => t + start[s.id], 0)), hunger: 0, epidemics: 0, trickle: 0, famineMig: 0, harvest: 1, timber: 0, stone: 0, goods: 0, privateHands: 0, buildings: 0, treasury: 0, tax: 0, sales: 0, spent: 0, fTimber: 0, fStone: 0, lost: 0 };
 show(startRow);
 for (const r of rows) if (r.year % 5 === 0 || r.year === YEARS) show(r);
 
 // ---- materials, money and buildings (Sessions 11–12) ----
 console.log(`\n  year   timber    stone    goods  private-hands  buildings  treasury   tax/yr  sales/yr  spent/yr  realm-timber  realm-stone  lost/yr`);
 for (const r of rows) if (r.year % 5 === 0 || r.year === YEARS) console.log(`${String(r.year).padStart(6)} ${Math.round(r.timber).toLocaleString('en-US').padStart(8)} ${Math.round(r.stone).toLocaleString('en-US').padStart(8)} ${Math.round(r.goods).toLocaleString('en-US').padStart(8)} ${Math.round(r.privateHands).toLocaleString('en-US').padStart(14)} ${String(r.buildings).padStart(10)} ${Math.round(r.treasury).toLocaleString('en-US').padStart(9)} ${Math.round(r.tax).toLocaleString('en-US').padStart(8)} ${Math.round(r.sales).toLocaleString('en-US').padStart(9)} ${Math.round(r.spent).toLocaleString('en-US').padStart(9)} ${Math.round(r.fTimber).toLocaleString('en-US').padStart(13)} ${Math.round(r.fStone).toLocaleString('en-US').padStart(12)} ${Math.round(r.lost).toLocaleString('en-US').padStart(8)}`);
+if (SETTLERS) {
+  console.log(`\n  year  settlements  founded  parties raised  in the field  people afield   spent/yr  treasury   hunger`);
+  for (const r of [startRow, ...rows]) if (r.year % 5 === 0 || r.year === YEARS) console.log(`${String(r.year).padStart(6)} ${String(r.settlements).padStart(12)} ${String(r.founded).padStart(8)} ${String(r.raised).padStart(15)} ${String(r.fieldUnits).padStart(13)} ${Math.round(r.fieldPeople).toLocaleString('en-US').padStart(14)} ${Math.round(r.spent).toLocaleString('en-US').padStart(10)} ${Math.round(r.treasury).toLocaleString('en-US').padStart(9)} ${String(Math.round(r.hunger)).padStart(8)}`);
+  const newIds = new Set(list().filter((s) => s.foundedTurn > startTurn).map((s) => s.id));
+  let hNew = 0, hOld = 0;
+  for (const [id, h] of Object.entries(hungerBy)) { if (newIds.has(id)) hNew += h; else hOld += h; }
+  console.log(`  hunger deaths over the run: ${Math.round(hOld).toLocaleString('en-US')} in the original settlements, ${Math.round(hNew).toLocaleString('en-US')} in the villages founded (standing at the end)`);
+  console.log(`  sprawl curve (settlements at each year's end): ${rows.map((r) => r.settlements).join(' ')}`);
+  console.log(`  spammer: ${spam.raised} parties raised (${Math.round(spam.peopleOut).toLocaleString('en-US')} people), ${rows[rows.length - 1].founded} villages standing that were founded; waited for people ${spam.waitedForPeople}×, no site ${spam.noSite}×, short of coins ${spam.refusedMoney}×, short of timber ${spam.refusedMaterials}×`);
+  const lost = state.events.filter((e) => e.kind === 'lost' || e.kind === 'hunger').length;
+  console.log(`  parties starving or lost in the field (last ${Math.min(200, state.events.length)} events): ${lost}; founded events: ${state.events.filter((e) => e.kind === 'founded').length}`);
+}
 if (BUILDER) {
   console.log(`  builder: ${queued} projects queued, ${built} buildings finished, ${Math.round(shipped).toLocaleString('en-US')} materials shipped from the realm`);
   const counts: Record<string, number> = {};

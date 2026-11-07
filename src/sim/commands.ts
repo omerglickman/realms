@@ -13,6 +13,14 @@ import { makeSettlement, settlementIdAt, buildingDef, type FoundOptions, type Se
 import { totalPopulation, createPopulation, type Population } from './demography';
 import { canBuild, moneyCost } from './buildings';
 import { payFromCluster, refund, addMaterials, MATERIAL_IDS, type Materials } from './materials';
+import {
+  type Unit, type UnitOrder, type RaiseSpec, type MusterTaken, raiseUnit, cancelRaise, routeFor, unitTypeDef, settleUnit, canSettle,
+  disbandTarget, disbandInto, unitCell,
+} from './units';
+import type { Payment } from './materials';
+import { addPopulation } from './demography';
+import { clusterRootOf } from './clusters';
+import { idx as cellIndex } from './map';
 
 export interface CellEdit {
   /** flat index = row * width + col */
@@ -108,7 +116,81 @@ export interface TransferMaterialsCommand {
   amount: Partial<Materials>;
 }
 
+// ---- units (Phase 2, DESIGN §3.2b, Session 14) ----
+
+/** Raise a party at a settlement with a muster (rule 3). Inverse: cancelRaise (only while the party is still forming). */
+export interface RaiseUnitCommand {
+  type: 'raiseUnit';
+  spec: RaiseSpec;
+}
+
+export interface CancelRaiseCommand {
+  type: 'cancelRaise';
+  unitId: string;
+  spec: RaiseSpec;
+  taken: MusterTaken[];
+  paid: Payment[];
+  fromRealm: Materials;
+  paidMoney: number;
+}
+
+/** Give a unit an order (a destination and what to do on arrival) or clear it. Inverse: the previous order. */
+export interface OrderUnitCommand {
+  type: 'orderUnit';
+  id: string;
+  order: UnitOrder;
+}
+
+/** Settlers found a village where they stand (rule 6). Inverse: unsettle. */
+export interface SettleUnitCommand {
+  type: 'settleUnit';
+  id: string;
+  name?: string;
+}
+
+export interface UnsettleCommand {
+  type: 'unsettle';
+  settlementId: string;
+  unit: Unit;
+}
+
+/**
+ * Disband a unit (rules 7, 11): into the own settlement on its hex at once, or
+ * — when the nearest fit is within reach — as a move order there. Inverse:
+ * undisband (people back out) or the previous order.
+ */
+export interface DisbandUnitCommand {
+  type: 'disbandUnit';
+  id: string;
+}
+
+export interface UndisbandCommand {
+  type: 'undisband';
+  unit: Unit;
+  into: string;
+}
+
+/**
+ * Send food between two members of one cluster by hand (rule 6, DECIDED 2026-11-07;
+ * never automatic). Instant — PLACEHOLDER until roads and caravans. Capped at
+ * what the source holds; its own inverse with from/to swapped.
+ */
+export interface SendFoodCommand {
+  type: 'sendFood';
+  from: string;
+  to: string;
+  amount: number;
+}
+
 export type Command =
+  | RaiseUnitCommand
+  | CancelRaiseCommand
+  | OrderUnitCommand
+  | SettleUnitCommand
+  | UnsettleCommand
+  | DisbandUnitCommand
+  | UndisbandCommand
+  | SendFoodCommand
   | QueueBuildingCommand
   | CancelBuildingCommand
   | RestoreProjectCommand
@@ -240,6 +322,79 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       }
       return { type: 'transferMaterials', from: cmd.to, to: cmd.from, amount: moved };
     }
+    case 'raiseUnit': {
+      const r = raiseUnit(state, cmd.spec);
+      return { type: 'cancelRaise', unitId: r.unit.id, spec: cmd.spec, taken: r.taken, paid: r.paid, fromRealm: r.fromRealm, paidMoney: r.paidMoney };
+    }
+    case 'cancelRaise': {
+      cancelRaise(state, cmd);
+      return { type: 'raiseUnit', spec: cmd.spec };
+    }
+    case 'orderUnit': {
+      const u = state.units[cmd.id];
+      if (!u) throw new Error(`No unit "${cmd.id}"`);
+      const prev = u.order;
+      if (cmd.order) {
+        const o = cmd.order;
+        if (o.then === 'settle' && !unitTypeDef(u.type).canSettle) throw new Error(`${u.name} cannot found a settlement`);
+        if (o.dest !== unitCell(state.map, u)) {
+          const route = routeFor(state, u, o.dest);
+          if (!route || !Number.isFinite(route.months)) throw new Error(`${u.name} has no way to get there`);
+        }
+      }
+      u.order = cmd.order;
+      return { type: 'orderUnit', id: cmd.id, order: prev };
+    }
+    case 'settleUnit': {
+      const u = state.units[cmd.id];
+      if (!u) throw new Error(`No unit "${cmd.id}"`);
+      const snapshot: Unit = JSON.parse(JSON.stringify(u));
+      const s = settleUnit(state, u, cmd.name);
+      return { type: 'unsettle', settlementId: s.id, unit: snapshot };
+    }
+    case 'unsettle': {
+      const s = state.settlements[cmd.settlementId];
+      if (!s) throw new Error(`No settlement "${cmd.settlementId}"`);
+      delete state.settlements[cmd.settlementId];
+      state.units[cmd.unit.id] = cmd.unit;
+      return { type: 'settleUnit', id: cmd.unit.id, name: s.name };
+    }
+    case 'disbandUnit': {
+      const u = state.units[cmd.id];
+      if (!u) throw new Error(`No unit "${cmd.id}"`);
+      const d = disbandTarget(state, u);
+      if (!d.ok || !d.target) throw new Error(`${u.name} cannot disband: ${d.reason}`);
+      if (d.target.col === u.col && d.target.row === u.row) {
+        const snapshot: Unit = JSON.parse(JSON.stringify(u));
+        disbandInto(state, u, d.target);
+        return { type: 'undisband', unit: snapshot, into: d.target.id };
+      }
+      const prev = u.order;
+      u.order = { kind: 'move', dest: cellIndex(state.map, d.target.col, d.target.row), then: 'disband', to: d.target.id };
+      return { type: 'orderUnit', id: cmd.id, order: prev };
+    }
+    case 'undisband': {
+      const s = state.settlements[cmd.into];
+      if (!s) throw new Error(`No settlement "${cmd.into}"`);
+      const back = { m: cmd.unit.pop.m.map((x) => -x), f: cmd.unit.pop.f.map((x) => -x) };
+      addPopulation(s.pop, back);
+      for (let b = 0; b < s.pop.m.length; b++) { if (s.pop.m[b] < 0) s.pop.m[b] = 0; if (s.pop.f[b] < 0) s.pop.f[b] = 0; }
+      s.food = Math.max(0, s.food - cmd.unit.provisions);
+      state.units[cmd.unit.id] = cmd.unit;
+      return { type: 'disbandUnit', id: cmd.unit.id };
+    }
+    case 'sendFood': {
+      const a = state.settlements[cmd.from], b = state.settlements[cmd.to];
+      if (!a) throw new Error(`No settlement "${cmd.from}"`);
+      if (!b) throw new Error(`No settlement "${cmd.to}"`);
+      if (a.id === b.id) return { type: 'sendFood', from: cmd.to, to: cmd.from, amount: 0 };
+      if (clusterRootOf(state, a.id) !== clusterRootOf(state, b.id)) throw new Error(`${a.name} and ${b.name} are not in the same cluster`);
+      const x = Math.max(0, Math.min(cmd.amount, a.food));
+      a.food -= x; b.food += x;
+      a.report.sent += x; b.report.received += x;
+      a.year.sent += x; b.year.received += x;
+      return { type: 'sendFood', from: cmd.to, to: cmd.from, amount: x };
+    }
   }
 }
 
@@ -276,12 +431,19 @@ function stockOf(state: GameState, key: string): Materials {
 /** Does this command change anything? (used to skip empty undo entries) */
 export function isNoop(cmd: Command): boolean {
   if (cmd.type === 'transferMaterials') return MATERIAL_IDS.every((k) => !(cmd.amount[k] && cmd.amount[k]! > 0));
+  if (cmd.type === 'sendFood') return !(cmd.amount > 0);
   return (cmd.type === 'setTerrain' || cmd.type === 'setResource') && cmd.cells.length === 0;
 }
 
 /** Does this command touch settlements (so zone/marker layers must redraw)? */
 export function commandTouchesSettlements(cmd: Command): boolean {
-  return cmd.type === 'foundSettlement' || cmd.type === 'removeSettlement' || cmd.type === 'restoreSettlement' || cmd.type === 'renameSettlement' || cmd.type === 'editSettlement' || cmd.type === 'replaceMap';
+  return cmd.type === 'foundSettlement' || cmd.type === 'removeSettlement' || cmd.type === 'restoreSettlement' || cmd.type === 'renameSettlement' || cmd.type === 'editSettlement' || cmd.type === 'replaceMap'
+    || cmd.type === 'settleUnit' || cmd.type === 'unsettle' || cmd.type === 'raiseUnit' || cmd.type === 'cancelRaise' || cmd.type === 'disbandUnit' || cmd.type === 'undisband';
+}
+
+/** Does this command touch units (so the unit layer must redraw)? */
+export function commandTouchesUnits(cmd: Command): boolean {
+  return cmd.type === 'raiseUnit' || cmd.type === 'cancelRaise' || cmd.type === 'orderUnit' || cmd.type === 'settleUnit' || cmd.type === 'unsettle' || cmd.type === 'disbandUnit' || cmd.type === 'undisband' || cmd.type === 'replaceMap';
 }
 
 /** Cells touched by a command (for renderer invalidation); 'all' for whole-map commands. */

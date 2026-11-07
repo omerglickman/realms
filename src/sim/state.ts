@@ -9,9 +9,10 @@ import { type RngState, seedRng } from './rng';
 import { type Settlement, emptyReport, emptyYearTotals } from './settlements';
 import { type Faction, initialFactions, emptyFactionYear, PLAYER_FACTION } from './factions';
 import { emptyMaterials } from './materials';
+import type { Unit } from './units';
 
-/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). */
-export const STATE_VERSION = 5;
+/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). v6: + units (Phase 2, Session 14). */
+export const STATE_VERSION = 6;
 
 export interface GameState {
   version: number;
@@ -24,6 +25,8 @@ export interface GameState {
   settlements: Record<string, Settlement>;
   /** Factions by id (Phase 1: the player only). */
   factions: Record<string, Faction>;
+  /** Units on the map by id (Phase 2, DESIGN §3.2b) — settlers, work-bands, levies; people in the field. */
+  units: Record<string, Unit>;
   /** Id of the faction the player controls (fixed for now — DESIGN §4.8). */
   playerFaction: string;
   /** Counter for generated entity ids. */
@@ -58,6 +61,7 @@ export function createGameState(seed: string, map: MapData): GameState {
     turn: 0,
     map,
     settlements: {},
+    units: {},
     factions: initialFactions(),
     playerFaction: PLAYER_FACTION,
     nextId: 1,
@@ -111,10 +115,16 @@ export function deserializeState(json: string): GameState {
     for (const f of Object.values(s.factions ?? {})) { f.year = emptyFactionYear(); f.lastYear = null; }
     s.version = 5;
   }
+  if (s.version === 5) {
+    // Session 14 (Phase 2): units on the map
+    s.units = {};
+    s.version = 6;
+  }
   if (s.version !== STATE_VERSION) {
     throw new Error(`Save version ${s.version} not supported (expected ${STATE_VERSION})`);
   }
   if (!s.settlements) s.settlements = {};
+  if (!s.units) s.units = {};
   if (!s.factions) s.factions = initialFactions();
   if (!s.playerFaction) s.playerFaction = PLAYER_FACTION;
   if (typeof s.nextId !== 'number') s.nextId = 1;

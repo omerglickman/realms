@@ -237,6 +237,10 @@ export interface FoundOptions {
   population: number;
   /** starting granary in months of consumption (default 12 — enough to reach the first harvest from January) */
   foodMonths?: number;
+  /** exact cohorts instead of the stationary distribution (settlers founding a village, Session 14) */
+  pop?: Population;
+  /** exact granary in food units (settlers' remaining provisions); overrides foodMonths */
+  food?: number;
 }
 
 /** Terrain a settlement centre may stand on: passable land (DESIGN §3.3; water and mountains excluded). */
@@ -262,8 +266,8 @@ export function makeSettlement(state: GameState, o: FoundOptions): Settlement {
     col: o.col,
     row: o.row,
     faction: o.faction === undefined ? state.playerFaction : o.faction,
-    pop: createPopulation(o.population),
-    food: o.population * (o.foodMonths ?? 12),
+    pop: o.pop ? { m: o.pop.m.slice(), f: o.pop.f.slice() } : createPopulation(o.population),
+    food: o.food !== undefined ? o.food : o.population * (o.foodMonths ?? 12),
     buildings: [def.hall, def.granary],
     stock: emptyMaterials(),
     build: null,

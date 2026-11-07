@@ -1,0 +1,79 @@
+{
+  "_comment": "Units (DESIGN §3.2b, DECIDED by Omer 2026-11-07; every number here is DRAFT, ×3 scale — DESIGN §5.8). A unit carries people drawn from settlements (a proportional slice of every cohort; a levy takes men 15–44 only) and returns them when it settles or disbands. `enabled` says which types the player may raise in the current build: settlers in Phase 2 session 1; work-bands (session 2) and levies (session 3) are data only until then. Costs: `money` from the faction treasury; materials from the raising settlement's cluster stockpile, the rest from the realm stockpile with a notice (instant — PLACEHOLDER until roads and caravans). `movePoints` per month against data/terrain.json moveCost (mountains take the whole month, lake and sea are impassable, a river hex is crossed only by a bridge or a settlement standing on it). `defaultSize`: a number of people, or \"destination\" = the hands the destination's seven hexes + hall + granary need, turned into people at the source's hands share. `defaultProvisions`: months, or \"calendar\" = months until the October harvest + 2 (max 12).",
+  "types": [
+    {
+      "id": "settlers",
+      "name": "Settlers",
+      "icon": "settlers",
+      "enabled": true,
+      "slice": "all",
+      "movePoints": 4,
+      "cost": { "money": 1000, "timber": 90 },
+      "defaultSize": "destination",
+      "defaultProvisions": "calendar",
+      "canSettle": true,
+      "blurb": "Families with carts and seed grain, bound for new land. Founds a village where it stops; disbands only into an own settlement."
+    },
+    {
+      "id": "workband",
+      "name": "Work-band",
+      "icon": "workband",
+      "enabled": false,
+      "slice": "all",
+      "movePoints": 5,
+      "cost": { "money": 500, "timber": 30 },
+      "defaultSize": 300,
+      "defaultProvisions": 3,
+      "canSettle": false,
+      "blurb": "Labourers who build roads, bridges, quarries and forts on the hex they stand on (Phase 2 session 2)."
+    },
+    {
+      "id": "levy",
+      "name": "Levy",
+      "icon": "levy",
+      "enabled": false,
+      "slice": "men",
+      "movePoints": 5,
+      "cost": { "money": 0 },
+      "defaultSize": 300,
+      "defaultProvisions": 3,
+      "canSettle": false,
+      "upkeepPerManPerMonth": 1,
+      "blurb": "Men 15–44 called from a settlement; paid upkeep; disband is a walk home (Phase 2 session 3)."
+    }
+  ],
+  "provisions": {
+    "_comment": "months of food a unit may carry at most; the settlers' calendar default = months until harvestMonth (0 = January) + afterHarvestMonths. Inside own borders a unit refills to its chosen months from the cluster whose influence covers the hex.",
+    "maxMonths": 12,
+    "harvestMonth": 9,
+    "afterHarvestMonths": 2
+  },
+  "foraging": {
+    "_comment": "Outside the borders a unit works the food jobs of its hex and ring 1 with its own hands, best yield per hand first: fish and game at settlement efficiency, farming and herding at these shares of the hex's yield (Omer 2026-11-07), arriving monthly in twelfths (no harvest calendar — gleaning, not a harvest).",
+    "rings": 1,
+    "share": { "farm": 0.2, "herd": 0.3, "fish": 1, "hunt": 1 }
+  },
+  "staffing": {
+    "_comment": "Partial staffing of a food hex (DESIGN §3.2b rule 1, continuous reading confirmed by Omer 2026-11-07): at or above `full` the hex yields its staffing share; between `drop` and `full` each point below `full` costs `slope` points of output; below `drop` the hex is not worked and its hands try a smaller job before becoming spare. Buildings and material gathering stay linear.",
+    "full": 0.75,
+    "drop": 0.5,
+    "slope": 2
+  },
+  "muster": {
+    "_comment": "a party may be gathered from the raising settlement, the other members of its cluster, and any own settlement within this many hexes; it forms on the raising settlement's hex at the next end of turn (the walk inside the cluster is abstracted — PLACEHOLDER until groups exist).",
+    "withinHexes": 3
+  },
+  "disband": {
+    "_comment": "a unit disbands into the closest non-starving own settlement within this many hexes (the least starving if all are); none within reach → the order is refused.",
+    "withinHexes": 3
+  },
+  "settle": {
+    "_comment": "settlers may found a village on any land hex except these terrains, outside every other settlement's work zone.",
+    "excludeTerrain": ["mountains"],
+    "tier": "village"
+  },
+  "naming": {
+    "_comment": "PLACEHOLDER until culture groups and naming exist (DESIGN §4.10): a new village is called after its home settlement.",
+    "pattern": "New {home}"
+  }
+}

@@ -14,6 +14,7 @@
 // Deterministic apart from the seeded noise knobs (src/sim/noise.ts).
 
 import economyData from '../../data/economy.json';
+import unitData from '../../data/units.json';
 import type { GameState } from './state';
 import type { MapData } from './map';
 import { TERRAIN } from './terrain';
@@ -120,7 +121,26 @@ export interface StaffedBuilding {
 }
 
 export interface StaffedJob extends Job {
+  /** share of the hex's yield produced (after the partial-staffing curve) */
   fraction: number;
+  /** share of the hex's hands present */
+  staffing: number;
+}
+
+/** Partial staffing of a hex (DESIGN §3.2b rule 1, DECIDED 2026-11-07; numbers in data/units.json `staffing`) — read live. */
+type StaffingCurve = { full: number; drop: number; slope: number };
+const STAFFING: StaffingCurve = (unitData as unknown as { staffing: StaffingCurve }).staffing;
+
+/**
+ * Output share of a food hex staffed at `staffing` (0–1): the staffing itself
+ * from `full` up; below it each point costs `slope` points; under `drop` the
+ * hex is not worked at all (0).
+ */
+export function staffingOutput(staffing: number): number {
+  const f = Math.max(0, Math.min(1, staffing));
+  if (f >= STAFFING.full) return f;
+  if (f < STAFFING.drop) return 0;
+  return Math.max(0, STAFFING.full - STAFFING.slope * (STAFFING.full - f));
 }
 
 export interface LabourPlan {
@@ -191,15 +211,19 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
   jobs.sort((a, b) => b.fedPerYear / b.hands - a.fedPerYear / a.hands || a.cell - b.cell);
   const staffed: StaffedJob[] = [];
   let landCapacity = 0, plannedPerYear = 0, fieldHands = 0;
+  // hexes fill in yield order, so at most one is partly staffed; under the drop line (DESIGN §3.2b rule 1) a
+  // hex is not worked and its hands stay free for a smaller job further down the list
   for (const j of jobs) {
     landCapacity += j.fedPerYear;
-    const got = Math.min(left, j.hands);
+    let got = Math.min(left, j.hands);
+    let staffing = got / j.hands;
+    let fraction = staffingOutput(staffing);
+    if (fraction <= 0) { got = 0; staffing = 0; }
     left -= got;
     fieldHands += got;
     vacancies += j.hands - got;
-    const fraction = got / j.hands;
     plannedPerYear += j.fedPerYear * fraction;
-    staffed.push({ ...j, fraction });
+    staffed.push({ ...j, fraction, staffing });
   }
   const idleHands = left;
 
