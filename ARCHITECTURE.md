@@ -9,17 +9,17 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 - **`src/headless/`** — CLI runners that import `src/sim` only.
 - **`data/`** — the designer's numbers. `terrain.json`, `resources.json`, `settlements.json` tiers are **index-stable** (append only).
 - **`maps/testmap.json`** — the canonical map ("vinral", 160×100, format `realms-map` v2). **`scenarios/start.json`** — Omer's starting position (a whole `GameState`, format `realms-scenario` v1); the build opens on it.
-- **`tests/`** — one file per sim module + scenario tests (Vitest). Tests zero the noise knobs (`setNoise(NO_NOISE)`) and usually abandonment (`setAbandonBelow(0)`).
+- **`tests/`** — one file per sim module + scenario tests (Vitest; `units.test.ts`, `pathfinding.test.ts` since Session 14). Tests zero the noise knobs (`setNoise(NO_NOISE)`) and usually abandonment (`setAbandonBelow(0)`).
 
 ## Turn order (one month)
 
-`turn.ts endTurn` → `economy.ts economyMonth` (January: harvest factors; per settlement in rank order — villages before towns before cities: plan labour → produce → tithe up → consume + hunger → gather, tax, goods, sales, construction → spoil & cap; then the cluster stockpile-cap pass; surplus up; abandonment; famine migration; yearly totals) → in December `demographyYear` (epidemic roll, births/deaths/aging with the granary brake, the pull factor, faction year roll-over, pop history).
+`turn.ts endTurn` → `units.ts unitsMonth` (Phase 2: every unit in id order — walk its route for the month and carry out the arrival order (settle / disband); then eat: inside own borders from the covering settlement's cluster, topping the bags up to the chosen months; outside, forage hex + ring 1 and eat the bags; hunger when empty) → `economy.ts economyMonth` (January: harvest factors; per settlement in rank order — villages before towns before cities: plan labour → produce → tithe up → consume + hunger → gather, tax, goods, sales, construction → spoil & cap; then the cluster stockpile-cap pass; surplus up; abandonment; famine migration; yearly totals) → in December `demographyYear` (epidemic roll, births/deaths/aging with the granary brake, the pull factor, faction year roll-over, pop history).
 
 ## `src/sim/` — one line each
 
 | File | Job |
 |---|---|
-| `state.ts` | `GameState` (version 5), `createGameState`, `calendar`, `logEvent`, serialize/deserialize with migrations v1→v5 |
+| `state.ts` | `GameState` (version 6), `createGameState`, `calendar`, `logEvent`, serialize/deserialize with migrations v1→v6 |
 | `rng.ts` | seeded sfc32: `seedRng`, `nextFloat`, `nextU32`, `nextGaussian` |
 | `hex.ts` | pointy-top hexes, axial ↔ odd-r offset, rings, distance — the only file that knows geometry |
 | `map.ts` / `mapfile.ts` | `MapData` (terrain + resource index arrays), bounds, neighbours; map file v2 read/write |
@@ -28,15 +28,17 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `water.ts` | `isShore` (sea touching land), `isFishable` |
 | `settlements.ts` | `Settlement`, `TIERS`, `BUILDINGS` + `buildingDef`, `BuildProject`, `SettlementReport` (last month), `YearTotals` (running year / `lastYear`), work & influence zones, contested-hex assignment (`workedCellsBySettlement`), parent resolution, `settlementsByRank`, `abandonBelow` |
 | `demography.ts` | cohort `Population` (sex × 5 bands), `workingHands`, `yearlyUpdate` (births, deaths, aging, crowding, epidemic, Poisson sampling, granary brake `granaryBrakeFactor`), `applyHunger`, `takeSlice`/`addPopulation` |
-| `economy.ts` | labour plan (`planLabour`: buildings → fields → construction → gathering; private hands, tax, goods, admin quality), food jobs per hex, `monthlyProduction`, granary terms, `reserveFood`/`forecastBeforeHarvest`, tithe (`titheShare`), `economyMonth`, `abandonEmptySettlements`, `demographyYear` (pull factor), `PRIVATE`/`taxRate` |
+| `economy.ts` | labour plan (`planLabour`: buildings → fields with the partial-staffing curve `staffingOutput` (Session 14; `StaffedJob.staffing` vs `fraction`) → construction → gathering; private hands, tax, goods, admin quality), food jobs per hex, `monthlyProduction`, granary terms, `reserveFood`/`forecastBeforeHarvest`, tithe (`titheShare`), `economyMonth`, `abandonEmptySettlements`, `demographyYear` (pull factor), `PRIVATE`/`taxRate` |
 | `materials.ts` | `Materials` {timber, stone, goods}; `clusterStock`, `clusterCap`/`realmCap` (+ `setStockCaps`), `payFromCluster` (own stock first, exact record) / `refund`, `takeFromCluster` (proportional) |
 | `buildings.ts` | `buildableFor`, `canBuild` (tier, duplicate, running project, required hex, stockpile, treasury), `cellMeets`, `hasStone`, `sumEffects` (`BuildingEffects`), `monthsLeft`, `moneyCost` |
 | `clusters.ts` | derived clusters from parent links: `clustersOf`, `clusterOf`, `clusterRootOf`, `clusterMembers`, `clusterInfluenceCells`, `realmReport` — never stored |
 | `factions.ts` | `Faction` (treasury, stock, yearly ledger `FactionYear`), `initialFactions`, colours |
 | `noise.ts` | the realism knobs read live from data (sampling, epidemic, harvest variance, pull factor): `noise()`, `setNoise`, `NO_NOISE` |
-| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`) |
+| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`); units (Session 14): `raiseUnit` ⇄ `cancelRaise`, `orderUnit` (its own inverse; validates the route), `settleUnit` ⇄ `unsettle`, `disbandUnit` ⇄ `undisband` (or a move order home), `sendFood` (same cluster; own inverse); `commandTouchesUnits` |
+| `units.ts` | Phase 2 (DESIGN §3.2b): `Unit` (type, faction, hex + river bank, cohorts, provisions, provisionMonths, home, order, report), `UNIT_TYPES` from `data/units.json`; sizes and defaults (`destinationHands`, `defaultSize`, `defaultProvisionMonths`); raising with a muster (`musterSources`, `raiseCheck`, `raiseUnit`, `cancelRaise`, `takeMen`); settling (`canFoundAt`, `canSettle`, `settleUnit`, `villageName`); disbanding (`disbandTarget`, `disbandInto`); the field (`coveringSettlement`, `forage`); `unitsMonth` |
+| `pathfinding.ts` | A* over (hex, bank) nodes: `stepCost` (terrain `moveCost`; mountains = the month's points; lake/sea impassable), `riverBanks` (runs of land between water / map-edge neighbours; exactly two → banks; a settlement bridges — `isBridged`), `stepsFrom`, `findRoute` → `Route {nodes, cost, months}`, `stepsThisMonth` / `walkMonths` (a step needs its full cost, a unit that has not moved yet may always take one) |
 | `scenario.ts` | scenario file ↔ `GameState`, `rebaseAsStart` |
-| `turn.ts` | `endTurn` |
+| `turn.ts` | `endTurn`: units, then economy, then December's demography |
 
 ## `src/ui/`
 
@@ -67,7 +69,8 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `run.ts` | `npm run sim -- …` dispatcher: draft maps (`--seed --continents --islands --land --turns --out`), `--scenario phase1 | testmap | start` |
 | `phase1.ts` | eight ideal-land cases, 20 years |
 | `testmap.ts` | cities on the real map |
-| `start.ts` | Omer's starting position with knob presets and overrides (`--preset`, `--tithe`, `--brake`, `--prosperous`, `--caps`, `--tax`, `--builder 1` scripted builder that ships materials, `--csv`) — the A/B tool |
+| `start.ts` | Omer's starting position with knob presets and overrides (`--preset`, `--tithe`, `--brake`, `--prosperous`, `--caps`, `--tax`, `--builder 1` scripted builder that ships materials, `--settlers 1|2 --reach N` the settler-spammer with the sprawl table, `--csv`) — the A/B tool |
+| `settlers.ts` | the settler-spammer (Session 14): per cluster root, one party at a time from the members' spare hands (2 = also 10 % of everyone) to the best unclaimed site within reach (food of the hexes nobody works, ≥ 5 free hexes, route ≤ 6 months); `fieldReport` |
 | `inspect.ts` | list a scenario's settlements |
 | `mapdiff.ts` | `npm run mapdiff -- <file>` — diff an exported map against the canonical one |
 
@@ -87,8 +90,9 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `settlements.json` | tiers (rings, gates), abandonment, metropolis prerequisites (proposed) |
 | `buildings.json` | mandatory halls/granaries per tier; buildable buildings (cost incl. money, months, hands, requires, effects, stockCap) |
 | `factions.json` | the player faction (placeholder name/colour) |
+| `units.json` | unit types (settlers enabled; work-band, levy data only), provisions rule, foraging shares, the partial-staffing curve, muster / disband reach, settle rule, naming placeholder |
 | `terrain.json`, `resources.json` | index-stable tables |
 
 ## Save/state versions
 
-v1 map+clock · v2 settlements · v3 factions, pop history · v4 stocks, projects · v5 faction ledger, `paidMoney`. `deserializeState` migrates forward; a test covers it.
+v1 map+clock · v2 settlements · v3 factions, pop history · v4 stocks, projects · v5 faction ledger, `paidMoney` · v6 units. `deserializeState` migrates forward; a test covers it.
