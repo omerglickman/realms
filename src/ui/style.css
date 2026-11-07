@@ -519,3 +519,65 @@ body.editing #map { cursor: crosshair; }
 
 /* new-draft generator (lives in the Settings/Map modal) */
 .gen-grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; align-items: center; max-width: 420px; }
+
+/* =====================================================================
+   Units (Phase 2 session 1b): the pinned unit card and the raise dialog
+   ===================================================================== */
+
+/* the unit card shares the hover card's shape; it is pinned (click to open, Esc or a click on empty map closes) */
+#unitcard {
+  position: absolute; z-index: 16;
+  min-width: 250px; max-width: 330px;
+  background: var(--parch); color: var(--ink);
+  border: 1px solid var(--oak-2); border-left: 5px solid var(--oak);
+  border-radius: 3px; padding: 7px 11px 8px;
+  font-size: 12.5px; line-height: 1.45;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+#unitcard .pop-head { display: flex; align-items: center; gap: 7px; margin-bottom: 3px; }
+#unitcard .pop-ico .ico { width: 20px; height: 20px; color: var(--oak-2); }
+#unitcard .pop-name { font-family: var(--script); font-size: 16px; color: var(--oak); }
+#unitcard .pop-tier { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-left: auto; }
+#unitcard .pop-row { display: flex; justify-content: space-between; gap: 12px; }
+#unitcard .pop-row span:first-child { color: var(--ink-3); }
+#unitcard .pop-row .num { font-variant-numeric: tabular-nums; text-align: right; }
+#unitcard .pop-row a { color: var(--lapis); }
+#unitcard .gauge { margin: 3px 0 2px; }
+#unitcard .warnline { color: var(--verm); margin-top: 4px; line-height: 1.4; }
+#unitcard .warnline .ico { width: 13px; height: 13px; vertical-align: -2px; }
+#unitcard .pop-hint { color: var(--ink-3); font-size: 10.5px; margin-top: 4px; font-style: italic; }
+#unitcard .pop-actions { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--rule); }
+#unitcard .pop-actions .ico { width: 12px; height: 12px; vertical-align: -2px; }
+#unitcard.targeting { outline: 2px solid var(--gold); outline-offset: -1px; }
+
+/* the raise dialog: a small parchment modal above the ledger */
+#dialog {
+  position: absolute; z-index: 45;
+  left: 50%; top: calc(var(--bar-h) + 60px);
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100vh - var(--bar-h) - 90px);
+  display: flex; flex-direction: column;
+  background: var(--parch-2); color: var(--ink);
+  border: 2px solid var(--oak); outline: 1px solid var(--gold); outline-offset: -5px; border-radius: 4px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.65);
+  font-size: 13px; line-height: 1.45;
+}
+#dialog .rd-head { display: flex; align-items: center; gap: 12px; padding: 10px 16px 8px; border-bottom: 1px solid var(--rule); }
+#dialog .rd-head .rd-ico .ico { width: 30px; height: 30px; color: var(--oak-2); }
+#dialog .rd-head .rd-title { font-family: var(--script); font-size: 22px; color: var(--oak); line-height: 1.1; }
+#dialog .rd-head .m-close { margin-left: auto; font: inherit; font-size: 22px; line-height: 1; background: transparent; border: none; color: var(--ink-3); cursor: pointer; padding: 0 4px; }
+#dialog .rd-head .m-close:hover { color: var(--verm); }
+#dialog .rd-body { overflow-y: auto; padding: 8px 16px 12px; flex: 1; min-height: 0; }
+#dialog .rd-body h3 { font-family: var(--script); font-weight: 400; font-size: 16px; color: var(--oak); margin: 10px 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--rule); }
+#dialog .rd-body h3:first-child { margin-top: 0; }
+#dialog .rd-body h3 small { font-family: var(--body); font-size: 11.5px; color: var(--ink-3); margin-left: 8px; }
+#dialog .rd-body input[type=number], #dialog .rd-body input[type=text] { font: inherit; font-size: 12.5px; background: var(--parch); border: 1px solid var(--rule); border-radius: 2px; padding: 1px 4px; color: var(--ink); }
+#dialog .rd-body table.data td input { text-align: right; }
+#dialog .rd-body input[type=range] { accent-color: var(--verd); }
+#dialog .rd-foot { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-top: 1px solid var(--rule); background: rgba(0, 0, 0, 0.04); }
+#dialog .rd-foot .cost { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+#dialog .rd-foot .cost .ico { color: var(--oak-2); width: 13px; height: 13px; vertical-align: -2px; }
+#dialog .rd-foot .cost .short { color: var(--verm); }
+#dialog .rd-foot .spacer { flex: 1; }
+#dialog .rd-foot .warn { font-style: italic; font-size: 12.5px; }

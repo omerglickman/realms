@@ -3,8 +3,10 @@
 
 Loads dist/realms.html in headless Chrome, runs a few years, opens the realm,
 cluster and settlement ledgers (Session 13 modals), buys the first affordable
-building, advances until it finishes, sends materials from the realm stockpile — and fails on any
-console error or page error. Screenshots go to /tmp/smoke_*.png.
+building, advances until it finishes, sends materials from the realm stockpile,
+raises a party of settlers (Phase 2: the Recruitment page and the raise dialog),
+lets it form, opens its card, disbands it, and sends food inside a cluster — and
+fails on any console error or page error. Screenshots go to /tmp/smoke_*.png.
 
 Needs: python3 with the playwright package (pip install playwright) and a
 Chrome/Chromium binary — $CHROME, else /usr/bin/google-chrome, else
@@ -65,6 +67,32 @@ async def main() -> int:
         await tab('stockpile')
         await pg.fill('#sp-send-timber', '30'); await pg.click('#sp-send-go'); await pg.wait_for_timeout(300)
         t = await panel(); print('REALM AFTER:', *lines(t, 'timber'), sep='\n  ')
+        # ---- Phase 2: raise settlers at the cluster root, let them form, open the card, disband ----
+        await tab('clusters'); await pg.click('#modal .m-body a[data-cluster]'); await pg.wait_for_timeout(300)
+        await tab('members'); await pg.click('#modal .m-body a[data-focus]'); await pg.wait_for_timeout(400)
+        await tab('recruitment')
+        t = await panel(); print('RECRUIT:', *lines(t, 'can be raised'), sep='\n  ')
+        if await pg.query_selector('#modal .cube.avail[data-raise=settlers]'):
+            await pg.click('#modal .cube.avail[data-raise=settlers]'); await pg.wait_for_timeout(400)
+            assert await pg.is_visible('#dialog'), 'raise dialog did not open'
+            print('DIALOG:', (await pg.inner_text('#dialog .rd-foot')).replace('\n', ' | '))
+            await pg.click('#dialog [data-act=raise]'); await pg.wait_for_timeout(500)
+            assert await pg.is_visible('#unitcard'), 'unit card did not open after raising'
+            print('CARD:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:200])
+            await pg.keyboard.press('Space'); await pg.wait_for_timeout(600)  # the party forms
+            assert await pg.query_selector('#unitcard [data-act=move]'), 'the formed party has no orders'
+            await pg.screenshot(path='/tmp/smoke_unit.png')
+            await pg.click('#unitcard [data-act=disband]'); await pg.wait_for_timeout(400)
+            assert await pg.is_hidden('#unitcard'), 'the party did not disband on its own settlement'
+            print('EVENT:', await pg.inner_text('#info-event'))
+        # ---- send food between two members of a cluster ----
+        await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
+        await tab('clusters'); await pg.click('#modal .m-body a[data-cluster]'); await pg.wait_for_timeout(300)
+        await tab('food')
+        if await pg.query_selector('#sf-go'):
+            await pg.fill('#sf-amount', '300'); await pg.click('#sf-go'); await pg.wait_for_timeout(300)
+            ev = await pg.inner_text('#info-event'); print('SEND FOOD:', ev)
+            assert 'sent 300 food' in ev, 'send food did not happen'
         await b.close()
     if errs:
         print('CONSOLE ERRORS:', *errs, sep='\n  '); return 1

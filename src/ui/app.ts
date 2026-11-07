@@ -5,16 +5,21 @@
 import { Application, Graphics } from 'pixi.js';
 import { MapRenderer, HEX_SIZE } from './render/mapRenderer';
 import { SettlementLayer, setLabelFont } from './render/settlementLayer';
+import { UnitLayer, unitAtWorld, shieldSize, type UnitPath } from './render/unitLayer';
+import { renderUnitCard } from './panels/unitCard';
+import { renderRaiseDialog, newRaiseDraft, type RaiseDraft } from './panels/raiseDialog';
+import { routeFor, unitCell, unitTypeDef, canFoundAt, unitsAt, UNIT_TYPES, type Unit } from '../sim/units';
+import { findRoute, OPEN } from '../sim/pathfinding';
 import { Camera } from './camera';
 import { Editor } from './editor/editor';
 import { renderHud } from './panels/hud';
 import { renderHoverCard } from './panels/hoverCard';
 import { ModalShell, wireLinks, type ModalSpec } from './panels/modal';
 import { settlementSpec, wireSettlement } from './panels/settlementModal';
-import { clusterSpec, wireSend } from './panels/clusterModal';
+import { clusterSpec, wireSend, wireSendFood } from './panels/clusterModal';
 import { realmSpec } from './panels/realmModal';
 import { clusterOf, clusterRootOf } from '../sim/clusters';
-import { factionStockKey, type Command } from '../sim/commands';
+import { factionStockKey, type Command, type CancelRaiseCommand } from '../sim/commands';
 import type { Materials } from '../sim/materials';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
@@ -133,13 +138,28 @@ export async function startApp(): Promise<void> {
   // the map's icon textures (resources, things on hexes, tier marks) — rasterised once from the shared icon set
   await preloadIconTextures([...RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), 'mill', 'wharf', 'castle1', 'castle2', 'castle3', 'station'], MAP_BADGE);
   await preloadIconTextures(RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), MAP_BADGE_IDLE);
-  await preloadIconTextures(SL.TIER_ICON, MAP_MARK);
+  await preloadIconTextures([...SL.TIER_ICON, ...UNIT_TYPES.map((t) => t.icon)], MAP_MARK);
 
   const renderer = new MapRenderer(state.map);
   const settlementLayer = new SettlementLayer();
+  const unitLayer = new UnitLayer();
   const camera = new Camera(renderer.root, app.screen.width, app.screen.height);
   const hover = new Graphics();
-  renderer.root.addChild(settlementLayer.root, hover);
+  renderer.root.addChild(settlementLayer.root, hover, unitLayer.root);
+
+  // ---- units (Phase 2 session 1b): selection, the pinned card, targeting modes, the raise dialog ----
+  let selectedUnitId: string | null = null;
+  let hoverUnitId: string | null = null;
+  /** choosing a hex on the map: a move / settle order for a unit, or the destination of a party being raised */
+  type Mode = { kind: 'order'; unitId: string; then: 'none' | 'settle' } | { kind: 'pickDest' } | null;
+  let mode: Mode = null;
+  let preview: { cells: number[]; months: number; label: string } | null = null;
+  let previewCell = -1;
+  let raiseDraft: RaiseDraft | null = null;
+  /** the inverse of every raise made in this session, so a mustering party can be cancelled from its Recruitment page */
+  const raiseInverses = new Map<string, CancelRaiseCommand>();
+  const unitCard = el<HTMLDivElement>('unitcard');
+  const dialog = el<HTMLDivElement>('dialog');
   app.stage.addChild(renderer.root);
 
   // ---- hover card: a small card to the right of the hovered settlement ----
@@ -212,7 +232,7 @@ export async function startApp(): Promise<void> {
 
   function applyMap(fit: boolean): void {
     renderer.setMap(state.map);
-    renderer.root.addChild(settlementLayer.root, hover);
+    renderer.root.addChild(settlementLayer.root, hover, unitLayer.root);
     const ws = renderer.worldSize();
     camera.setWorldSize(ws.width, ws.height);
     if (fit) camera.fit();
@@ -224,6 +244,8 @@ export async function startApp(): Promise<void> {
     state = s;
     selectedId = null;
     hoverId = null;
+    selectedUnitId = null; hoverUnitId = null; mode = null; preview = null; raiseDraft = null;
+    raiseInverses.clear();
     if (view && (view.kind === 'settlement' || view.kind === 'cluster')) closeView();
     applyMap(fit);
   }
@@ -232,19 +254,195 @@ export async function startApp(): Promise<void> {
   function stateChanged(): void {
     if (selectedId && !state.settlements[selectedId]) selectedId = null;
     if (hoverId && !state.settlements[hoverId]) hoverId = null;
+    if (selectedUnitId && !state.units[selectedUnitId]) { selectedUnitId = null; mode = mode?.kind === 'order' ? null : mode; preview = null; }
+    if (hoverUnitId && !state.units[hoverUnitId]) hoverUnitId = null;
+    if (raiseDraft && !state.settlements[raiseDraft.at]) closeDialog();
     workAssign = computeWorkAssignment(state);
     renderer.setWorkedCells(new Set(workAssign.keys()));
     updateMapInfo();
     refreshLayer();
     renderHud(tiles, state, { onRealm: (tab) => openView('realm', '', tab) });
     renderView();
+    renderUnitCardNow();
+    if (raiseDraft) renderDialog();
     editor.refreshPanel();
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   }
 
   function refreshLayer(): void {
     settlementLayer.update(state, { hover: hoverId, selected: selectedId, zoom: camera.zoom, settling: editor.settling });
+    unitLayer.update(state, { hover: hoverUnitId, selected: selectedUnitId, zoom: camera.zoom, preview });
     positionPopover();
+    positionUnitCard();
+  }
+
+  // ---- the unit card: pinned next to the selected unit's shield ----
+  function selectUnit(id: string | null): void {
+    if (id && !state.units[id]) id = null;
+    selectedUnitId = id;
+    if (!id && mode?.kind === 'order') { mode = null; preview = null; }
+    if (id) {
+      // a unit's card and a settlement's ledger do not share the screen well: close the ledger
+      if (view?.kind === 'settlement' || view?.kind === 'cluster') { closeView(); }
+      selectedId = null;
+    }
+    renderUnitCardNow();
+    refreshLayer();
+  }
+  function renderUnitCardNow(): void {
+    const u = selectedUnitId ? state.units[selectedUnitId] : null;
+    if (!u) { unitCard.classList.add('hidden'); return; }
+    renderUnitCard(unitCard, state, u, {
+      onMove: (id) => startOrder(id, 'none'),
+      onSettleAt: (id) => startOrder(id, 'settle'),
+      onSettleHere: (id) => act({ type: 'settleUnit', id }),
+      onDisband: (id) => act({ type: 'disbandUnit', id }),
+      onCancelOrder: (id) => act({ type: 'orderUnit', id, order: null }),
+      onFocusSettlement: (id) => focusSettlement(id),
+    });
+    unitCard.style.borderLeftColor = state.factions[u.faction]?.color ?? '#4a2f1a';
+    unitCard.classList.toggle('targeting', mode?.kind === 'order');
+    unitCard.classList.remove('hidden');
+    positionUnitCard();
+  }
+  function positionUnitCard(): void {
+    const u = selectedUnitId ? state.units[selectedUnitId] : null;
+    if (!u || unitCard.classList.contains('hidden')) return;
+    const cell = unitCell(state.map, u);
+    const sh = unitLayer.shieldAt(state, cell, camera.zoom);
+    let p = sh ? { x: sh.x, y: sh.y } : offsetToPixel(u.col, u.row, HEX_SIZE);
+    let r = shieldSize(camera.zoom).w * 0.6 * camera.zoom;
+    // on a settlement's hex the shield sits at the marker's upper-left: keep the card clear of the marker
+    const sid = settlementIdAt(state, u.col, u.row);
+    if (sid && !unitLayer.animating) {
+      const sp = offsetToPixel(u.col, u.row, HEX_SIZE);
+      r = Math.max(r, (SL.markerRadius(state.settlements[sid], camera.zoom) + (sp.x - p.x)) * camera.zoom);
+      p = { x: sp.x, y: p.y };
+    }
+    const sx = renderer.root.position.x + p.x * camera.zoom;
+    const sy = renderer.root.position.y + p.y * camera.zoom;
+    const w = unitCard.offsetWidth, h = unitCard.offsetHeight;
+    let left = sx + r + 12;
+    if (left + w > window.innerWidth - 8) left = sx - r - 12 - w;
+    let top = sy - h / 2;
+    top = Math.max(topbar.offsetHeight + 4, Math.min(window.innerHeight - h - 8, top));
+    unitCard.style.left = `${Math.max(4, left)}px`;
+    unitCard.style.top = `${top}px`;
+  }
+  /** Move / Settle at…: the next click on the map is the destination; hovering previews the route. */
+  function startOrder(unitId: string, then: 'none' | 'settle'): void {
+    if (mode?.kind === 'order' && mode.unitId === unitId && mode.then === then) { mode = null; preview = null; }
+    else mode = { kind: 'order', unitId, then };
+    previewCell = -1;
+    el('info-event').textContent = mode ? (then === 'settle' ? 'Click the hex where the settlers should found their village (Esc to cancel).' : 'Click the hex the party should march to (Esc to cancel).') : '';
+    renderUnitCardNow();
+    if (mouseX >= 0) updateHover(mouseX, mouseY);
+    refreshLayer();
+  }
+  /** The route a hovered hex would mean in the current targeting mode, for the preview. */
+  function previewTo(cell: number): void {
+    if (cell === previewCell) return;
+    previewCell = cell;
+    preview = null;
+    if (!mode) return;
+    let start: { cell: number; bank: number } | null = null, points = 4, settle = false, label = '';
+    if (mode.kind === 'order') {
+      const u = state.units[mode.unitId];
+      if (!u) { mode = null; return; }
+      start = { cell: unitCell(state.map, u), bank: u.bank };
+      points = unitTypeDef(u.type).movePoints;
+      settle = mode.then === 'settle';
+    } else if (raiseDraft) {
+      const s = state.settlements[raiseDraft.at];
+      if (!s) return;
+      start = { cell: idx(state.map, s.col, s.row), bank: OPEN };
+      points = unitTypeDef(raiseDraft.type).movePoints;
+      settle = unitTypeDef(raiseDraft.type).canSettle;
+    }
+    if (!start || start.cell === cell) return;
+    const route = findRoute(state, start, cell, points);
+    if (!route || !Number.isFinite(route.months)) { preview = { cells: [start.cell, cell], months: Infinity, label: 'no way there' }; return; }
+    label = `${route.months} mo`;
+    if (settle) { const f = canFoundAt(state, cell); label += f.ok ? ' · settle' : ` · ${f.reason}`; }
+    preview = { cells: [start.cell, ...route.nodes.map((n) => n.cell)], months: route.months, label };
+  }
+  /** A click on `cell` while targeting. */
+  function targetClicked(cell: number): void {
+    if (!mode) return;
+    if (mode.kind === 'order') {
+      const u = state.units[mode.unitId];
+      const then = mode.then;
+      mode = null; preview = null; previewCell = -1;
+      el('info-event').textContent = '';
+      if (!u) return;
+      if (cell === unitCell(state.map, u)) { if (then === 'settle') act({ type: 'settleUnit', id: u.id }); else act({ type: 'orderUnit', id: u.id, order: null }); }
+      else act({ type: 'orderUnit', id: u.id, order: { kind: 'move', dest: cell, then } });
+      renderUnitCardNow();
+    } else {
+      mode = null; preview = null; previewCell = -1;
+      if (raiseDraft) {
+        const s = state.settlements[raiseDraft.at];
+        // the raising settlement's own hex means "no destination"
+        raiseDraft.dest = s && idx(state.map, s.col, s.row) === cell ? null : cell;
+      }
+      el('info-event').textContent = '';
+      reopenAfterPick();
+    }
+    refreshLayer();
+  }
+
+  // ---- the raise dialog ----
+  function openRaise(settlementId: string, type: string): void {
+    const s = state.settlements[settlementId];
+    if (!s) return;
+    raiseDraft = newRaiseDraft(state, s, type);
+    renderDialog();
+  }
+  function renderDialog(): void {
+    if (!raiseDraft) { dialog.classList.add('hidden'); dialog.innerHTML = ''; return; }
+    renderRaiseDialog(dialog, state, raiseDraft, {
+      onChange: () => { /* the dialog refreshed its own derived parts */ },
+      onPickDest: () => {
+        mode = { kind: 'pickDest' };
+        previewCell = -1;
+        dialog.classList.add('hidden');
+        modal.hide();
+        el('info-event').textContent = 'Click the hex the party is bound for (Esc to go back).';
+        refreshLayer();
+      },
+      onClearDest: () => { if (raiseDraft) { raiseDraft.dest = null; raiseDraft.name = ''; renderDialog(); } },
+      onRaise: (spec) => {
+        const before = new Set(Object.keys(state.units));
+        try { editor.execute({ type: 'raiseUnit', spec }); } catch (e) { el('info-event').textContent = (e as Error).message; return; }
+        const newId = Object.keys(state.units).find((k) => !before.has(k));
+        const inv = editor.lastInverse();
+        if (newId && inv && inv.type === 'cancelRaise') raiseInverses.set(newId, inv);
+        raiseDraft = null;
+        dialog.classList.add('hidden');
+        stateChanged();
+        if (newId) selectUnit(newId);
+      },
+      onClose: closeDialog,
+    });
+    dialog.classList.remove('hidden');
+  }
+  function closeDialog(): void {
+    raiseDraft = null;
+    if (mode?.kind === 'pickDest') { mode = null; preview = null; }
+    dialog.classList.add('hidden');
+    dialog.innerHTML = '';
+    el('info-event').textContent = '';
+  }
+  /** After the destination was picked (or the pick cancelled): the ledger and the dialog come back. */
+  function reopenAfterPick(): void {
+    if (view) renderView();
+    renderDialog();
+  }
+  function cancelRaise(unitId: string): void {
+    const inv = raiseInverses.get(unitId);
+    if (!inv) { el('info-event').textContent = 'This party was raised in an earlier session and can no longer be cancelled; it forms at the end of the month.'; return; }
+    act(inv);
+    raiseInverses.delete(unitId);
   }
 
   function updateMapInfo(): void {
@@ -291,6 +489,9 @@ export async function startApp(): Promise<void> {
         onRemove: (id) => { editor.removeSettlement(id); closeView(); },
         onBuild: (id, building) => act({ type: 'queueBuilding', id, building }),
         onCancelBuild: (id) => act({ type: 'cancelBuilding', id }),
+        onRaise: (id, type) => openRaise(id, type),
+        onCancelRaise: (unitId) => cancelRaise(unitId),
+        onSelectUnit: (unitId) => { selectUnit(unitId); const u = state.units[unitId]; if (u) { const p = offsetToPixel(u.col, u.row, HEX_SIZE); camera.centerOn(p.x, p.y); refreshLayer(); } },
       }, editor.active);
       wireLinks(root, links);
     } else if (view.kind === 'cluster') {
@@ -300,6 +501,7 @@ export async function startApp(): Promise<void> {
       const root = modal.show(`cluster:${c.root}:${view.tab}`, spec, modalHost);
       wireLinks(root, links);
       wireSend(root, { onSend: (to, amount) => sendMaterials(to, amount) });
+      wireSendFood(root, { onSendFood: (from, to, amount) => act({ type: 'sendFood', from, to, amount }) });
     } else if (view.kind === 'realm') {
       spec = realmSpec(state, view.tab);
       const root = modal.show(`realm:${view.tab}`, spec, modalHost);
@@ -332,9 +534,10 @@ export async function startApp(): Promise<void> {
   function helpSpec(): ModalSpec {
     const row = (k: string, v: string) => `<tr><th><kbd>${k}</kbd></th><td>${v}</td></tr>`;
     return {
-      title: 'Keys & help', badge: 'phase 1',
+      title: 'Keys & help', badge: 'phase 2',
       body: `<div class="cols"><div><h3>Turns</h3><table class="kv">${row('Space', 'end the month')}${row('Go', 'run the years in the box')}</table>
-        <h3>Ledgers</h3><table class="kv">${row('click', 'a settlement opens its ledger; the tiles at the top open the realm\'s')}${row('K', 'the realm ledger')}${row('Esc', 'close')}</table></div>
+        <h3>Ledgers</h3><table class="kv">${row('click', 'a settlement opens its ledger; the tiles at the top open the realm\'s')}${row('K', 'the realm ledger')}${row('Esc', 'close')}</table>
+        <h3>Parties</h3><table class="kv">${row('click', 'a shield opens the party\'s card: Move, Settle, Disband')}${row('Recruitment', 'the settlement ledger\'s last page raises settlers')}</table></div>
         <div><h3>Map</h3><table class="kv">${row('drag', 'pan')}${row('wheel', 'zoom')}${row('Home', 'fit the map')}${row('arrows', 'pan')}${row('G', 'hex grid')}${row('R', 'resource glyphs')}${row('Z', 'zones and cluster outlines')}${row('E', 'the map editor')}</table></div></div>
         <h3>Reading the screen</h3>
         <p>The strip at the top is the realm's bottom line: the crown's <b>treasury</b>, the <b>people</b>, <b>months of food</b> in all granaries, and the realm's <b>stockpile</b> of timber, stone and goods against its cap. Hover a tile for the figures behind it; click it for the full page.</p>
@@ -347,6 +550,7 @@ export async function startApp(): Promise<void> {
   function select(id: string | null): void {
     if (!id || !state.settlements[id]) { if (view?.kind === 'settlement' || view?.kind === 'cluster') closeView(); selectedId = null; refreshLayer(); return; }
     const keepTab = view?.kind === 'settlement' ? view.tab : undefined;
+    if (selectedUnitId) { selectedUnitId = null; unitCard.classList.add('hidden'); if (mode?.kind === 'order') { mode = null; preview = null; } }
     openView('settlement', id, keepTab);
   }
   function focusSettlement(id: string): void {
@@ -382,11 +586,27 @@ export async function startApp(): Promise<void> {
   // ---- turns ----
   function advance(months: number): void {
     const t0 = performance.now();
+    // for the gliding animation (one month only): the route every ordered unit is about to walk
+    const planned: { id: string; cells: number[] }[] = [];
+    if (months === 1) {
+      for (const u of Object.values(state.units)) {
+        if (!u.order || u.order.dest === unitCell(state.map, u)) continue;
+        const r = routeFor(state, u, u.order.dest);
+        if (r && Number.isFinite(r.months)) planned.push({ id: u.id, cells: [unitCell(state.map, u), ...r.nodes.map((n) => n.cell)] });
+      }
+    }
     for (let i = 0; i < months; i++) endTurn(state);
+    const paths: UnitPath[] = [];
+    for (const p of planned) {
+      const u = state.units[p.id];
+      if (!u || u.report.moved <= 0) continue;
+      paths.push({ id: p.id, cells: p.cells.slice(0, u.report.moved + 1) });
+    }
     const ms = performance.now() - t0;
     el('info-run').textContent = months > 1 ? `${months / 12} years in ${ms.toFixed(0)} ms` : '';
     editor.stateChangedExternally();
     stateChanged();
+    if (paths.length) unitLayer.animate(state, paths, camera.zoom);
     renderPopoverIfStale();
   }
   el<HTMLButtonElement>('end-turn').addEventListener('click', () => advance(1));
@@ -462,12 +682,24 @@ export async function startApp(): Promise<void> {
       painting = false;
       editor.pointerUp();
     } else if (wasPanning && e.button === 0 && !moved) {
-      // a plain click outside edit mode: open the settlement under the cursor (or close the ledger)
       const h = hexAt(e.clientX, e.clientY);
-      const id = inBounds(state.map, h.col, h.row) ? settlementIdAt(state, h.col, h.row) : null;
-      if (id) select(id);
-      else if (view) closeView();
-      else select(null);
+      const on = inBounds(state.map, h.col, h.row);
+      if (mode) {
+        // targeting: the click is the destination
+        if (on) targetClicked(idx(state.map, h.col, h.row));
+        else if (mode.kind === 'pickDest') { mode = null; preview = null; reopenAfterPick(); }
+        else { mode = null; preview = null; renderUnitCardNow(); refreshLayer(); }
+      } else {
+        // a plain click outside edit mode: a unit's shield first, then the settlement under the cursor (or close what is open)
+        const wpt = camera.screenToWorld(e.clientX, e.clientY);
+        const u = unitAtWorld(state, unitLayer, wpt.x, wpt.y, camera.zoom);
+        const id = on ? settlementIdAt(state, h.col, h.row) : null;
+        if (u) selectUnit(u.id);
+        else if (id) select(id);
+        else if (view) closeView();
+        else if (selectedUnitId) selectUnit(null);
+        else select(null);
+      }
     }
     canvas.releasePointerCapture(e.pointerId);
   });
@@ -478,6 +710,7 @@ export async function startApp(): Promise<void> {
       lastX = e.clientX;
       lastY = e.clientY;
       positionPopover();
+      positionUnitCard();
     } else if (painting) {
       const h = hexAt(e.clientX, e.clientY);
       editor.pointerMove(h.col, h.row);
@@ -515,7 +748,15 @@ export async function startApp(): Promise<void> {
     else if (e.key === 'k' || e.key === 'K') { if (view?.kind === 'realm') closeView(); else openView('realm'); }
     else if (e.key === '?') openView('help');
     else if (e.key === 'c' || e.key === 'C') { if (selectedId) openView('cluster', clusterRootOf(state, selectedId)); }
-    else if (e.key === 'Escape') { if (!menu.classList.contains('hidden')) toggleMenu(false); else if (view) closeView(); else select(null); }
+    else if (e.key === 'Escape') {
+      if (!menu.classList.contains('hidden')) toggleMenu(false);
+      else if (mode?.kind === 'pickDest') { mode = null; preview = null; reopenAfterPick(); refreshLayer(); }
+      else if (raiseDraft) closeDialog();
+      else if (mode) { mode = null; preview = null; el('info-event').textContent = ''; renderUnitCardNow(); refreshLayer(); }
+      else if (view) closeView();
+      else if (selectedUnitId) selectUnit(null);
+      else select(null);
+    }
     if (mouseX >= 0) updateHover(mouseX, mouseY);
   });
 
@@ -531,18 +772,30 @@ export async function startApp(): Promise<void> {
     if (!inBounds(state.map, h.col, h.row)) {
       el('info-hex').textContent = 'Outside the map';
       hoverId = null;
-      if (prevHover !== hoverId) { showPopover(null); refreshLayer(); }
+      const hadUnit = hoverUnitId !== null;
+      hoverUnitId = null;
+      if (preview) { preview = null; previewCell = -1; refreshLayer(); }
+      if (prevHover !== hoverId || hadUnit) { showPopover(null); refreshLayer(); }
       return;
     }
     const t = TERRAIN[getTerrain(state.map, h.col, h.row)];
     const r = resourceByIndex(getResource(state.map, h.col, h.row));
     const y = [t.fertility ? `fertility ${t.fertility}` : '', t.pasture ? `pasture ${t.pasture}` : '', t.timber ? `timber ${t.timber}` : ''].filter(Boolean).join(' · ');
-    const workedBy = workAssign.get(idx(state.map, h.col, h.row));
+    const cell = idx(state.map, h.col, h.row);
+    const workedBy = workAssign.get(cell);
     const workedText = workedBy && state.settlements[workedBy] ? ` · worked by ${state.settlements[workedBy].name}` : '';
+    const here = unitsAt(state, cell);
+    const unitsText = here.length ? ` · ${here.length === 1 ? here[0].name : `${here.length} parties`}` : '';
     el('info-hex').textContent =
-      `${t.name}${r ? ` · ${r.name}` : ''} (${h.col}, ${h.row}) · move ${t.passable ? t.moveCost : '—'}${y ? ' · ' + y : ''}${workedText}`;
-    hoverId = settlementIdAt(state, h.col, h.row);
-    if (prevHover !== hoverId) { showPopover(hoverId); refreshLayer(); }
+      `${t.name}${r ? ` · ${r.name}` : ''} (${h.col}, ${h.row}) · move ${t.passable ? t.moveCost : '—'}${y ? ' · ' + y : ''}${workedText}${unitsText}`;
+    // a unit's shield under the cursor takes the hover; otherwise the settlement
+    const wpt = camera.screenToWorld(sx, sy);
+    const hu: Unit | null = mode ? null : unitAtWorld(state, unitLayer, wpt.x, wpt.y, camera.zoom);
+    const prevHoverUnit = hoverUnitId;
+    hoverUnitId = hu ? hu.id : null;
+    hoverId = hu ? null : settlementIdAt(state, h.col, h.row);
+    if (mode) { const pc = previewCell; previewTo(cell); if (pc !== previewCell) refreshLayer(); }
+    if (prevHover !== hoverId || prevHoverUnit !== hoverUnitId) { showPopover(hoverId); refreshLayer(); }
     else if (hoverId) renderPopoverIfStale();
     const lw = 2 / camera.zoom;
     if (editor.active && editor.tool !== 'inspect') {
@@ -568,6 +821,7 @@ export async function startApp(): Promise<void> {
   app.ticker.add(() => {
     renderer.setZoom(camera.zoom);
     if (Math.abs(camera.zoom - lastZoom) > 1e-6) { lastZoom = camera.zoom; refreshLayer(); }
+    if (unitLayer.animating) { unitLayer.tick(); positionUnitCard(); }
     const visible = renderer.cull(camera.viewRect());
     maxBuild = Math.max(maxBuild, renderer.lastBuildMs);
     frames++;

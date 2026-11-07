@@ -1,6 +1,7 @@
-// The settlement ledger (Session 13): one modal, five pages — Overview,
-// People, Land & Food, Economy, Buildings. Display only, except the player
-// actions it forwards (build / cancel, and the editor's rename / people / remove).
+// The settlement ledger (Session 13): one modal, six pages — Overview,
+// People, Land & Food, Economy, Buildings, Recruitment (Phase 2, Session 15).
+// Display only, except the player actions it forwards (build / cancel, raise /
+// cancel a party, and the editor's rename / people / remove).
 
 import type { GameState } from '../../sim/state';
 import { calendar } from '../../sim/state';
@@ -14,6 +15,9 @@ import { resourceByIndex } from '../../sim/resources';
 import { getTerrain, getResource } from '../../sim/map';
 import { fmt, fmt1, pct, signed, esc, tierName, tierGlyph, foodMonths, clusterLine, projectText, gauge, hbar, stack, stat, kv, ICON, jobIcon, jobName, sparkSvg } from './format';
 import type { ModalSpec } from './modal';
+import { UNIT_TYPES, unitTypeDef, raiseCheck, defaultSize, defaultProvisionMonths, isForming, unitCell, type Unit } from '../../sim/units';
+import { idx } from '../../sim/map';
+import { unitState } from './unitCard';
 
 export interface SettlementHost {
   onRename(id: string, name: string): void;
@@ -21,6 +25,10 @@ export interface SettlementHost {
   onRemove(id: string): void;
   onBuild(id: string, building: string): void;
   onCancelBuild(id: string): void;
+  /** open the raise dialog for a unit type at this settlement */
+  onRaise(id: string, type: string): void;
+  onCancelRaise(unitId: string): void;
+  onSelectUnit(unitId: string): void;
 }
 
 export const SETTLEMENT_TABS = [
@@ -29,6 +37,7 @@ export const SETTLEMENT_TABS = [
   { id: 'land', label: 'Land & Food' },
   { id: 'economy', label: 'Economy' },
   { id: 'buildings', label: 'Buildings' },
+  { id: 'recruitment', label: 'Recruitment' },
 ];
 
 const MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
@@ -61,6 +70,7 @@ export function settlementSpec(state: GameState, s: Settlement, tab: string, edi
     tab === 'land' ? landPage(ctx) :
     tab === 'economy' ? economyPage(ctx) :
     tab === 'buildings' ? buildingsPage(ctx) :
+    tab === 'recruitment' ? recruitmentPage(ctx) :
     overviewPage(ctx);
   const foot = editing ? `<span class="dim">Editor:</span> <label>Set people <input id="sp-pop" type="number" min="1" step="100" value="${Math.round(ctx.pop)}" /></label> <button id="sp-pop-apply" class="btn small">Apply</button><span class="spacer"></span><button id="sp-remove" class="btn small danger">Remove settlement</button>` : undefined;
   return {
@@ -89,6 +99,9 @@ export function wireSettlement(root: HTMLElement, state: GameState, s: Settlemen
   }
   root.querySelectorAll<HTMLElement>('[data-build]').forEach((b) => b.addEventListener('click', () => host.onBuild(s.id, b.dataset.build!)));
   root.querySelectorAll<HTMLButtonElement>('[data-cancel-build]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); host.onCancelBuild(s.id); }));
+  root.querySelectorAll<HTMLElement>('[data-raise]').forEach((b) => b.addEventListener('click', () => host.onRaise(s.id, b.dataset.raise!)));
+  root.querySelectorAll<HTMLButtonElement>('[data-cancel-raise]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); host.onCancelRaise(b.dataset.cancelRaise!); }));
+  root.querySelectorAll<HTMLElement>('[data-unit]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); host.onSelectUnit(b.dataset.unit!); }));
 }
 
 // ---------------------------------------------------------------- pages
@@ -398,4 +411,75 @@ function buildingsPage(ctx: Ctx): string {
   for (const o of off) cubes.push(optionCube(o, false));
   return `<div class="cubes">${cubes.join('')}</div>
     <p class="note">${plan.buildings.length} standing · ${avail.length} can be started${s.build ? ' once the current project is done' : ''} · ${off.length} not now. Hover a cube for what it does; click a green one to start it. One project at a time; the cost is paid when it starts and refunded in full if cancelled.</p>`;
+}
+
+// ---- Recruitment (Phase 2, Session 15; UI-DESIGN §5 "Recruitment cubes") ----
+
+/** Cost chips for a unit type: coins, materials, people (the default size), months of food. */
+export function unitCostChips(state: GameState, s: Settlement, def: ReturnType<typeof unitTypeDef>, check: ReturnType<typeof raiseCheck> | null, full: boolean): string {
+  const chips: string[] = [];
+  const money = def.cost.money ?? 0;
+  if (money > 0) chips.push(`<span class="${check?.lackingMoney ? 'short' : ''}" title="coins from the treasury">${ICON.coin} ${fmt(money)}</span>`);
+  for (const k of MATERIAL_IDS) {
+    const v = def.cost[k] ?? 0;
+    if (v > 0) chips.push(`<span class="${check?.lacking && check.lacking[k] > 0 ? 'short' : ''}" title="${k} from the cluster's stockpile (the realm's when short)">${k === 'timber' ? ICON.timber : k === 'stone' ? ICON.stone : ICON.goods} ${fmt(v)}</span>`);
+  }
+  const size = def.enabled ? defaultSize(state, def.id, s, null) : (typeof def.defaultSize === 'number' ? def.defaultSize : 0);
+  chips.push(`<span title="people who leave (the default size; chosen when raising)">${ICON.people} ${fmt(size)}</span>`);
+  if (full) {
+    chips.push(`<span title="months of food carried by default">${ICON.wheat} ${defaultProvisionMonths(def.id, calendar(state.turn).month)} mo</span>`);
+    chips.push(`<span title="hexes a month on open ground">${ICON.walk} ${def.movePoints} / mo</span>`);
+    if (def.upkeepPerManPerMonth) chips.push(`<span title="upkeep">${ICON.coin} ${def.upkeepPerManPerMonth} / man / mo</span>`);
+  }
+  return chips.join('');
+}
+
+function unitCube(cls: string, def: ReturnType<typeof unitTypeDef>, body: string, tip: string, attrs = ''): string {
+  return `<div class="cube ${cls}" data-tip="1" ${attrs}><div class="ci">${ICON[def.icon] ?? ICON.walk}</div><div class="cn">${esc(def.name)}</div><div class="cf">party</div>${body}<div class="tip">${tip}</div></div>`;
+}
+
+function recruitmentPage(ctx: Ctx): string {
+  const { state, s, plan } = ctx;
+  const tipH = (h: string, sub: string) => `<div class="tiph">${esc(h)}</div><div class="dim">${esc(sub)}</div>`;
+  const month = calendar(state.turn).month;
+  const here = idx(state.map, s.col, s.row);
+  const units = Object.values(state.units).filter((u) => u.faction === s.faction).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const forming = units.filter((u) => u.home === s.id && isForming(state, u));
+  const standing = units.filter((u) => unitCell(state.map, u) === here && !isForming(state, u));
+  const cubes: string[] = [];
+  // mustering parties first (gold, with Cancel)
+  for (const u of forming) {
+    const def = unitTypeDef(u.type);
+    const pop = totalPopulation(u.pop);
+    cubes.push(unitCube('project', def, `<div class="cs num">${fmt(pop)} people · ${u.provisionMonths} mo food</div><div class="cb"><button class="btn small" data-cancel-raise="${u.id}">Cancel</button></div>`,
+      tipH(u.name, 'mustering — forms at the end of the month') + `<p>${fmt(pop)} people with ${u.provisionMonths} months of food${u.order ? `, bound for (${u.order.dest % state.map.width}, ${Math.floor(u.order.dest / state.map.width)})` : ''}.</p><div class="dim">Cancel returns everyone and everything. Click the cube to see the party.</div>`,
+      `data-unit="${u.id}"`));
+  }
+  // the types: available (green) then unavailable (greyed)
+  const taxPerHand = plan.taxableHands > 0 ? plan.taxPerYear / plan.taxableHands : 0;
+  const opts = UNIT_TYPES.map((def) => {
+    if (!def.enabled) return { def, ok: false, reason: `${def.name} cannot be raised yet — ${def.id === 'workband' ? 'Phase 2 session 2' : 'Phase 2 session 3'}.`, check: null as ReturnType<typeof raiseCheck> | null };
+    const people = Math.min(defaultSize(state, def.id, s, null), Math.floor(ctx.pop * 0.5));
+    const check = raiseCheck(state, { type: def.id, at: s.id, muster: [{ id: s.id, people: Math.max(10, people) }], provisionMonths: defaultProvisionMonths(def.id, month) });
+    return { def, ok: check.ok, reason: check.reason ?? '', check };
+  });
+  const who = (def: ReturnType<typeof unitTypeDef>) => def.slice === 'men' ? 'Men 15–44 leave; the women, children and old stay.' : 'A proportional slice of every cohort leaves — families, not just hands. Hands leave the private economy first, then gathering, then the fields; buildings keep their staff.';
+  const dent = plan.privateHands > 0 ? ` In a town the people who leave were mostly private hands: about −${fmt(taxPerHand)} coins a year in tax for each hand.` : '';
+  for (const o of opts.filter((o) => o.ok)) {
+    const realmNote = o.check && MATERIAL_IDS.some((k) => (o.check!.fromRealm?.[k] ?? 0) > 0) ? `<div class="dim">${MATERIAL_IDS.filter((k) => (o.check!.fromRealm?.[k] ?? 0) > 0).map((k) => `${fmt(o.check!.fromRealm![k])} ${k}`).join(', ')} will come from the realm stockpile.</div>` : '';
+    cubes.push(unitCube('avail', o.def, `<div class="cc">${unitCostChips(state, s, o.def, o.check, false)}</div>`,
+      tipH(o.def.name, 'can be raised') + `<div class="cost">${unitCostChips(state, s, o.def, o.check, true)}</div><p>${esc(o.def.blurb ?? '')}</p><p>${who(o.def)}${esc(dent)} The party may be gathered from this settlement, the rest of its cluster and own settlements within 3 hexes; it forms here at the end of the month.</p>${realmNote}<div class="dim">Click to choose the size, the muster, the provisions and a destination.</div>`,
+      `data-raise="${o.def.id}"`));
+  }
+  for (const o of opts.filter((o) => !o.ok)) {
+    cubes.push(unitCube('off', o.def, `<div class="cc">${unitCostChips(state, s, o.def, o.check, false)}</div>`,
+      tipH(o.def.name, o.def.enabled ? 'not now' : 'not yet') + `<div class="cost">${unitCostChips(state, s, o.def, o.check, true)}</div><p>${esc(o.def.blurb ?? '')}</p><div class="why">${esc(o.reason)}</div>`));
+  }
+  const standingRows = standing.map((u: Unit) => `<tr><td>${ICON[unitTypeDef(u.type).icon] ?? ICON.walk} <a href="#" data-unit="${u.id}">${esc(u.name)}</a></td><td class="r">${fmt(totalPopulation(u.pop))}</td><td class="r">${fmt1(totalPopulation(u.pop) > 0 ? u.provisions / totalPopulation(u.pop) : 0)}</td><td>${esc(unitState(state, u))}</td></tr>`).join('');
+  const away = units.filter((u) => u.home === s.id && unitCell(state.map, u) !== here);
+  const awayRows = away.map((u: Unit) => `<tr><td>${ICON[unitTypeDef(u.type).icon] ?? ICON.walk} <a href="#" data-unit="${u.id}">${esc(u.name)}</a></td><td class="r">${fmt(totalPopulation(u.pop))}</td><td class="r">${fmt1(totalPopulation(u.pop) > 0 ? u.provisions / totalPopulation(u.pop) : 0)}</td><td>${esc(unitState(state, u))}${u.report.monthsLeft !== null && Number.isFinite(u.report.monthsLeft) && u.report.monthsLeft > 0 ? ` <span class="dim">· ${u.report.monthsLeft} mo left</span>` : ''}</td></tr>`).join('');
+  return `<div class="cubes">${cubes.join('')}</div>
+    <p class="note">${forming.length ? `${forming.length} part${forming.length === 1 ? 'y' : 'ies'} mustering · ` : ''}${opts.filter((o) => o.ok).length} can be raised · ${opts.filter((o) => !o.ok).length} not now. Hover a cube for the rule; click a green one to raise. People who leave take their share of the granary with them as provisions; inside the borders a party eats from the cluster it stands in, outside it forages.</p>
+    ${standing.length ? `<h3>Parties here <small>standing on this hex</small></h3><table class="data"><tr><th>Party</th><th class="r">people</th><th class="r">food (mo)</th><th>state</th></tr>${standingRows}</table>` : ''}
+    ${away.length ? `<h3>Raised here, now afield</h3><table class="data"><tr><th>Party</th><th class="r">people</th><th class="r">food (mo)</th><th>state</th></tr>${awayRows}</table>` : ''}`;
 }

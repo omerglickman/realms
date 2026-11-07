@@ -274,6 +274,12 @@ export class Editor {
     this.markDirty();
   }
 
+  /** The inverse of the last executed command (Phase 2: lets the UI cancel a party it just raised). */
+  lastInverse(): Command | null {
+    const e = this.undoStack[this.undoStack.length - 1];
+    return e ? e.undo : null;
+  }
+
   private pushUndo(e: UndoEntry): void {
     this.undoStack.push(e);
     if (this.undoStack.length > 200) this.undoStack.shift();

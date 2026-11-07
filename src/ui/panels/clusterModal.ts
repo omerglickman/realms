@@ -1,6 +1,6 @@
 // The cluster ledger (Session 13): the unit inside which food flows —
-// Overview, Members, Food, Stockpile. Display only, except the Send form
-// (shipping from the realm stockpile) it forwards.
+// Overview, Members, Food (+ Send food between members, Phase 2 session 1b),
+// Stockpile. Display only, except the Send forms it forwards.
 
 import type { GameState } from '../../sim/state';
 import { calendar } from '../../sim/state';
@@ -21,6 +21,37 @@ export const CLUSTER_TABS = [
 
 export interface SendHost {
   onSend(root: string, amount: Partial<Materials>): void;
+}
+
+export interface SendFoodHost {
+  onSendFood(from: string, to: string, amount: number): void;
+}
+
+/** The Send food form (DESIGN §3.2b rule 6, DECIDED 2026-11-07 — by hand, never automatic): grain from one member of the cluster to another. */
+export function sendFoodForm(state: GameState, c: Cluster): string {
+  const members = c.members.map((id) => state.settlements[id]).sort((a, b) => TIERS[b.tier].rank - TIERS[a.tier].rank || (a.name < b.name ? -1 : 1));
+  if (members.length < 2) return '<p class="note">A lone settlement has nobody to send food to.</p>';
+  const opt = (sel: (m: Settlement, i: number) => boolean) => members.map((m, i) => `<option value="${m.id}" ${sel(m, i) ? 'selected' : ''}>${esc(m.name)} — ${fmt1(foodMonths(m))} mo (${fmt(m.food)})</option>`).join('');
+  const hungriest = members.slice().sort((a, b) => foodMonths(a) - foodMonths(b))[0];
+  const fullest = members.slice().sort((a, b) => foodMonths(b) - foodMonths(a))[0];
+  return `<div class="form-row">
+    <label>from <select id="sf-from">${opt((m) => m.id === fullest.id)}</select></label>
+    <label>to <select id="sf-to">${opt((m) => m.id === hungriest.id)}</select></label>
+    <label>${ICON.wheat} food <input id="sf-amount" type="number" min="0" step="100" value="${Math.max(0, Math.round(Math.min(fullest.food * 0.25, Math.max(0, 3 * totalPopulation(hungriest.pop) - hungriest.food)) / 100) * 100)}" style="width:7em"></label>
+    <button id="sf-go" class="btn primary small">Send food</button>
+    <span class="dim">one month of food feeds one person · arrives at once (a placeholder until roads carry it)</span>
+  </div>`;
+}
+
+export function wireSendFood(root: HTMLElement, host: SendFoodHost): void {
+  const go = root.querySelector<HTMLButtonElement>('#sf-go');
+  if (!go) return;
+  go.addEventListener('click', () => {
+    const from = root.querySelector<HTMLSelectElement>('#sf-from')!.value;
+    const to = root.querySelector<HTMLSelectElement>('#sf-to')!.value;
+    const amount = Math.max(0, Number(root.querySelector<HTMLInputElement>('#sf-amount')?.value) || 0);
+    if (amount > 0 && from !== to) host.onSendFood(from, to, amount);
+  });
 }
 
 /** "1,200 / 5,220 timber" rows as bars. */
@@ -85,7 +116,7 @@ export function clusterSpec(state: GameState, c: Cluster, tab: string, canSend: 
   const privateHands = members.reduce((a, m) => a + m.report.privateHands, 0);
   const body =
     tab === 'members' ? membersPage(state, c) :
-    tab === 'food' ? foodPage(state, c) :
+    tab === 'food' ? foodPage(state, c, canSend) :
     tab === 'stockpile' ? stockpilePage(state, c, canSend) :
     overviewPage(state, c, privateHands);
   return {
@@ -127,7 +158,7 @@ function membersPage(state: GameState, c: Cluster): string {
     <p class="note">Towns are nested under their city and villages under their town. "Built" counts buildings beyond the hall and granary; tax is last month's ×12.</p>`;
 }
 
-function foodPage(state: GameState, c: Cluster): string {
+function foodPage(state: GameState, c: Cluster, canSend: boolean): string {
   const t = c.totals;
   const members = c.members.map((id) => state.settlements[id]);
   const y = t.lastYear ?? t.year;
@@ -145,6 +176,7 @@ function foodPage(state: GameState, c: Cluster): string {
   }).join('');
   return `<h3>${partial ? 'This year so far' : 'Last year'} <small>${fmt(y.produced)} grown in the cluster</small></h3>${flows}
     <p class="note">Grown ${fmt(y.produced)}, eaten ${fmt(y.consumed)}: <b class="${y.produced >= y.consumed ? 'good' : 'warn'}">${signed(y.produced - y.consumed)}</b>${y.hungerDeaths > 0.5 ? ` · <b class="warn">${fmt(y.hungerDeaths)} starved</b>` : ''}${y.migrantsIn > 0.5 ? ` · ${fmt(y.migrantsIn)} fled hunger to their parents` : ''}.</p>
+    ${canSend ? `<h3>Send food <small>between members, by the crown's order</small></h3>${sendFoodForm(state, c)}` : ''}
     <h3>By settlement <small>${partial ? 'this year so far' : 'last year'}</small></h3>
     <table class="data"><tr><th>Settlement</th><th class="r">grown</th><th class="r">eaten</th><th class="r">net</th><th class="r">tithe</th><th class="r">surplus</th><th class="r">starved</th><th class="r">months now</th><th class="r">people</th></tr>${rows}</table>`;
 }

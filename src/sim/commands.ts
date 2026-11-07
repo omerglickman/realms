@@ -6,6 +6,7 @@
 // Session 11: queueing and cancelling buildings, moving materials.
 
 import type { GameState } from './state';
+import { logEvent } from './state';
 import type { MapData } from './map';
 import { inBounds, idx, neighborsOffset, cloneMap } from './map';
 import { axialRange, offsetToAxial, axialToOffset } from './hex';
@@ -393,6 +394,7 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       a.food -= x; b.food += x;
       a.report.sent += x; b.report.received += x;
       a.year.sent += x; b.year.received += x;
+      if (x > 0) logEvent(state, 'sent', `${a.name} sent ${Math.round(x)} food to ${b.name}.`);
       return { type: 'sendFood', from: cmd.to, to: cmd.from, amount: x };
     }
   }

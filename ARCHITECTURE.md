@@ -34,7 +34,7 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `clusters.ts` | derived clusters from parent links: `clustersOf`, `clusterOf`, `clusterRootOf`, `clusterMembers`, `clusterInfluenceCells`, `realmReport` — never stored |
 | `factions.ts` | `Faction` (treasury, stock, yearly ledger `FactionYear`), `initialFactions`, colours |
 | `noise.ts` | the realism knobs read live from data (sampling, epidemic, harvest variance, pull factor): `noise()`, `setNoise`, `NO_NOISE` |
-| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`); units (Session 14): `raiseUnit` ⇄ `cancelRaise`, `orderUnit` (its own inverse; validates the route), `settleUnit` ⇄ `unsettle`, `disbandUnit` ⇄ `undisband` (or a move order home), `sendFood` (same cluster; own inverse); `commandTouchesUnits` |
+| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`); units (Session 14): `raiseUnit` ⇄ `cancelRaise`, `orderUnit` (its own inverse; validates the route), `settleUnit` ⇄ `unsettle`, `disbandUnit` ⇄ `undisband` (or a move order home), `sendFood` (same cluster; own inverse; logs an event); `commandTouchesUnits` |
 | `units.ts` | Phase 2 (DESIGN §3.2b): `Unit` (type, faction, hex + river bank, cohorts, provisions, provisionMonths, home, order, report), `UNIT_TYPES` from `data/units.json`; sizes and defaults (`destinationHands`, `defaultSize`, `defaultProvisionMonths`); raising with a muster (`musterSources`, `raiseCheck`, `raiseUnit`, `cancelRaise`, `takeMen`); settling (`canFoundAt`, `canSettle`, `settleUnit`, `villageName`); disbanding (`disbandTarget`, `disbandInto`); the field (`coveringSettlement`, `forage`); `unitsMonth` |
 | `pathfinding.ts` | A* over (hex, bank) nodes: `stepCost` (terrain `moveCost`; mountains = the month's points; lake/sea impassable), `riverBanks` (runs of land between water / map-edge neighbours; exactly two → banks; a settlement bridges — `isBridged`), `stepsFrom`, `findRoute` → `Route {nodes, cost, months}`, `stepsThisMonth` / `walkMonths` (a step needs its full cost, a unit that has not moved yet may always take one) |
 | `scenario.ts` | scenario file ↔ `GameState`, `rebaseAsStart` |
@@ -44,23 +44,26 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 
 | File | Job |
 |---|---|
-| `app.ts` | wiring: state, camera, renderer, the ledger strip, hover card, the ledgers (`view` = settlement / cluster / realm / settings / help / draft; K, C, ?, Esc, Z, G, R, E), End month / Run N years, the ☰ menu, scenario save/import, autosave, `act(cmd)` → `editor.execute`, the header-font setting |
+| `app.ts` | wiring: state, camera, renderer, the ledger strip, hover card, the ledgers (`view` = settlement / cluster / realm / settings / help / draft; K, C, ?, Esc, Z, G, R, E), End month / Run N years, the ☰ menu, scenario save/import, autosave, `act(cmd)` → `editor.execute`, the header-font setting; **units (Session 15):** `selectedUnitId`, the targeting `mode` (a unit's move / settle order, or the raise dialog's destination pick) with the route preview, `advance(1)` recording each ordered unit's route for the glide, the raise draft and dialog, the per-session map of raise inverses for Cancel |
 | `camera.ts` | pan/zoom |
 | `render/mapRenderer.ts` | chunked, culled hex terrain + resource icon badges (PixiJS 8) |
-| `icons.ts` | the icon set (UI-DESIGN.md §4): SVG bodies, `icon()` for the DOM, `iconTexture` / `preloadIconTextures` for the map (badge and mark styles) |
+| `icons.ts` | the icon set (UI-DESIGN.md §4): SVG bodies (resources, tiers, units, buildings, interface), `icon()` for the DOM, `iconTexture` / `preloadIconTextures` for the map (badge and mark styles) |
 | `zoomLevels.ts` | the four zoom levels: which tiers show markers and names, when resources show (UI-DESIGN.md §6) |
+| `render/unitLayer.ts` | Phase 2 (Session 15): one heater shield per occupied hex (faction colour, type icon, count for a group, 60 % while forming, offset beside a settlement marker, vermilion dot when blocked), selection / hover rings, the selected unit's remaining route and the targeting preview as dotted lines, the glide (`animate` + `tick`), `unitAtWorld` hit test, `shieldAt` for the card |
 | `render/settlementLayer.ts` | influence zones, faction border, cluster outlines, worked-hex hatching, faction-disc markers with tier icons, mill / wharf badges on hexes, labels by zoom level (`setLabelFont`) |
 | `panels/format.ts` | shared display helpers: `fmt`, `esc`, tier words, `foodMonths`, `clusterLine`, `costText`, `projectText`, gauges / bars / stacks / stat tiles / `kv` tables, the sparkline, the inline-SVG `ICON` set |
 | `panels/hud.ts` | the ledger strip (Session 13): date, treasury, people, food, realm stockpile tiles with hover tips; clicks open the realm ledger |
 | `panels/hoverCard.ts` | the settlement hover card |
+| `panels/unitCard.ts` | the pinned unit card (Session 15): people, food gauge, home, bound for / arrives, `unitState`, warnings; Move · Settle at… · Settle here · Disband · Cancel order |
+| `panels/raiseDialog.ts` | the raise dialog (Session 15): `RaiseDraft`, `newRaiseDraft` / `distribute` (spare hands first, raising settlement first), `draftSpec`; size slider with the destination reckoning, provisions, destination + village name, muster rows, cost chips, Raise gated by `raiseCheck` |
 | `panels/modal.ts` | the modal shell (`ModalShell.show(key, spec, host)`, `wireLinks`) |
 | `panels/tooltip.ts` | the one shared tooltip (`data-tip` + a hidden `.tip` child) |
-| `panels/settlementModal.ts` | the settlement ledger: Overview · People (age pyramid, growth line, crowding / granary brake) · Land & Food (harvest calendar, every worked hex) · Economy (hands stack, tax, stockpile, gathering) · Buildings (cubes: built → project → available → unavailable, tooltips, click to start); editor footer (rename / people / remove) |
-| `panels/clusterModal.ts` | the cluster ledger: Overview · Members · Food · Stockpile (+ the Send form helpers `sendForm` / `wireSend`, `stockBars`, `yearFoodText`) |
+| `panels/settlementModal.ts` | the settlement ledger: Overview · People (age pyramid, growth line, crowding / granary brake) · Land & Food (harvest calendar, every worked hex) · Economy (hands stack, tax, stockpile, gathering) · Buildings (cubes: built → project → available → unavailable, tooltips, click to start) · Recruitment (Session 15: unit cubes mustering → available → unavailable, `unitCostChips`, parties here / afield); editor footer (rename / people / remove) |
+| `panels/clusterModal.ts` | the cluster ledger: Overview · Members · Food (+ `sendFoodForm` / `wireSendFood`, Session 15) · Stockpile (+ the Send form helpers `sendForm` / `wireSend`, `stockBars`, `yearFoodText`) |
 | `panels/realmModal.ts` | the realm ledger: Overview · Clusters · People · Food · Treasury · Stockpile |
 | `fonts/` | bundled woff2 fonts (SIL OFL): Lugrasimo, Almendra, Uncial Antiqua (header hands), Alegreya (body) |
-| `editor/editor.ts` | undo/redo stack over commands, brushes, flood fill, resource tools, Settle tool, autosave |
-| `style.css` | all styling: the medieval palette as CSS variables, `@font-face` for the bundled fonts, strip / menu / status / hover card / modal / editor rules |
+| `editor/editor.ts` | undo/redo stack over commands (`lastInverse()` for the UI's Cancel of a raise), brushes, flood fill, resource tools, Settle tool, autosave |
+| `style.css` | all styling: the medieval palette as CSS variables, `@font-face` for the bundled fonts, strip / menu / status / hover card / modal / editor / unit card / raise dialog rules |
 
 ## `src/headless/`
 
@@ -78,8 +81,8 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 
 | File | Command |
 |---|---|
-| `smoke.py` | `npm run smoke` — loads `dist/realms.html` in headless Chrome, runs years, opens the realm → cluster → settlement ledgers, buys a building, sends materials; fails on any console error; screenshots to `/tmp/smoke_*.png` |
-| `shots.py` | `npm run shots` — screenshots every ledger page, the menu, editor, settings and help to `/tmp/ui_*.png` for a visual check |
+| `smoke.py` | `npm run smoke` — loads `dist/realms.html` in headless Chrome, runs years, opens the realm → cluster → settlement ledgers, buys a building, sends materials, raises settlers from the Recruitment page, forms and disbands them, sends food in a cluster; fails on any console error; screenshots to `/tmp/smoke_*.png` |
+| `shots.py` | `npm run shots` — screenshots every ledger page, the raise dialog, the unit card and the move preview, the menu, editor, settings and help to `/tmp/ui_*.png` for a visual check |
 
 ## Data files
 

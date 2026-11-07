@@ -41,9 +41,25 @@ async def main():
         # settlement: the cluster root
         await pg.click('.m-tabs button[data-tab=members]'); await pg.wait_for_timeout(200)
         await pg.click('.m-body a[data-focus]'); await pg.wait_for_timeout(500)
-        for tab in ['overview', 'people', 'land', 'economy', 'buildings']:
+        for tab in ['overview', 'people', 'land', 'economy', 'buildings', 'recruitment']:
             await pg.click(f'.m-tabs button[data-tab={tab}]'); await pg.wait_for_timeout(300)
             await pg.screenshot(path=f'/tmp/ui_settlement_{tab}.png')
+        # Phase 2: the raise dialog and the unit card
+        if await pg.query_selector('#modal .cube.avail[data-raise=settlers]'):
+            await pg.click('#modal .cube.avail[data-raise=settlers]'); await pg.wait_for_timeout(400)
+            await pg.screenshot(path='/tmp/ui_raise_dialog.png')
+            await pg.click('#dialog [data-act=raise]'); await pg.wait_for_timeout(500)
+            await pg.keyboard.press('Space'); await pg.wait_for_timeout(600)
+            await pg.screenshot(path='/tmp/ui_unit_card.png')
+            await pg.click('#unitcard [data-act=move]'); await pg.wait_for_timeout(200)
+            await pg.mouse.move(820, 520); await pg.wait_for_timeout(300)
+            await pg.screenshot(path='/tmp/ui_unit_move.png')
+            await pg.keyboard.press('Escape'); await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
+            await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
+            await pg.click('.m-tabs button[data-tab=clusters]'); await pg.wait_for_timeout(200)
+            await pg.click('.m-body a[data-cluster]'); await pg.wait_for_timeout(300)
+            await pg.click('.m-tabs button[data-tab=members]'); await pg.wait_for_timeout(200)
+            await pg.click('.m-body a[data-focus]'); await pg.wait_for_timeout(400)
         # a village
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         await pg.keyboard.press('k'); await pg.wait_for_timeout(300)

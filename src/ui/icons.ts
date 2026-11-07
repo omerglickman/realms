@@ -28,6 +28,10 @@ export const ICON_PATHS: Record<string, string> = {
   town: '<path d="M3 20v-7l4-3 4 3v7M11 20V9l3-5 3 5v11M17 20v-6l4-3v9M3 20h18"/><path d="M6 15v2M14 11v2"/>',
   city: '<path d="M3 20V10h4V7h3v3h4V7h3v3h4v10z"/><path d="M3 20h18M10 20v-5h4v5M6 13h1M17 13h1"/>',
   metropolis: '<path d="M2 20V11h4V8h3v3h2V4l1-2 1 2v7h2V8h3v3h4v9z"/><path d="M2 20h20M10 20v-5h4v5M5 14h1M18 14h1M10 9h4"/>',
+  // ---- units (Phase 2, data/units.json `icon`; drawn in parchment on a heater shield) ----
+  settlers: '<path d="M4 15V9c0-2.5 2-4 4.5-4h7C18 5 20 6.5 20 9v6z"/><path d="M4 15h16M8 5v10M12 5v10M16 5v10"/><circle cx="8" cy="18" r="2"/><circle cx="16" cy="18" r="2"/><path d="M20 12h2l1 3"/>',
+  workband: '<path d="M5 19L17 7"/><path d="M14 4l3 3 3-3M14 4c1.5-1 4.5-1 6 0"/><path d="M19 19L7 7"/><path d="M4 4h4v4"/>',
+  levy: '<circle cx="10" cy="13" r="6"/><circle cx="10" cy="13" r="1.5"/><path d="M10 7v12M4 13h12"/><path d="M17 20L20 4"/><path d="M19 3.5l2.5 2M19 3.5l-1 3"/>',
   // ---- things built on hexes (now and later) ----
   mill: '<path d="M11 20V11l4-4 4 4v9z"/><path d="M11 20h8M3 20h8"/><circle cx="6.5" cy="14.5" r="3.5"/><path d="M6.5 11v7M3 14.5h7M4 12l5 5M9 12l-5 5"/>',
   wharf: '<path d="M3 15h18"/><path d="M5 15v4M9 15v4M13 15v4M17 15v4"/><path d="M6 11c3-3 9-3 12 0v4H6z"/><path d="M12 11V6M12 6l4 2"/>',
