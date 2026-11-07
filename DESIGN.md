@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.4d — 2026-11-05 — Status: DRAFT, core decisions made; see §5 for what is still open**
+**Version 0.5 — 2026-11-07 — Status: DRAFT, core decisions made; Phase 1 signed off; see §3.2b for the Phase 2 kickoff questions and §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -133,6 +133,24 @@ Unit families:
 - *(later)* **Caravans / envoys / ships.**
 
 **Grouping (DECIDED):** units on the same hex can be joined into a **group** that moves and acts as one — e.g. military units escorting settlers, or several military units forming an *army*. A group moves at the speed of its slowest member and may have a commanding character.
+
+### 3.2b Phase 2 kickoff — the unit rules Omer must rule on (all PROPOSED, 2026-11-07)
+
+Claude's best reading of each open question, written so that Omer can accept, change or reject each line at the start of the first Phase 2 session. Everything here is a *(draft)* number in `data/units.json` / `data/infrastructure.json` until decided.
+
+1. **Who leaves.** A unit is a **proportional slice of all cohorts** (families, like migration in §4.1) sized to its people count, *except levies*, which take **men 15–44 only**. The hands in the slice come out of the settlement's **spare hands** (village) or **private hands** (town and above, §4.2b — their tax is the price); a settlement cannot raise a unit its spare/private hands cannot cover.
+2. **Sizes *(draft, ×3)*.** Settlers 900 (a founding village); work-band 300; levy 300 men. One size per type to start; variable sizes later.
+3. **Raising** takes **one month**: the command is given, the people are removed at once, the unit appears on the settlement's hex at the next end of turn. Money cost *(draft)*: settlers 1,000, work-band 500, levy 0 — the people are the real cost. Raising a levy lowers order when §4.4 exists.
+4. **What a unit eats.** Every unit carries **provisions**: it leaves with 3 months of food *(draft)* from the settlement's granary. **Inside the realm's borders** (any own influence zone) it refills from the cluster that owns the hex each month; **outside**, provisions tick down and an empty unit suffers the §4.1 hunger rule. Units of all types eat 1 food per person per month, like everyone else.
+5. **Movement.** Movement points per month *(draft)*: settlers 4, work-band 5, levy 5; terrain costs from §2.3 (plains / grassland / river 1, hills / woodland / tundra 2, forest / swamp 3, mountains and water impassable; a road halves the cost of the hex, minimum 1). A unit may stop short and continue next month; A* picks the path. Hexes of other factions are passable (there are none yet).
+6. **Settling.** Settlers found a village on **any passable land hex that is not inside another settlement's work zone**, inside or outside the realm's current borders (the new village's influence extends the border). The settlers' people become the village; it starts with the settlers' remaining provisions as its granary. Settling onto a *hex a resource is on* is allowed.
+7. **Work-bands** build on the hex they stand on, one project at a time, from `data/infrastructure.json`: **dirt road** (per hex; 2 months, 30 timber *(draft)*), **paved road** (over a dirt road; 6 months, 60 stone), **quarry / lumber camp** (on a Stone / high-timber hex in some settlement's work zone; ×2 the hex's material output; 6 months), **fort** (border and garrison point; 12 months, 180 timber / 120 stone), **watchtower** (vision, later). Materials come from the **cluster whose influence covers the hex**, else from the realm stockpile (the instant-shipping placeholder). A work-band is disbanded into any own settlement it stands on; its people rejoin the cohorts.
+8. **Roads and food.** A road changes two things: movement (above) and **food sharing** — a subordinate connected to its parent by road sends surplus with a smaller loss per hex; a settlement connected by road to a settlement *outside its cluster* may send surplus to it (the first cross-cluster flow; the player decides). Loss per hex *(draft)*: 3 % off-road within the influence zone (today 0 — a placeholder), 1 % on a dirt road, 0.5 % paved.
+9. **Levies** (Phase 2 scope only): raise / move / disband; **upkeep** 1 coin per man per month *(draft)* and their food; disband returns the men to the settlement they stand in (any own settlement, not necessarily home). No combat, no facilities, no roster until Phase 4.
+10. **Tier upgrade** is a command on a settlement that meets the gate (§3.3): village → town 10,000 coins, 300 timber / 150 stone, 12 months; town → city 40,000 coins, 600 / 600, 24 months *(draft)*; the zones and the hall grow at completion. Administrative capacity is added by §4.3 later.
+11. **Disbanding settlers** is allowed only into an own settlement (their people rejoin its cohorts); in the field their only exit is to settle.
+12. **No administrative-capacity placeholder** in Phase 2 (ROADMAP): the people cost is the only brake; the sprawl is measured, not capped.
+
 
 ### 3.3 Settlements (DECIDED; zones and tiers DECIDED 2026-11-04)
 
@@ -275,7 +293,7 @@ Currencies: **money** (one coin), plus stockpiled **food, timber, stone, iron, h
 
 There is no research. A faction advances by organizing itself. Omer's framing (DECIDED): some advances are **simply enabled once a milestone is reached**; others are **policy choices with trade-offs** that the player must actively decide on, even after the milestone makes them available. The game must gradually hand the player more tools as the faction becomes more sophisticated. *How the faction is organized* is itself part of this system.
 
-PROPOSED three-layer structure (to be worked out in a dedicated **Government & Institutions design session before Phase 2** — see ROADMAP):
+PROPOSED three-layer structure (to be worked out in a dedicated **Government & Institutions design session after Phase 2 and before Phase 3** — moved 2026-11-07 so that it opens with the measured sprawl of a realm that can found settlements and with the list of "§4.3 hooks" Phase 2 accumulates; see ROADMAP):
 
 **Layer 1 — Government form.** A few forms of state, each defining what the ruler is called, which institutions and policies are available, and the base administrative capacity. Sketch *(draft)*: *Chiefdom* (a warlord and his hall; rule by personal loyalty) → *Petty Kingdom* (a king, a court, a handful of named offices) → *Kingdom* (provinces, chancery, law). Changing form is a major event with prerequisites and consequences, not a free upgrade.
 
@@ -372,7 +390,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 1. ~~Desert terrain~~ — RESOLVED 2026-11-05: not now; perhaps a future iteration.
 2. The yield rows marked *draft* in the §3.1 terrain table — the ones Omer has not ruled on: River as grassland (fertility 4, pasture 1), Tundra pasture 1, Swamp fertility 1 / timber 1, Forest fertility 1, Hills timber 1, Woodland and Grassland pasture 1. Confirm or change.
 3. ~~Whether the 6 factions are hand-designed or generated~~ — RESOLVED 2026-11-05: hand-designed; player faction alone until the mechanics work (§4.8). Still OPEN: the culture groups and naming schemes (later).
-4. **Government & Institutions** detailed design — scheduled as a dedicated design session before Phase 2 (§4.3 is a sketch only).
+4. **Government & Institutions** detailed design — a dedicated design session **after Phase 2, before Phase 3** (moved 2026-11-07; §4.3 is a sketch only).
 5. ~~Hall names~~ — RESOLVED 2026-11-05: Moot Hall (village) and Great Hall (metropolis).
 6. ~~River farming + fishing~~ — RESOLVED 2026-11-05: yes, both.
 7. ~~Metropolis prerequisites~~ — accepted as a draft 2026-11-05; revisit with roads.
@@ -380,6 +398,8 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 9. ~~City growth brake~~ — RESOLVED 2026-11-05: the granary brake (§4.1) plus the pull factor.
 10. ~~Urban work scale~~ — RESOLVED 2026-11-05: the private economy (§4.2b); the pull factor runs on prosperity, not vacancies.
 11. ~~Money and the private economy~~ — RESOLVED 2026-11-05 (Session 12c): building prices ×5; gatherers and professional soldiers join construction, levies, settlers and work-bands as uses that cost tax; cap numbers left to Claude (realm cap doubled); goods become money only through a Market.
+12. **Phase 2 kickoff** — the twelve unit rules in §3.2b (who leaves, sizes, raising, provisions, movement points, where settlers may settle, work-band projects, roads and food loss, levy upkeep, upgrade costs). Omer rules at the start of the first Phase 2 session; anything not ruled on is built as the §3.2b draft and marked PLACEHOLDER.
+13. **Phase 1 numbers** — tuning of food / materials / tax deferred until the Phase 2 sinks exist (Omer, 2026-11-07).
 
 Every DECIDED item above carries its date; the change log below lists what each version settled, and the DEVLOG entries hold the discussion and the measurements behind each decision.
 
@@ -412,6 +432,7 @@ Every DECIDED item above carries its date; the change log below lists what each 
 
 ## Change log
 
+- 0.5 (2026-11-07, Session 13f): Phase 1 signed off with tuning deferred; §3.2b Phase 2 kickoff proposals added; the Government & Institutions session moved to after Phase 2 (§4.3, §5.4); §5.12–13 opened.
 - 0.4d (2026-11-05, Session 12c): Omer's verdicts — prices ×5; uses of private hands that cost tax (incl. gatherers, professional soldiers); Market the only route from goods to money; realm cap doubled; desert no; hall names; river both; metropolis draft accepted; §5 updated.
 - 0.4c (2026-11-05, Session 12b): trimmed to a contract — implementation notes, findings and the resolved-items log removed or reduced to pointers (DEVLOG holds them); no decision changed.
 - 0.4b (2026-11-05, Session 12): §4.2b, §4.2 caps, §4.1 pull on prosperity implemented; §3.3 money column, Workshop/Market multipliers, Warehouse; §5.11 opened.

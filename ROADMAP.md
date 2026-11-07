@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.5b — 2026-11-06 — Status: ACTIVE (Phase 1 in progress — sessions 5–13 done; working agreement revised in Session 12b)**
+**Version 0.6 — 2026-11-07 — Status: ACTIVE (Phase 1 signed off; Phase 2 next; the Government & Institutions design session moved to after Phase 2)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -95,7 +95,7 @@ Written for a non-programmer first; the technical specifics follow.
 | Save format | JSON (download/upload + browser autosave) | State is already JSON |
 | Random numbers | Seeded sfc32 PRNG, state stored inside `GameState` | Reproducibility |
 | Pathfinding | A* on hexes; hierarchical (region graph) for long routes | Needed at 400×250 (Phase 2) |
-| Simulation thread | Web Worker (from Phase 2 onward) | Keeps the UI smooth during AI turns |
+| Simulation thread | Web Worker (from Phase 5, with the AI) | Keeps the UI smooth during AI turns |
 | Hosting of code | GitHub `omerglickman/realms` | See A.4 |
 | Node (for development only) | 22 | — |
 
@@ -155,11 +155,7 @@ Goal: see the world, edit the world.
 
 **Acceptance**: Omer can generate a draft, paint it, save it, reload it; 400×250 renders smoothly on his machine. ✔
 
-### Design session — Government & Institutions (before Phase 2)
-
-A chat devoted to DESIGN §4.3: government forms, the institution list and prerequisites, the policy list and trade-offs, administrative capacity. Output: DESIGN.md §4.3 moved from PROPOSED to DECIDED and `data/institutions.json` drafted.
-
-### Phase 1 — Settlements, people and food (≈ 3–4 sessions) — IN PROGRESS
+### Phase 1 — Settlements, people and food — DONE, signed off by Omer 2026-11-07
 
 Goal: a living economy with no enemies.
 
@@ -173,29 +169,38 @@ Suggested order (each session ends with a build): (1) numbers first — propose 
 - [~] Economy loop: gather → consume → store → share done for food (Session 5) and for timber/stone (Session 11: cluster stockpiles, realm stockpile, instant shipping placeholder; Session 12: caps, Warehouses); produce and trade (private hands → goods, sold into the treasury; Workshop/Market multipliers) and **tax on private hands** (Session 12); roads later.
 - [x] Buildings inside settlements — halls and granaries with hands (Session 5); starter list with effects, military buildings as data, one-at-a-time build queue with cancel (Session 11); money + labour + materials + time on every building (Session 12).
 - [x] Turn structure: 12 months, harvest in Sept/Oct, yearly update in December. *(Session 5; winter effects belong to armies, Phase 4)*
-- [x] Settlement panel, end-turn button, run-years, scenario save/load (Session 7); realm panel with the treasury's yearly ledger and the realm stockpile (Sessions 10–12); **the UI overhaul — ledger strip, hover cards, tabbed ledgers with age pyramids, harvest calendars, hex tables, building cards** (Session 13). Omer's feedback pending.
+- [x] Settlement panel, end-turn button, run-years, scenario save/load (Session 7); realm panel with the treasury's yearly ledger and the realm stockpile (Sessions 10–12); **the UI overhaul — ledger strip, hover cards, tabbed ledgers with age pyramids, harvest calendars, hex tables, building cards** (Session 13); icons, zoom levels, shorelines, rivers as water (13b–13e). Accepted by Omer 2026-11-07.
 - [x] **Cluster view** (DESIGN §3.3, decided 2026-11-05): derived clusters, cluster outline on the map, cluster panel; realm report as the sum over clusters. *(Session 10)*
 - [x] **Tithe** (DESIGN §4.2, decided 2026-11-05): 10 % in kind from subordinates; headless A/B on the start position. *(Session 10 — finding: it moves people from towns to cities, not hunger; see DEVLOG)*
 - [x] **Pull factor** (DESIGN §4.1, decided 2026-11-05): 4 %/yr of spare hands to a fed parent with vacancies. *(Session 11 — inert on the start position; DESIGN §5.10)* → to a **prosperous** parent (fed with ≥ 4 spare months) *(Session 12 — fires; the prosperity condition halves the hunger the unconditional pull causes)*.
 - [x] **Private economy** (DESIGN §4.2b, decided 2026-11-05): private hands → tax and goods; money costs; stockpile caps. *(Session 12 — money non-binding until sinks exist; DESIGN §5.11)*
-- [ ] Tuning against the headless curves with Omer; **Phase 1 acceptance review**.
+- [x] **Phase 1 acceptance review** — passed 2026-11-07 on the Session 12c headless runs (the start position grows over 40 years; a lone city starves in the `phase1` scenario; the ledgers show why). **Tuning deferred** by Omer's decision: the food / materials / tax numbers are not retuned until the Phase 2 sinks exist (units, upkeep, settlers, work-bands), because tuning an economy with nothing to spend on would be redone.
 - [x] Headless scenario: 20 years, six cases; population and food curves. *(Session 5)*; `--scenario start` runs the real starting position with knob presets *(Session 9)*.
 
-**Acceptance**: a faction with a city and several villages survives and grows over 20 years; a city with no villages starves. Omer can read why from the panels.
+**Acceptance**: a faction with a city and several villages survives and grows over 20 years; a city with no villages starves. Omer can read why from the panels. ✔ (Numbers to be tuned after Phase 2.)
 
-### Phase 2 — Units, movement and building the land (≈ 3 sessions)
+### Phase 2 — Units, movement and building the land (≈ 3–4 sessions) — NEXT
 
-Goal: expand and connect.
+Goal: a game loop — people leave settlements as units, move, and change the land and the demography; the system built in Phase 1 is both what they cost and what they act on.
 
-- Units carrying population; settlers found villages; work-bands build roads, forts, mills, extraction sites.
-- Movement with terrain costs; A* pathfinding; hierarchical pathfinding if needed at scale.
-- Groups (stack, split, move together).
-- Fog of war (simple).
-- Simulation moved into a Web Worker.
-- Upgrading village→town→city as a player decision with requirements.
-- Administrative capacity, government forms, and the first institutions and policies.
+**Why before Government & Institutions (Omer's decision 2026-11-07):** units are the economy's missing *sinks* (the Session 12 finding that money does not bind), and administrative capacity — the centrepiece of §4.3 — is a brake on *how many settlements a realm can run*; until settlers exist there is nothing to brake and no measurement of how fast a realm sprawls on its own. Phase 2 therefore runs **without** any administrative-capacity placeholder: the demographic cost of founding (≈ 900 people per village) is the only brake, and the headless sprawl measurement at the end of Phase 2 is the opening exhibit of the design session.
 
-**Acceptance**: Omer can expand a faction from one city to a region of villages connected by roads, and feel the administrative ceiling.
+Session plan (one feature cluster each; each ends with a build):
+
+1. **Units and movement** — the unit entity (faction, hex, people as cohorts, provisions), commands (raise, move, disband), movement points with terrain costs from `data/terrain.json`, A* on hexes, units drawn on the map and a unit card; **settlers** as the first type: raised from a settlement's spare/private hands with dependants, walk, found a village (`foundSettlement` exists). Headless: a scripted settler-spamming builder.
+2. **Work-bands and roads** — work-bands build on the hex they stand on from `data/infrastructure.json`: roads first (movement, and food sharing by distance replacing the instant-shipping placeholder; the metropolis prerequisite), then quarries / lumber camps on resource hexes, forts (border + garrison point), watchtowers if cheap.
+3. **Levies and tier upgrades** — one generic **levy** unit (men 15–44 from a settlement; raise / move / upkeep in coins and food / disband home) with no roster, facilities or combat (Phase 4); **upgrading village → town → city as a player command** with the population gate + money + materials + months (administrative capacity added when §4.3 exists).
+4. (if needed) Groups (stack, split, move together), hierarchical pathfinding, tuning of the Phase 1 + 2 numbers against the headless curves with Omer.
+
+Kickoff: the Phase 2 design questions are drafted as PROPOSED in DESIGN §3.2b; Omer rules on them at the start of session 1. Every Phase 2 session keeps a **"§4.3 hooks"** list in its DEVLOG entry — each number or rule that the Government & Institutions session must later own (administration quality, the tithe as a policy, the realm cap, upkeep, capacity costs…).
+
+Moved out of Phase 2 (2026-11-07): fog of war (meaningless with one faction) and the Web Worker (needed only when AI turns are slow) → Phase 5. Administrative capacity, government forms and the first institutions → the design session below, then Phase 3.
+
+**Acceptance**: Omer can expand the faction from one city to a region of villages connected by roads, with the cost visible in people and tax; a village that sends settlers and a levy visibly shrinks and recovers; the headless sprawl curve over 40 years is on the table.
+
+### Design session — Government & Institutions (after Phase 2, before Phase 3)
+
+A chat devoted to DESIGN §4.3: government forms, the institution list and prerequisites, the policy list and trade-offs, administrative capacity — opened with the Phase 2 sprawl measurement and the accumulated "§4.3 hooks" list. Output: DESIGN.md §4.3 moved from PROPOSED to DECIDED, `data/institutions.json` drafted, and the first institutions, policies and administrative capacity scheduled (as a Phase 2b or the first part of Phase 3 — institutions need the characters who staff them).
 
 ### Phase 3 — Characters (≈ 2 sessions)
 
@@ -220,6 +225,7 @@ Goal: expand and connect.
 
 - Relations, treaties, client and subjugated states; diplomacy screen.
 - AI in layers: economic (build, grow, feed) → expansion (settle, roads) → military (defend, raid, conquer) → diplomatic. Faction personas.
+- Fog of war (simple) and the simulation moved into a Web Worker — both moved here from Phase 2 (2026-11-07).
 - Victory condition and end screen.
 - Headless balancing: 20 AI-only games, stats reviewed with Omer.
 
@@ -244,6 +250,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.6 (2026-11-07, Session 13f): Phase 1 signed off (tuning deferred); the Government & Institutions design session moved from before Phase 2 to after it; Phase 2 rewritten as a session plan without administrative capacity; fog of war and the Web Worker moved to Phase 5.
 - 0.5b (2026-11-06, Session 13b): UI-DESIGN.md added to the document table (A.2); archive split into volumes under ~45 KB.
 - 0.5a (2026-11-05, Session 13): the UI overhaul noted in the Phase 1 checklist.
 - 0.5 (2026-11-05, Session 12b): working agreement revised for shorter sessions — CLAUDE.md and ARCHITECTURE.md in the repo, Project docs kept small and read selectively, `npm run smoke`, one feature cluster per session (A.2, A.3, B.2, B.4).
