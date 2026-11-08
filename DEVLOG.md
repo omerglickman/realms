@@ -17,7 +17,7 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 - **Placeholders and limitations:** instant shipping and instant muster; roads move units only (food sharing by road, §5.15, the end of the phase); no quarries / lumber camps / watchtowers yet; roads belong to no faction, no upkeep or decay; `replaceMap` leaves `infra` alone; levies not raisable; city → metropolis upgrade a placeholder; an upgrade runs beside the build queue; a mustering party is cancellable only in the session it was raised in; the glide moves a whole group's shield; flat realm cap; administration quality = hall staffing.
 - **Numbers to remember:** model scale ×3 (a village 900, a town 9,000, a city 24,000; farm hex 600 fed / 90 hands); gates 1,500 / 6,000 / 36,000; influence rings 1/3/5/6; settlers 4 move points, work-band 5; a band of 300 lays a dirt-road hex in 2 months; a dirt step on plains costs 0.5 point (settlers: 8 hexes a month), paved 0.25 (16 a month).
 - **Next steps (in order):**
-  1. **Omer plays the Session 16d build**; open under DESIGN §5.17: work speed, bridges from the bank, materials per hex; his look at the meandering roads up close.
+  1. **Omer plays the Session 16e build**; open under DESIGN §5.17: work speed, bridges from the bank, materials per hex; his look at the (now clearly curved) roads up close.
   1b. **Docs:** DESIGN.md is split (Session 16c) into DESIGN.md (core + index + open decisions + glossary), DESIGN-units / -settlements / -people-economy / -history; every Project doc is under ~35 KB. Keep it that way: a file nearing 35 KB gets split again.
   2. **Session 2b — castles and forts** per DESIGN-units.md §3.5 (read it whole; `data/castles.json`; castle kinds on a seven-rank ladder — append castle tiers to `TIERS` with explicit ranks so saved tier indexes stay valid; castle service as a labour-planner job; the siege reserve; garrison capacity; fortify order; ruin / fort decay; pathfinding hook). Quarries / lumber camps (×2 a hex's material output; needs `economy.ts` gathering to read a per-hex multiplier) and watchtowers can ride along or follow.
   3. Session 3 — levies (`takeMen` exists) with upkeep; session 4 if needed — groups, hierarchical pathfinding, tuning; **roads and food sharing** at the end of the phase (§5.15).
@@ -283,3 +283,11 @@ Sessions 0–13e (planning, Phase 0, the headless Phase 1 model, the ×3 scale, 
 **Tests & build:** pass (162/162; `tsc`, build, smoke OK). **Build delivered:** `realms.html` (Session 16d).
 
 **Next session should:** session 2b castles (DESIGN-units.md §3.5).
+
+## 2026-11-08 — Session 16e — Roads: the curve made visible
+
+**Omer:** the 16d build showed no curve in roads. **Found:** the Bézier was already used for every road segment, but each bend was `(hash − 0.5) × 2 × 0.17`, so many segments got a near-zero bend and the rest were barely perceptible. **Done:** `render/infraLayer.ts` — `MEANDER` 0.17 → 0.42 and each bend now has a random side and a magnitude of 40–100 % of it (never straight); bridge decks still bend a quarter as much. UI-DESIGN §6 and its change log (1.7b) updated. No sim change.
+
+**Tests & build:** pass (162/162; build and smoke OK, zero console errors). Not checked by eye in a close-up (no road exists in a fresh scenario to screenshot); the geometry puts the mid-curve about 0.1 hex-lengths off the straight line. **Commit:** `phase1: roads meander clearly (Session 16e)`. **Build delivered:** `realms.html` (Session 16e).
+
+**Next session should:** take Omer's verdict on the curve's strength (`MEANDER` in `infraLayer.ts` is the one knob); then session 2b castles (DESIGN-units.md §3.5).

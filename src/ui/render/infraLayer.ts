@@ -19,7 +19,7 @@ const STONE = 0xc9c1ad;
 const STONE_EDGE = 0x5a5246;
 const DECK = 0xc8a266;
 /** How far a road may wander sideways, as a share of the hex-to-hex distance (Omer 2026-11-08: slightly meandering, not straight). */
-const MEANDER = 0.17;
+const MEANDER = 0.42; // control-point offset as a share of the segment length (min 40% of it is guaranteed)
 const BRIDGE_BEND = 0.25; // a deck stays nearly straight
 
 export class InfraLayer {
@@ -77,8 +77,10 @@ export class InfraLayer {
       const nx = -dy / len, ny = dx / len;
       const seed = Math.min(a, b) * 7919 + Math.max(a, b);
       const sign = a < b ? 1 : -1; // same curve whichever way the pair is given
-      const o1 = (hash01(seed) - 0.5) * 2 * MEANDER * len * bend * sign;
-      const o2 = (hash01(seed + 0.5) - 0.5) * 2 * MEANDER * len * bend * sign;
+      // each bend has a random side and a magnitude of 40–100% of MEANDER, so no road is ever straight
+      const bendOf = (h: number, h2: number): number => (0.4 + 0.6 * h) * (h2 < 0.5 ? -1 : 1);
+      const o1 = bendOf(hash01(seed), hash01(seed + 0.25)) * MEANDER * len * bend * sign;
+      const o2 = bendOf(hash01(seed + 0.5), hash01(seed + 0.75)) * MEANDER * len * bend * sign;
       g.moveTo(pa.x, pa.y)
         .bezierCurveTo(pa.x + dx / 3 + nx * o1, pa.y + dy / 3 + ny * o1, pa.x + 2 * dx / 3 + nx * o2, pa.y + 2 * dy / 3 + ny * o2, pb.x, pb.y)
         .stroke({ width, color, alpha, cap: 'round', join: 'round' });
