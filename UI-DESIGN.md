@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — UI Design
 
-**Version 1.8a — 2026-11-08 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13–13f and built through Session 15. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
+**Version 1.9 — 2026-11-08 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13–13f and built through Session 15. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
 
 Omer's brief (2026-11-05): the bottom lines (funds, people, resources) always visible in a clear place that hides little of the map; everything else in hover summaries or modals that present resources, buildings, economic activity and demographics in an orderly, friendly way, with graphics; headers in a hand resembling Carolingian minuscule; a medieval palette. Design left to Claude; Omer amends.
 
