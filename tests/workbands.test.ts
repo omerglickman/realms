@@ -48,14 +48,14 @@ function put(u: Unit, map: { width: number }, cell: number) {
 }
 
 describe('roads and bridges on the map', () => {
-  it('state v8 carries an empty infra and v7 saves migrate', () => {
+  it('state carries an empty infra and v7 saves migrate', () => {
     const { state } = world();
-    expect(STATE_VERSION).toBe(8);
-    expect(state.infra).toEqual({ roads: {}, bridges: {} });
+    expect(STATE_VERSION).toBe(9);
+    expect(state.infra).toEqual({ roads: {}, bridges: {}, sites: {} });
     const old = JSON.parse(serializeState(state));
     delete old.infra; old.version = 7;
     const back = deserializeState(JSON.stringify(old));
-    expect(back.infra).toEqual({ roads: {}, bridges: {} });
+    expect(back.infra).toEqual({ roads: {}, bridges: {}, sites: {} });
   });
 
   it('a road halves the cost of rough ground between two road hexes, never under the road minimum (dirt 0.5, paved 0.25); mountains stop being a month', () => {

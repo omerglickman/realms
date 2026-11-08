@@ -6,7 +6,10 @@
 // the river hex, along the road through it. Sparse, so one Graphics redrawn when
 // the infrastructure (or the zoom's line weight) changes. Purely visual.
 
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
+import { iconTexture, MAP_BADGE } from '../icons';
+import { showResources } from '../zoomLevels';
+import { siteInfo } from '../../sim/infrastructure';
 import type { GameState } from '../../sim/state';
 import { offsetToPixel } from '../../sim/hex';
 import { neighbourCells } from '../../sim/pathfinding';
@@ -25,22 +28,27 @@ const BRIDGE_BEND = 0.25; // a deck stays nearly straight
 export class InfraLayer {
   readonly root = new Container();
   private g = new Graphics();
+  /** quarry / lumber-camp badges (Session 17) */
+  private badges = new Container();
   private lastKey = '';
 
-  constructor() { this.root.addChild(this.g); }
+  constructor() { this.root.addChild(this.g, this.badges); }
 
   /** Redraw when the roads / bridges (or the zoom bucket) changed. */
   update(state: GameState, zoom: number, previewCells?: number[] | null): void {
     const roads = state.infra?.roads ?? {};
     const bridges = state.infra?.bridges ?? {};
     const rk = Object.keys(roads), bk = Object.keys(bridges);
-    const key = `${rk.length}:${bk.length}:${rk.reduce((t, c) => t + Number(c) * (roads[c] ?? 0), 0)}:${Math.round(Math.log2(zoom) * 2)}:${state.map.width}`;
+    const sites = state.infra?.sites ?? {};
+    const sk = Object.keys(sites);
+    const key = `${rk.length}:${bk.length}:${bk.reduce((t, c) => t + Number(c), 0)}:${sk.length}:${sk.reduce((t, c) => t + Number(c) * (sites[c] === 'quarry' ? 1 : 2), 0)}:${showResources(zoom) ? 1 : 0}:${rk.reduce((t, c) => t + Number(c) * (roads[c] ?? 0), 0)}:${Math.round(Math.log2(zoom) * 2)}:${state.map.width}`;
     if (key === this.lastKey && !previewCells) return;
     this.lastKey = key;
     const map = state.map;
     const w = map.width;
     const g = this.g;
     g.clear();
+    this.badges.removeChildren().forEach((ch) => ch.destroy());
     const level = (cell: number): number => {
       const b = roads[cell] ?? 0;
       if (b > 0) return b;
@@ -105,6 +113,19 @@ export class InfraLayer {
       if (segs.some((s) => s.a === cell || s.b === cell)) continue;
       const p = centre(cell);
       g.roundRect(p.x - 3.5 * k, p.y - 1.6 * k, 7 * k, 3.2 * k, 0.8 * k).fill({ color: DECK }).stroke({ width: 0.9 * k, color: INK });
+    }
+    // quarries and lumber camps: a parchment badge, lower left of the hex so a resource badge stays readable
+    if (showResources(zoom)) {
+      for (const c of sk) {
+        const info = siteInfo(sites[c]);
+        if (!info) continue;
+        const p = centre(Number(c));
+        const sp = new Sprite(iconTexture(info.icon, MAP_BADGE));
+        sp.anchor.set(0.5);
+        sp.width = HEX_SIZE * 0.8; sp.height = HEX_SIZE * 0.8;
+        sp.position.set(p.x - HEX_SIZE * 0.3, p.y + HEX_SIZE * 0.28);
+        this.badges.addChild(sp);
+      }
     }
   }
 }

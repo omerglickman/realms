@@ -20,6 +20,7 @@ import {
   disbandTarget, disbandInto, unitCell,
 } from './units';
 import { type BuildOrder, checkBuildOrder } from './workbands';
+import { infraCellAt, type InfraCell } from './infrastructure';
 import type { Payment } from './materials';
 import { addPopulation } from './demography';
 import { clusterRootOf } from './clusters';
@@ -230,7 +231,14 @@ export interface SetParentsCommand {
   changes: { id: string; parent: string | null }[];
 }
 
+/** Set the infrastructure of some hexes to absolute values (the editor's Infrastructure tab); the inverse restores the previous values. */
+export interface SetInfraCommand {
+  type: 'setInfra';
+  cells: InfraCell[];
+}
+
 export type Command =
+  | SetInfraCommand
   | SetParentsCommand
   | UpgradeSettlementCommand
   | CancelUpgradeCommand
@@ -284,6 +292,19 @@ export function applyCommand(state: GameState, cmd: Command): Command {
         map.resource[c.i] = c.t;
       }
       return { type: 'setResource', cells: inverse };
+    }
+    case 'setInfra': {
+      const inf = state.infra;
+      const inverse: InfraCell[] = [];
+      for (const c of cmd.cells) {
+        const prev = infraCellAt(state, c.i);
+        if (prev.road === c.road && prev.bridge === c.bridge && prev.site === c.site) continue;
+        inverse.push(prev);
+        if (c.road > 0) inf.roads[c.i] = c.road; else delete inf.roads[c.i];
+        if (c.bridge) inf.bridges[c.i] = true; else delete inf.bridges[c.i];
+        if (c.site) inf.sites[c.i] = c.site; else delete inf.sites[c.i];
+      }
+      return { type: 'setInfra', cells: inverse };
     }
     case 'replaceMap': {
       const prev = state.map;
@@ -549,7 +570,7 @@ function stockOf(state: GameState, key: string): Materials {
 export function isNoop(cmd: Command): boolean {
   if (cmd.type === 'transferMaterials') return MATERIAL_IDS.every((k) => !(cmd.amount[k] && cmd.amount[k]! > 0));
   if (cmd.type === 'sendFood') return !(cmd.amount > 0);
-  return (cmd.type === 'setTerrain' || cmd.type === 'setResource') && cmd.cells.length === 0;
+  return (cmd.type === 'setTerrain' || cmd.type === 'setResource' || cmd.type === 'setInfra') && cmd.cells.length === 0;
 }
 
 /** Does this command touch settlements (so zone/marker layers must redraw)? */
@@ -567,6 +588,7 @@ export function commandTouchesUnits(cmd: Command): boolean {
 /** Cells touched by a command (for renderer invalidation); 'all' for whole-map commands. */
 export function commandCells(cmd: Command): number[] | 'all' {
   if (cmd.type === 'setTerrain' || cmd.type === 'setResource') return cmd.cells.map((c) => c.i);
+  if (cmd.type === 'setInfra') return [];
   if (cmd.type === 'replaceMap') return 'all';
   return [];
 }

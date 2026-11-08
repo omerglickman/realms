@@ -6,6 +6,7 @@
 
 ## Change log
 
+- 0.7b (2026-11-08, Session 17): §3.4 quarries and lumber camps are map entities now (editor-placed, no economic effect until the economic overhaul); Omer.
 - 0.7a (2026-11-08, Session 16d): paved road factor ¼ DECIDED by Omer (§3.2b rule 5); §5.17(b) resolved.
 - 0.7 (2026-11-08, Session 16c): DESIGN.md split into a core file and area files (units / settlements / people-economy / history); no rule changed, section numbers kept.
 - 0.6b (2026-11-08, Session 16b): §3.2b rule 5 and §3.4 — the road minimum costs DECIDED by Omer (dirt 0.5, paved 0.25); §5.17(a) resolved, (b) narrowed.

@@ -1,11 +1,72 @@
 {
-  "_comment": "Infrastructure built by work-bands (DESIGN §3.2b rule 7, §3.4; DECIDED by Omer 2026-11-07, numbers DRAFT, ×3 scale). `items`: what a band can build on a hex — months for a band of `work.refPeople` people (a bigger band is proportionally faster up to `work.maxRate`, a smaller one slower), materials paid when work on that hex begins (from the cluster whose influence covers it, else from the realm stockpile; the project waits if neither has them). A paved road goes over a dirt road; a bridge goes on a river hex, is built from the bank beside it, and carries a dirt road. Movement (rule 5): a unit stepping from one road hex to another pays the terrain's cost times the road's factor, never less than `movement.minCost` for the link's level (DECIDED by Omer 2026-11-08: dirt road minimum 0.5, paved road minimum 0.25 — so on plains a dirt road doubles a unit's speed). A settlement hex counts as a dirt road for this. Mountains are one hex a month unless a road links them, then they cost 4 × the factor. `planning.bridgePenalty`: extra route cost the planner adds for a bridge still to be built, so 'road from X to Y' prefers existing bridges, settlements and short crossings; `planning.reuse`: the cost of stepping onto a hex that already has the road.",
-  "work": { "refPeople": 300, "maxRate": 3 },
-  "movement": { "minCost": { "1": 0.5, "2": 0.25 }, "factor": { "1": 0.5, "2": 0.25 } },
-  "planning": { "bridgePenalty": 6, "reuse": 0.4 },
+  "_comment": "Infrastructure built by work-bands (DESIGN §3.2b rule 7, §3.4; DECIDED by Omer 2026-11-07, numbers DRAFT, ×3 scale). `items`: what a band can build on a hex — months for a band of `work.refPeople` people (a bigger band is proportionally faster up to `work.maxRate`, a smaller one slower), materials paid when work on that hex begins (from the cluster whose influence covers it, else from the realm stockpile; the project waits if neither has them). A paved road goes over a dirt road; a bridge goes on a river hex, is built from the bank beside it, and carries a dirt road. Movement (rule 5): a unit stepping from one road hex to another pays the terrain's cost times the road's factor, never less than `movement.minCost` for the link's level (DECIDED by Omer 2026-11-08: dirt road minimum 0.5, paved road minimum 0.25 — so on plains a dirt road doubles a unit's speed). A settlement hex counts as a dirt road for this. Mountains are one hex a month unless a road links them, then they cost 4 × the factor. `planning.bridgePenalty`: extra route cost the planner adds for a bridge still to be built, so 'road from X to Y' prefers existing bridges, settlements and short crossings; `planning.reuse`: the cost of stepping onto a hex that already has the road. `sites`: quarries and lumber camps (Session 17, Omer 2026-11-08) — map entities placed from the editor's Infrastructure tab; their economic influence is NOT decided (the economic/demographic overhaul will), so for now they are only on the map and in saves.",
+  "work": {
+    "refPeople": 300,
+    "maxRate": 3
+  },
+  "movement": {
+    "minCost": {
+      "1": 0.5,
+      "2": 0.25
+    },
+    "factor": {
+      "1": 0.5,
+      "2": 0.25
+    }
+  },
+  "planning": {
+    "bridgePenalty": 6,
+    "reuse": 0.4
+  },
   "items": [
-    { "id": "dirt", "kind": "road", "level": 1, "name": "Dirt road", "months": 2, "cost": { "timber": 30 }, "blurb": "Cleared and levelled; halves the cost of rough ground between two road hexes." },
-    { "id": "paved", "kind": "road", "level": 2, "name": "Paved road", "months": 6, "cost": { "stone": 60 }, "requires": "dirt", "blurb": "Stone-laid over a dirt road; cheaper still to travel and the road food and trade will use later." },
-    { "id": "bridge", "kind": "bridge", "level": 0, "name": "Bridge", "months": 6, "cost": { "timber": 60, "stone": 30 }, "blurb": "Joins both banks of a river hex and carries a dirt road across." }
+    {
+      "id": "dirt",
+      "kind": "road",
+      "level": 1,
+      "name": "Dirt road",
+      "months": 2,
+      "cost": {
+        "timber": 30
+      },
+      "blurb": "Cleared and levelled; halves the cost of rough ground between two road hexes."
+    },
+    {
+      "id": "paved",
+      "kind": "road",
+      "level": 2,
+      "name": "Paved road",
+      "months": 6,
+      "cost": {
+        "stone": 60
+      },
+      "requires": "dirt",
+      "blurb": "Stone-laid over a dirt road; cheaper still to travel and the road food and trade will use later."
+    },
+    {
+      "id": "bridge",
+      "kind": "bridge",
+      "level": 0,
+      "name": "Bridge",
+      "months": 6,
+      "cost": {
+        "timber": 60,
+        "stone": 30
+      },
+      "blurb": "Joins both banks of a river hex and carries a dirt road across."
+    }
+  ],
+  "sites": [
+    {
+      "id": "quarry",
+      "name": "Quarry",
+      "icon": "quarry",
+      "blurb": "A stone-cutting site on a hex. Placeholder: no economic effect yet (DESIGN §5.17 / the economic overhaul will decide what it yields)."
+    },
+    {
+      "id": "lumber",
+      "name": "Lumber camp",
+      "icon": "lumbercamp",
+      "blurb": "A timber-felling camp on a hex. Placeholder: no economic effect yet (the economic overhaul will decide what it yields)."
+    }
   ]
 }

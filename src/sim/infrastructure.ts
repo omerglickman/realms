@@ -23,7 +23,12 @@ export interface InfraItem {
   blurb?: string;
 }
 
+/** A quarry or lumber camp on a hex (Session 17): a map entity whose economic influence is not decided yet. */
+export type SiteKind = 'quarry' | 'lumber';
+export interface SiteInfo { id: SiteKind; name: string; icon: string; blurb?: string }
+
 interface InfraData {
+  sites: SiteInfo[];
   work: { refPeople: number; maxRate: number };
   movement: { minCost: Record<string, number>; factor: Record<string, number> };
   planning: { bridgePenalty: number; reuse: number };
@@ -32,6 +37,9 @@ interface InfraData {
 
 export const INFRA: InfraData = infraData as unknown as InfraData;
 export const INFRA_ITEMS: readonly InfraItem[] = INFRA.items;
+
+export const SITE_KINDS: readonly SiteInfo[] = INFRA.sites;
+export function siteInfo(kind: string): SiteInfo | undefined { return SITE_KINDS.find((x) => x.id === kind); }
 
 export function infraItem(id: string): InfraItem {
   const i = INFRA_ITEMS.find((x) => x.id === id);
@@ -43,10 +51,44 @@ export function infraItem(id: string): InfraItem {
 export interface InfraState {
   roads: Record<string, number>;
   bridges: Record<string, true>;
+  /** quarries and lumber camps by cell (state v9) */
+  sites: Record<string, SiteKind>;
 }
 
 export function emptyInfra(): InfraState {
-  return { roads: {}, bridges: {} };
+  return { roads: {}, bridges: {}, sites: {} };
+}
+
+/** Everything the editor can put on one hex, as absolute values (the unit of the `setInfra` command and its inverse). */
+export interface InfraCell { i: number; road: number; bridge: boolean; site: SiteKind | '' }
+
+export function infraCellAt(state: GameState, i: number): InfraCell {
+  return { i, road: state.infra?.roads[i] ?? 0, bridge: !!state.infra?.bridges[i], site: state.infra?.sites?.[i] ?? '' };
+}
+
+/** What the editor's Infrastructure tab can place. */
+export type InfraBrush = 'dirt' | 'paved' | 'bridge' | 'quarry' | 'lumber' | 'erase';
+
+/** The new contents of hex `i` for a brush, or the reason it cannot go there (editor rules; DESIGN §3.4). */
+export function infraBrushResult(state: GameState, i: number, brush: InfraBrush): { ok: true; cell: InfraCell } | { ok: false; reason: string } {
+  const map = state.map;
+  const w = map.width;
+  const t = TERRAIN[map.terrain[i]];
+  const cur = infraCellAt(state, i);
+  if (brush === 'erase') return { ok: true, cell: { i, road: 0, bridge: false, site: '' } };
+  if (settlementIdAt(state, i % w, Math.floor(i / w)) !== null) return { ok: false, reason: 'a settlement stands there' };
+  const isRiver = map.terrain[i] === RIVER;
+  if (brush === 'bridge') {
+    if (!isRiver) return { ok: false, reason: 'a bridge goes on a river hex' };
+    return { ok: true, cell: { ...cur, bridge: true, road: Math.max(cur.road, 1) } };
+  }
+  if (!t.passable) return { ok: false, reason: `${t.name.toLowerCase()} cannot be built on` };
+  if (brush === 'dirt' || brush === 'paved') {
+    if (isRiver && !cur.bridge) return { ok: false, reason: 'a river hex needs a bridge first' };
+    return { ok: true, cell: { ...cur, road: brush === 'dirt' ? 1 : 2 } };
+  }
+  if (isRiver) return { ok: false, reason: 'not on a river hex' };
+  return { ok: true, cell: { ...cur, site: brush } };
 }
 
 const RIVER = terrainIndex('river');

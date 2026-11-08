@@ -94,6 +94,7 @@
         <button data-tab="terrain">Terrain</button>
         <button data-tab="resources">Resources</button>
         <button data-tab="settlements">Settlements</button>
+        <button data-tab="infrastructure">Infrastructure</button>
       </div>
 
       <div class="tab-page" data-tab="terrain">
@@ -145,6 +146,13 @@
         </div>
         <div class="row small"><span id="settle-count" class="dim"></span></div>
         <div class="help dim">Place: hatched hexes are already worked; dotted lines are the influence edges of towns and cities (a new village inside one becomes its dependant); the pale solid lines are cluster outlines. Pick: opens a settlement's ledger so you can change its name and population or remove it.</div>
+      </div>
+
+      <div class="tab-page hidden" data-tab="infrastructure">
+        <div class="section">Place</div>
+        <div id="infra-palette"></div>
+        <div class="row small"><span id="infra-count" class="dim"></span></div>
+        <div class="help dim">Left-click or drag places the selected item · roads and bridges join up automatically between neighbouring hexes · a bridge goes on a river hex (and carries a dirt road) · quarries and lumber camps are map entities only for now — their economic effect is not decided yet · Erase clears everything on a hex · keys D P B Q L X</div>
       </div>
     </div>
 

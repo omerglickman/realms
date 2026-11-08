@@ -12,8 +12,8 @@ import { emptyMaterials } from './materials';
 import type { Unit } from './units';
 import { type InfraState, emptyInfra } from './infrastructure';
 
-/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). v6: + units (Phase 2, Session 14). v7: + settlement.upgrade (Session 15b). v8: + infra, roads and bridges (Session 16). */
-export const STATE_VERSION = 8;
+/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). v6: + units (Phase 2, Session 14). v7: + settlement.upgrade (Session 15b). v8: + infra, roads and bridges (Session 16). v9: + infra.sites, quarries and lumber camps (Session 17). */
+export const STATE_VERSION = 9;
 
 export interface GameState {
   version: number;
@@ -134,12 +134,18 @@ export function deserializeState(json: string): GameState {
     s.infra = emptyInfra();
     s.version = 8;
   }
+  if (s.version === 8) {
+    // Session 17: quarries and lumber camps
+    if (s.infra) (s.infra as { sites?: unknown }).sites = {};
+    s.version = 9;
+  }
   if (s.version !== STATE_VERSION) {
     throw new Error(`Save version ${s.version} not supported (expected ${STATE_VERSION})`);
   }
   if (!s.settlements) s.settlements = {};
   if (!s.units) s.units = {};
   if (!s.infra) s.infra = emptyInfra();
+  if (!s.infra.sites) s.infra.sites = {};
   if (!s.factions) s.factions = initialFactions();
   if (!s.playerFaction) s.playerFaction = PLAYER_FACTION;
   if (typeof s.nextId !== 'number') s.nextId = 1;

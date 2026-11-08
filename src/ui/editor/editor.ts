@@ -1,5 +1,6 @@
-// Map editor: three tabs — Terrain (brush / fill / pick + palette), Resources
-// (palette + spawning), Settlements (place / pick). Undo-redo, export/import,
+// Map editor: four tabs — Terrain (brush / fill / pick + palette), Resources
+// (palette + spawning), Settlements (place / pick), Infrastructure (roads,
+// bridges, quarries, lumber camps; Session 17). Undo-redo, export/import,
 // autosave. All edits go through the command layer (src/sim/commands.ts).
 // This file owns the editor panel DOM (#editor) and the edit-mode flag; the
 // app forwards pointer and key events to it while edit mode is on.
@@ -15,11 +16,13 @@ import { seedRng } from '../../sim/rng';
 import { inBounds, idx } from '../../sim/map';
 import { loadMapFile, saveMapFile } from '../../sim/mapfile';
 import { TIERS, canSettleAt, settlementIdAt, zoneCells, workRangeCells, workedCellsBySettlement } from '../../sim/settlements';
+import { infraBrushResult, infraCellAt, SITE_KINDS, type InfraBrush, type InfraCell } from '../../sim/infrastructure';
+import { icon } from '../icons';
 import { saveScenarioFile, loadScenarioFile, detectFile } from '../../sim/scenario';
 
-export type Tab = 'terrain' | 'resources' | 'settlements';
+export type Tab = 'terrain' | 'resources' | 'settlements' | 'infrastructure';
 /** brush / fill / pick belong to the Terrain tab; resource to Resources; settle (place) and inspect (pick) to Settlements. */
-export type Tool = 'brush' | 'fill' | 'pick' | 'resource' | 'settle' | 'inspect';
+export type Tool = 'brush' | 'fill' | 'pick' | 'resource' | 'settle' | 'inspect' | 'infra';
 export const BRUSH_RADII = [0, 1, 2, 4] as const; // sizes 1, 2, 3, 5
 
 /** Default starting population per tier when placing in the editor (×3 model scale; DESIGN §3.3 typical sizes). */
@@ -27,7 +30,17 @@ const DEFAULT_POP: Record<string, number> = { village: 900, town: 9000, city: 24
 
 const AUTOSAVE_KEY = 'realms.editor.autosave';
 const TERRAIN_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'S'];
-const TABS: Tab[] = ['terrain', 'resources', 'settlements'];
+const TABS: Tab[] = ['terrain', 'resources', 'settlements', 'infrastructure'];
+
+/** The Infrastructure tab's palette, in order (key = shortcut). */
+const INFRA_PALETTE: { brush: InfraBrush; name: string; key: string; icon: string; tip: string }[] = [
+  { brush: 'dirt', name: 'Dirt road', key: 'D', icon: 'walk', tip: 'a dirt road on the hex' },
+  { brush: 'paved', name: 'Paved road', key: 'P', icon: 'stone', tip: 'a paved road on the hex' },
+  { brush: 'bridge', name: 'Bridge', key: 'B', icon: 'grid', tip: 'a bridge on a river hex (carries a dirt road)' },
+  { brush: 'quarry', name: 'Quarry', key: 'Q', icon: 'quarry', tip: SITE_KINDS.find((x) => x.id === 'quarry')?.blurb ?? '' },
+  { brush: 'lumber', name: 'Lumber camp', key: 'L', icon: 'lumbercamp', tip: SITE_KINDS.find((x) => x.id === 'lumber')?.blurb ?? '' },
+  { brush: 'erase', name: 'Erase', key: 'X', icon: 'close', tip: 'clear roads, bridge and quarry / lumber camp from the hex' },
+];
 
 interface UndoEntry {
   undo: Command;
@@ -65,6 +78,9 @@ export class Editor {
   dirty = false;
   /** settle tool: tier index into TIERS */
   settleTier = 0;
+  /** infra tool: what a click places */
+  infraBrush: InfraBrush = 'dirt';
+  private infraStroke: Map<number, InfraCell> | null = null; // cell -> its contents before the stroke
   private settleCounter = 0;
 
   private undoStack: UndoEntry[] = [];
@@ -76,6 +92,7 @@ export class Editor {
     this.buildPalette();
     this.buildResourcePalette();
     this.buildSettlePanel();
+    this.buildInfraPalette();
     this.wirePanel();
     this.refreshPanel();
     this.checkAutosave();
@@ -102,7 +119,7 @@ export class Editor {
 
   setTab(tab: Tab): void {
     this.tab = tab;
-    this.tool = tab === 'terrain' ? 'brush' : tab === 'resources' ? 'resource' : 'settle';
+    this.tool = tab === 'terrain' ? 'brush' : tab === 'resources' ? 'resource' : tab === 'infrastructure' ? 'infra' : 'settle';
     this.refreshPanel();
     this.host.onToolChanged();
   }
@@ -209,6 +226,11 @@ export class Editor {
         this.placeSettlement(col, row);
         return;
       }
+      case 'infra': {
+        this.infraStroke = new Map();
+        this.infraAt(col, row);
+        return;
+      }
       case 'inspect': {
         this.host.onSelect(settlementIdAt(state, col, row));
         return;
@@ -216,11 +238,39 @@ export class Editor {
     }
   }
 
+  /** Place the selected infrastructure item on one hex as part of the current stroke. */
+  private infraAt(col: number, row: number): void {
+    const state = this.host.getState();
+    const map = state.map;
+    if (!inBounds(map, col, row) || !this.infraStroke) return;
+    const i = idx(map, col, row);
+    const r = infraBrushResult(state, i, this.infraBrush);
+    if (!r.ok) { el('editor-msg').textContent = `Cannot place here: ${r.reason}.`; return; }
+    const prev = infraCellAt(state, i);
+    if (prev.road === r.cell.road && prev.bridge === r.cell.bridge && prev.site === r.cell.site) return;
+    if (!this.infraStroke.has(i)) this.infraStroke.set(i, prev);
+    applyCommand(state, { type: 'setInfra', cells: [r.cell] });
+    el('editor-msg').textContent = '';
+    this.host.onChanged([]);
+  }
+
   pointerMove(col: number, row: number): void {
+    if (this.infraStroke && this.tool === 'infra') { this.infraAt(col, row); return; }
     if (this.stroke && (this.tool === 'brush' || this.tool === 'resource')) this.paintAt(col, row);
   }
 
   pointerUp(): void {
+    if (this.infraStroke) {
+      const state = this.host.getState();
+      if (this.infraStroke.size > 0) {
+        const undo: Command = { type: 'setInfra', cells: [...this.infraStroke.values()] };
+        const redo: Command = { type: 'setInfra', cells: [...this.infraStroke.keys()].map((i) => infraCellAt(state, i)) };
+        this.pushUndo({ undo, redo });
+        this.markDirty();
+      }
+      this.infraStroke = null;
+      return;
+    }
     if (!this.stroke) return;
     const map = this.host.getState().map;
     if (this.stroke.size > 0) {
@@ -328,7 +378,7 @@ export class Editor {
     if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'y') { this.redo(); return true; }
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     const up = k.toUpperCase();
-    if (k === 'Tab') { this.setTab(TABS[(TABS.indexOf(this.tab) + (e.shiftKey ? 2 : 1)) % 3]); return true; }
+    if (k === 'Tab') { this.setTab(TABS[(TABS.indexOf(this.tab) + (e.shiftKey ? TABS.length - 1 : 1)) % TABS.length]); return true; }
     if (this.tab === 'terrain') {
       if (up === 'B') { this.setTool('brush'); return true; }
       if (up === 'F') { this.setTool('fill'); return true; }
@@ -339,6 +389,9 @@ export class Editor {
       if (ti >= 0 && ti < TERRAIN.length) { this.terrain = ti; this.refreshPanel(); return true; }
     } else if (this.tab === 'resources') {
       if (up === 'X') { this.resource = NO_RESOURCE; this.setTool('resource'); return true; }
+    } else if (this.tab === 'infrastructure') {
+      const hit = INFRA_PALETTE.find((x) => x.key === up);
+      if (hit) { this.infraBrush = hit.brush; this.refreshPanel(); return true; }
     } else {
       if (up === 'P') { this.setTool('settle'); return true; }
       if (up === 'I') { this.setTool('inspect'); return true; }
@@ -473,6 +526,20 @@ export class Editor {
     RESOURCES.forEach((r, i) => mk(r.name, i, r.color));
   }
 
+  private buildInfraPalette(): void {
+    const pal = el('infra-palette');
+    pal.innerHTML = '';
+    for (const it of INFRA_PALETTE) {
+      const b = document.createElement('button');
+      b.className = 'swatch';
+      b.dataset.brush = it.brush;
+      b.title = it.tip;
+      b.innerHTML = `<span class="chip none" style="display:inline-flex;align-items:center;justify-content:center;background:none;border:0">${icon(it.icon)}</span>${it.name}<kbd>${it.key}</kbd>`;
+      b.addEventListener('click', () => { this.infraBrush = it.brush; this.refreshPanel(); });
+      pal.appendChild(b);
+    }
+  }
+
   private buildSettlePanel(): void {
     const sel = el<HTMLSelectElement>('settle-tier');
     sel.innerHTML = '';
@@ -545,6 +612,14 @@ export class Editor {
     document.querySelectorAll<HTMLButtonElement>('#palette .swatch').forEach((b) => {
       b.classList.toggle('selected', Number(b.dataset.index) === this.terrain);
     });
+    document.querySelectorAll<HTMLButtonElement>('#infra-palette .swatch').forEach((b) => {
+      b.classList.toggle('selected', b.dataset.brush === this.infraBrush);
+    });
+    const inf = this.host.getState().infra;
+    const nr = Object.keys(inf?.roads ?? {}).length, nb = Object.keys(inf?.bridges ?? {}).length;
+    const sites = Object.values(inf?.sites ?? {});
+    const nq = sites.filter((x) => x === 'quarry').length, nl = sites.filter((x) => x === 'lumber').length;
+    el('infra-count').textContent = nr + nb + nq + nl ? `${nr} road hex${nr === 1 ? '' : 'es'} · ${nb} bridge${nb === 1 ? '' : 's'} · ${nq} quarr${nq === 1 ? 'y' : 'ies'} · ${nl} lumber camp${nl === 1 ? '' : 's'}` : 'nothing built yet';
     document.querySelectorAll<HTMLButtonElement>('#res-palette .swatch').forEach((b) => {
       b.classList.toggle('selected', Number(b.dataset.index) === this.resource);
     });

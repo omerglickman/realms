@@ -9,7 +9,7 @@ import { InfraLayer } from './render/infraLayer';
 import { UnitLayer, unitAtWorld, shieldSize, type UnitPath } from './render/unitLayer';
 import { renderUnitCard } from './panels/unitCard';
 import { makeBuildOrder, orderSummary } from '../sim/workbands';
-import { infraItem } from '../sim/infrastructure';
+import { infraItem, siteInfo } from '../sim/infrastructure';
 import { renderRaiseDialog, newRaiseDraft, type RaiseDraft } from './panels/raiseDialog';
 import { routeFor, unitCell, unitTypeDef, canFoundAt, unitsAt, UNIT_TYPES, type Unit } from '../sim/units';
 import { findRoute, OPEN } from '../sim/pathfinding';
@@ -139,7 +139,7 @@ export async function startApp(): Promise<void> {
   let mouseX = -1, mouseY = -1;
 
   // the map's icon textures (resources, things on hexes, tier marks) — rasterised once from the shared icon set
-  await preloadIconTextures([...RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), 'mill', 'wharf', 'castle1', 'castle2', 'castle3', 'station'], MAP_BADGE);
+  await preloadIconTextures([...RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), 'mill', 'wharf', 'quarry', 'lumbercamp', 'castle1', 'castle2', 'castle3', 'station'], MAP_BADGE);
   await preloadIconTextures(RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), MAP_BADGE_IDLE);
   await preloadIconTextures([...SL.TIER_ICON, ...UNIT_TYPES.map((t) => t.icon)], MAP_MARK);
 
@@ -841,9 +841,11 @@ export async function startApp(): Promise<void> {
     const here = unitsAt(state, cell);
     const rl = state.infra?.roads[cell] ?? 0, br = !!state.infra?.bridges[cell];
     const roadText = br ? ` · bridge${rl >= 2 ? ' · paved road' : ' · dirt road'}` : rl ? (rl >= 2 ? ' · paved road' : ' · dirt road') : '';
+    const siteK = state.infra?.sites?.[cell];
+    const siteText = siteK ? ` · ${siteInfo(siteK)?.name.toLowerCase() ?? siteK}` : '';
     const unitsText = here.length ? ` · ${here.length === 1 ? here[0].name : `${here.length} parties`}` : '';
     el('info-hex').textContent =
-      `${t.name}${r ? ` · ${r.name}` : ''} (${h.col}, ${h.row}) · move ${t.passable ? t.moveCost : '—'}${y ? ' · ' + y : ''}${roadText}${workedText}${unitsText}`;
+      `${t.name}${r ? ` · ${r.name}` : ''} (${h.col}, ${h.row}) · move ${t.passable ? t.moveCost : '—'}${y ? ' · ' + y : ''}${roadText}${siteText}${workedText}${unitsText}`;
     // a unit's shield under the cursor takes the hover; otherwise the settlement
     const wpt = camera.screenToWorld(sx, sy);
     const hu: Unit | null = mode ? null : unitAtWorld(state, unitLayer, wpt.x, wpt.y, camera.zoom);

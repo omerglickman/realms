@@ -35,6 +35,8 @@ export const ICON_PATHS: Record<string, string> = {
   // ---- things built on hexes (now and later) ----
   mill: '<path d="M11 20V11l4-4 4 4v9z"/><path d="M11 20h8M3 20h8"/><circle cx="6.5" cy="14.5" r="3.5"/><path d="M6.5 11v7M3 14.5h7M4 12l5 5M9 12l-5 5"/>',
   wharf: '<path d="M3 15h18"/><path d="M5 15v4M9 15v4M13 15v4M17 15v4"/><path d="M6 11c3-3 9-3 12 0v4H6z"/><path d="M12 11V6M12 6l4 2"/>',
+  quarry: '<path d="M3 20h18"/><path d="M3 20v-6l4-3 3 2 4-5 4 3 3-1v10"/><path d="M8 16l8-8"/><path d="M14 5.5c2-.8 4 0 5 1.5"/>',
+  lumbercamp: '<ellipse cx="9" cy="18" rx="5" ry="2"/><path d="M4 18v-4c0-1.1 2.2-2 5-2s5 .9 5 2v4"/><path d="M10 12l8-8"/><path d="M15.5 3.5l5 2.5-2 2.5z"/>',
   castle1: '<path d="M8 20V6h2V4h1v2h2V4h1v2h2v14z"/><path d="M8 20h8M11 20v-4h2v4"/>',
   castle2: '<path d="M3 20v-8h2v-2h1v2h2v-2h1v2h8v-2h1v2h2v-2h1v2h2v8z"/><path d="M3 20h18M10 20v-5h4v5M9 12V5h2V3h1v2h1V3h1v2h1v7"/>',
   castle3: '<path d="M2 20v-9h1V9h1v2h1V9h1v2h2V7h1V5h1v2h1V5h1v2h1V5h1v2h1v4h2V9h1v2h1V9h1v2h1v9z"/><path d="M2 20h20M10 20v-5h4v5M7 14h1M16 14h1"/>',
