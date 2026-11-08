@@ -11,6 +11,8 @@ import { inBounds } from './map';
 export type Glyph = 'circle' | 'ring' | 'triangle' | 'square' | 'diamond' | 'hex' | 'cross' | 'star';
 
 export interface ResourceDef {
+  /** a deposit a quarry / mine can work (Session 17b): stone, iron, silver, salt */
+  mineable?: boolean;
   id: string;
   name: string;
   color: string;

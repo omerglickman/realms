@@ -4,11 +4,15 @@ import { applyCommand } from '../src/sim/commands';
 import { infraBrushResult, infraCellAt, emptyInfra } from '../src/sim/infrastructure';
 import { terrainIndex } from '../src/sim/terrain';
 import { createMap } from '../src/sim/map';
+import { resourceIndex } from '../src/sim/resources';
 
 function world() {
   const map = createMap(8, 8, terrainIndex('plains'));
   map.terrain[1 * 8 + 3] = terrainIndex('river');
   map.terrain[2 * 8 + 3] = terrainIndex('sea');
+  map.terrain[3 * 8 + 1] = terrainIndex('mountains');
+  map.resource[4 * 8 + 6] = resourceIndex('silver');
+  map.resource[5 * 8 + 6] = resourceIndex('wine');
   return createGameState('t', map);
 }
 
@@ -22,7 +26,7 @@ describe('editor infrastructure (Session 17)', () => {
     const inv2 = applyCommand(s, { type: 'setInfra', cells: [ok(river, 'bridge')] });
     expect(s.infra.bridges[river]).toBe(true);
     expect(s.infra.roads[river]).toBe(1); // a bridge carries a dirt road
-    const q = 5 * 8 + 5, l = 6 * 8 + 5;
+    const q = 4 * 8 + 6, l = 6 * 8 + 5;
     applyCommand(s, { type: 'setInfra', cells: [ok(q, 'quarry'), ok(l, 'lumber')] });
     expect(s.infra.sites[q]).toBe('quarry');
     expect(s.infra.sites[l]).toBe('lumber');
@@ -40,7 +44,13 @@ describe('editor infrastructure (Session 17)', () => {
     expect(infraBrushResult(s, sea, 'dirt').ok).toBe(false);
     expect(infraBrushResult(s, sea, 'quarry').ok).toBe(false);
     expect(infraBrushResult(s, river, 'quarry').ok).toBe(false);
-    expect(infraBrushResult(s, plains, 'quarry').ok).toBe(true);
+    expect(infraBrushResult(s, plains, 'quarry').ok).toBe(false);        // plain land, no deposit
+    expect(infraBrushResult(s, 5 * 8 + 6, 'quarry').ok).toBe(false);     // wine is not mineable
+    expect(infraBrushResult(s, 4 * 8 + 6, 'quarry').ok).toBe(true);      // silver is
+    expect(infraBrushResult(s, 3 * 8 + 1, 'quarry').ok).toBe(true);      // mountains need no resource
+    expect(infraBrushResult(s, 3 * 8 + 1, 'lumber').ok).toBe(false);     // no lumber camps on mountains
+    expect(infraBrushResult(s, plains, 'lumber').ok).toBe(true);
+    expect(infraBrushResult(s, 3 * 8 + 1, 'dirt').ok).toBe(true);        // a road may cross mountains
   });
   it('survives save/load and a v8 save migrates with empty sites', () => {
     const s = world();

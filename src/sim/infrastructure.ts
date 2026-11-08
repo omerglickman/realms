@@ -9,6 +9,7 @@ import type { GameState } from './state';
 import type { MapData } from './map';
 import { TERRAIN, terrainIndex } from './terrain';
 import { settlementIdAt } from './settlements';
+import { resourceByIndex } from './resources';
 import type { Materials } from './materials';
 
 export interface InfraItem {
@@ -25,7 +26,7 @@ export interface InfraItem {
 
 /** A quarry or lumber camp on a hex (Session 17): a map entity whose economic influence is not decided yet. */
 export type SiteKind = 'quarry' | 'lumber';
-export interface SiteInfo { id: SiteKind; name: string; icon: string; blurb?: string }
+export interface SiteInfo { id: SiteKind; name: string; icon: string; blurb?: string; rule?: string; onTerrain?: string[]; notOnTerrain?: string[] }
 
 interface InfraData {
   sites: SiteInfo[];
@@ -82,12 +83,18 @@ export function infraBrushResult(state: GameState, i: number, brush: InfraBrush)
     if (!isRiver) return { ok: false, reason: 'a bridge goes on a river hex' };
     return { ok: true, cell: { ...cur, bridge: true, road: Math.max(cur.road, 1) } };
   }
-  if (!t.passable) return { ok: false, reason: `${t.name.toLowerCase()} cannot be built on` };
+  if (t.id === 'sea' || t.id === 'lake') return { ok: false, reason: `${t.name.toLowerCase()} cannot be built on` };
   if (brush === 'dirt' || brush === 'paved') {
     if (isRiver && !cur.bridge) return { ok: false, reason: 'a river hex needs a bridge first' };
     return { ok: true, cell: { ...cur, road: brush === 'dirt' ? 1 : 2 } };
   }
   if (isRiver) return { ok: false, reason: 'not on a river hex' };
+  if (brush === 'quarry') {
+    const res = resourceByIndex(map.resource[i]);
+    if (!(res?.mineable || t.id === 'mountains')) return { ok: false, reason: 'a quarry needs a mineable resource (stone, iron, silver, salt) or mountains' };
+  } else if (t.id === 'mountains') {
+    return { ok: false, reason: 'no lumber camps on mountains' };
+  }
   return { ok: true, cell: { ...cur, site: brush } };
 }
 

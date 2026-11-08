@@ -1,5 +1,5 @@
 {
-  "_comment": "Resources on hexes (DESIGN \u00a73.1). ORDER IS INDEX-STABLE from the first committed map with resources onward (none yet as of 2026-11-04): never reorder or remove, only append. Maps store the resource as its index here, -1 = none. spawn = chance per hex in per-mille (\u2030) for each terrain id; terrains not listed never get it. 'coastalOnly' restricts spawning to sea hexes that touch land. 'minSpacing' = no identical resource within this many hexes. All numbers are DRAFT \u2014 Omer tunes.",
+  "_comment": "Resources on hexes (DESIGN §3.1). ORDER IS INDEX-STABLE from the first committed map with resources onward (none yet as of 2026-11-04): never reorder or remove, only append. Maps store the resource as its index here, -1 = none. spawn = chance per hex in per-mille (‰) for each terrain id; terrains not listed never get it. 'coastalOnly' restricts spawning to sea hexes that touch land. 'minSpacing' = no identical resource within this many hexes. All numbers are DRAFT — Omer tunes.",
   "resources": [
     {
       "id": "game",
@@ -33,7 +33,8 @@
       "gives": {
         "stone": 2
       },
-      "notes": "Walls, paved roads, major buildings"
+      "notes": "Walls, paved roads, major buildings",
+      "mineable": true
     },
     {
       "id": "iron",
@@ -49,7 +50,8 @@
       "gives": {
         "iron": 2
       },
-      "notes": "Professional troops, knights (with Ironworks)"
+      "notes": "Professional troops, knights (with Ironworks)",
+      "mineable": true
     },
     {
       "id": "fish",
@@ -101,7 +103,8 @@
       "gives": {
         "goods": 1
       },
-      "notes": "Trade goods, food preservation"
+      "notes": "Trade goods, food preservation",
+      "mineable": true
     },
     {
       "id": "wine",
@@ -134,7 +137,8 @@
       "gives": {
         "money": 2
       },
-      "notes": "Rare, high value"
+      "notes": "Rare, high value",
+      "mineable": true
     }
   ]
 }

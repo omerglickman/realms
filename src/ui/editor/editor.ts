@@ -37,8 +37,8 @@ const INFRA_PALETTE: { brush: InfraBrush; name: string; key: string; icon: strin
   { brush: 'dirt', name: 'Dirt road', key: 'D', icon: 'walk', tip: 'a dirt road on the hex' },
   { brush: 'paved', name: 'Paved road', key: 'P', icon: 'stone', tip: 'a paved road on the hex' },
   { brush: 'bridge', name: 'Bridge', key: 'B', icon: 'grid', tip: 'a bridge on a river hex (carries a dirt road)' },
-  { brush: 'quarry', name: 'Quarry', key: 'Q', icon: 'quarry', tip: SITE_KINDS.find((x) => x.id === 'quarry')?.blurb ?? '' },
-  { brush: 'lumber', name: 'Lumber camp', key: 'L', icon: 'lumbercamp', tip: SITE_KINDS.find((x) => x.id === 'lumber')?.blurb ?? '' },
+  { brush: 'quarry', name: 'Quarry', key: 'Q', icon: 'quarry', tip: 'on stone, iron, silver or salt, or on mountains — ' + (SITE_KINDS.find((x) => x.id === 'quarry')?.blurb ?? '') },
+  { brush: 'lumber', name: 'Lumber camp', key: 'L', icon: 'lumbercamp', tip: 'on any land except mountains — ' + (SITE_KINDS.find((x) => x.id === 'lumber')?.blurb ?? '') },
   { brush: 'erase', name: 'Erase', key: 'X', icon: 'close', tip: 'clear roads, bridge and quarry / lumber camp from the hex' },
 ];
 

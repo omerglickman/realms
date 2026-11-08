@@ -60,13 +60,21 @@
       "id": "quarry",
       "name": "Quarry",
       "icon": "quarry",
-      "blurb": "A stone-cutting site on a hex. Placeholder: no economic effect yet (DESIGN §5.17 / the economic overhaul will decide what it yields)."
+      "blurb": "A stone-cutting site on a hex. Placeholder: no economic effect yet (DESIGN §5.17 / the economic overhaul will decide what it yields).",
+      "rule": "on a hex with a mineable resource (stone, iron, silver, salt — `mineable` in data/resources.json) or on mountains (a mountain quarry is meant to yield some stone even without a resource)",
+      "onTerrain": [
+        "mountains"
+      ]
     },
     {
       "id": "lumber",
       "name": "Lumber camp",
       "icon": "lumbercamp",
-      "blurb": "A timber-felling camp on a hex. Placeholder: no economic effect yet (the economic overhaul will decide what it yields)."
+      "blurb": "A timber-felling camp on a hex. Placeholder: no economic effect yet (the economic overhaul will decide what it yields).",
+      "rule": "on any land terrain except mountains (some terrains yield timber even without a camp — the terrain yield rows; a camp is meant to add to that)",
+      "notOnTerrain": [
+        "mountains"
+      ]
     }
   ]
 }

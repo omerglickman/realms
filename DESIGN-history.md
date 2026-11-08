@@ -6,6 +6,7 @@
 
 ## Change log
 
+- 0.7c (2026-11-08, Session 17b): §3.4 quarry placement (a mineable resource — stone, iron, silver, salt — or mountains) and lumber-camp placement (any land but mountains) DECIDED by Omer; intended yields noted for the economic overhaul.
 - 0.7b (2026-11-08, Session 17): §3.4 quarries and lumber camps are map entities now (editor-placed, no economic effect until the economic overhaul); Omer.
 - 0.7a (2026-11-08, Session 16d): paved road factor ¼ DECIDED by Omer (§3.2b rule 5); §5.17(b) resolved.
 - 0.7 (2026-11-08, Session 16c): DESIGN.md split into a core file and area files (units / settlements / people-economy / history); no rule changed, section numbers kept.

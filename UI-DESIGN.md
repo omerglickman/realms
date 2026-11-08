@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — UI Design
 
-**Version 1.8 — 2026-11-08 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13–13f and built through Session 15. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
+**Version 1.8a — 2026-11-08 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13–13f and built through Session 15. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
 
 Omer's brief (2026-11-05): the bottom lines (funds, people, resources) always visible in a clear place that hides little of the map; everything else in hover summaries or modals that present resources, buildings, economic activity and demographics in an orderly, friendly way, with graphics; headers in a hand resembling Carolingian minuscule; a medieval palette. Design left to Claude; Omer amends.
 
@@ -97,7 +97,7 @@ Adding an icon: draw it in the same grid and stroke, add it to `ICON_PATHS`, ref
 - *Buttons*: `.btn` parchment; `.btn.primary` verdigris, script hand (Start, Send, Go); `.btn.danger` vermilion outline (Cancel, Remove).
 - *Tooltips* (`#tooltip`, `src/ui/panels/tooltip.ts`): one shared element; any element with `data-tip` and a hidden child `.tip` shows it below (or above) the element on hover. Parchment, gold top rule, a script-hand heading (`.tiph`).
 
-**Editor** (`#editor`): a parchment drawer at the top right, 312 px, with the same buttons and tabs in the script hand; four tabs — Terrain · Resources · Settlements · **Infrastructure** (Session 17, Omer 2026-11-08): a palette of Dirt road (D), Paved road (P), Bridge (B), Quarry (Q), Lumber camp (L) and Erase (X) with an icon each; click or drag places on the hexes under the cursor, a whole drag is one undo step; a road hex needs land (a river hex needs a bridge first), a bridge goes on a river hex and brings a dirt road, a quarry or camp goes on any land hex without a settlement; the tab shows the counts and the reason when a hex refuses; `body.editing` gives the map a crosshair cursor.
+**Editor** (`#editor`): a parchment drawer at the top right, 312 px, with the same buttons and tabs in the script hand; four tabs — Terrain · Resources · Settlements · **Infrastructure** (Session 17, Omer 2026-11-08): a palette of Dirt road (D), Paved road (P), Bridge (B), Quarry (Q), Lumber camp (L) and Erase (X) with an icon each; click or drag places on the hexes under the cursor, a whole drag is one undo step; a road hex needs land (a river hex needs a bridge first), a bridge goes on a river hex and brings a dirt road, a quarry goes on a stone / iron / silver / salt hex or on mountains, a lumber camp on any land except mountains (neither on a settlement or a river hex); the tab shows the counts and the reason when a hex refuses; `body.editing` gives the map a crosshair cursor.
 
 ## 6. The map at different zooms
 
@@ -133,6 +133,7 @@ Other map marks (unchanged from Sessions 7–10): influence zones as a light fac
 
 ## Change log
 
+- 1.8a (2026-11-08, Session 17b): §5 the editor's placement rules for quarries (mineable resource or mountains) and lumber camps (not on mountains).
 - 1.8 (2026-11-08, Session 17): §4 the quarry and lumber-camp icons; §5 the editor's Infrastructure tab (drawer 312 px, four tabs); §6 quarry / lumber-camp badges on the map.
 - 1.7b (2026-11-08, Session 16e): §6 the meander made clearly visible — bends 17–42 % of the hex distance, a guaranteed minimum.
 - 1.7a (2026-11-08, Session 16b): §6 roads meander (Omer) — a seeded S-curve per segment, bridges nearly straight.
