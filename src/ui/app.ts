@@ -5,8 +5,11 @@
 import { Application, Graphics } from 'pixi.js';
 import { MapRenderer, HEX_SIZE } from './render/mapRenderer';
 import { SettlementLayer, setLabelFont } from './render/settlementLayer';
+import { InfraLayer } from './render/infraLayer';
 import { UnitLayer, unitAtWorld, shieldSize, type UnitPath } from './render/unitLayer';
 import { renderUnitCard } from './panels/unitCard';
+import { makeBuildOrder, orderSummary } from '../sim/workbands';
+import { infraItem } from '../sim/infrastructure';
 import { renderRaiseDialog, newRaiseDraft, type RaiseDraft } from './panels/raiseDialog';
 import { routeFor, unitCell, unitTypeDef, canFoundAt, unitsAt, UNIT_TYPES, type Unit } from '../sim/units';
 import { findRoute, OPEN } from '../sim/pathfinding';
@@ -142,16 +145,17 @@ export async function startApp(): Promise<void> {
 
   const renderer = new MapRenderer(state.map);
   const settlementLayer = new SettlementLayer();
+  const infraLayer = new InfraLayer();
   const unitLayer = new UnitLayer();
   const camera = new Camera(renderer.root, app.screen.width, app.screen.height);
   const hover = new Graphics();
-  renderer.root.addChild(settlementLayer.root, hover, unitLayer.root);
+  renderer.root.addChild(infraLayer.root, settlementLayer.root, hover, unitLayer.root);
 
   // ---- units (Phase 2 session 1b): selection, the pinned card, targeting modes, the raise dialog ----
   let selectedUnitId: string | null = null;
   let hoverUnitId: string | null = null;
   /** choosing a hex on the map: a move / settle order for a unit, or the destination of a party being raised */
-  type Mode = { kind: 'order'; unitId: string; then: 'none' | 'settle' } | { kind: 'pickDest' } | null;
+  type Mode = { kind: 'order'; unitId: string; then: 'none' | 'settle' } | { kind: 'build'; unitId: string; item: string } | { kind: 'pickDest' } | null;
   let mode: Mode = null;
   let preview: { cells: number[]; months: number; label: string } | null = null;
   let previewCell = -1;
@@ -232,7 +236,7 @@ export async function startApp(): Promise<void> {
 
   function applyMap(fit: boolean): void {
     renderer.setMap(state.map);
-    renderer.root.addChild(settlementLayer.root, hover, unitLayer.root);
+    renderer.root.addChild(infraLayer.root, settlementLayer.root, hover, unitLayer.root);
     const ws = renderer.worldSize();
     camera.setWorldSize(ws.width, ws.height);
     if (fit) camera.fit();
@@ -254,7 +258,7 @@ export async function startApp(): Promise<void> {
   function stateChanged(): void {
     if (selectedId && !state.settlements[selectedId]) selectedId = null;
     if (hoverId && !state.settlements[hoverId]) hoverId = null;
-    if (selectedUnitId && !state.units[selectedUnitId]) { selectedUnitId = null; mode = mode?.kind === 'order' ? null : mode; preview = null; }
+    if (selectedUnitId && !state.units[selectedUnitId]) { selectedUnitId = null; mode = mode?.kind === 'order' || mode?.kind === 'build' ? null : mode; preview = null; }
     if (hoverUnitId && !state.units[hoverUnitId]) hoverUnitId = null;
     if (raiseDraft && !state.settlements[raiseDraft.at]) closeDialog();
     workAssign = computeWorkAssignment(state);
@@ -270,6 +274,7 @@ export async function startApp(): Promise<void> {
   }
 
   function refreshLayer(): void {
+    infraLayer.update(state, camera.zoom);
     settlementLayer.update(state, { hover: hoverId, selected: selectedId, zoom: camera.zoom, settling: editor.settling });
     unitLayer.update(state, { hover: hoverUnitId, selected: selectedUnitId, zoom: camera.zoom, preview });
     positionPopover();
@@ -280,7 +285,7 @@ export async function startApp(): Promise<void> {
   function selectUnit(id: string | null): void {
     if (id && !state.units[id]) id = null;
     selectedUnitId = id;
-    if (!id && mode?.kind === 'order') { mode = null; preview = null; }
+    if (!id && (mode?.kind === 'order' || mode?.kind === 'build')) { mode = null; preview = null; }
     if (id) {
       // a unit's card and a settlement's ledger do not share the screen well: close the ledger
       if (view?.kind === 'settlement' || view?.kind === 'cluster') { closeView(); }
@@ -298,10 +303,20 @@ export async function startApp(): Promise<void> {
       onSettleHere: (id) => act({ type: 'settleUnit', id }),
       onDisband: (id) => act({ type: 'disbandUnit', id }),
       onCancelOrder: (id) => act({ type: 'orderUnit', id, order: null }),
+      onBuildHere: (id, item) => {
+        const bu = state.units[id];
+        const mk = bu ? makeBuildOrder(state, bu, item, null) : null;
+        if (!mk?.order) { el('info-event').textContent = mk?.reason ?? ''; return; }
+        act({ type: 'orderUnit', id, order: null, build: mk.order });
+        renderUnitCardNow();
+      },
+      onRoadTo: (id, item) => startBuild(id, item),
+      onBridgeAt: (id) => startBuild(id, 'bridge'),
+      onKind: () => renderUnitCardNow(),
       onFocusSettlement: (id) => focusSettlement(id),
     });
     unitCard.style.borderLeftColor = state.factions[u.faction]?.color ?? '#4a2f1a';
-    unitCard.classList.toggle('targeting', mode?.kind === 'order');
+    unitCard.classList.toggle('targeting', mode?.kind === 'order' || mode?.kind === 'build');
     unitCard.classList.remove('hidden');
     positionUnitCard();
   }
@@ -339,12 +354,31 @@ export async function startApp(): Promise<void> {
     if (mouseX >= 0) updateHover(mouseX, mouseY);
     refreshLayer();
   }
+  function startBuild(unitId: string, item: string): void {
+    if (mode?.kind === 'build' && mode.unitId === unitId && mode.item === item) { mode = null; preview = null; }
+    else mode = { kind: 'build', unitId, item };
+    previewCell = -1;
+    el('info-event').textContent = mode ? (item === 'bridge' ? 'Click the river hex to bridge (Esc to cancel).' : `Click the hex the ${infraItem(item).name.toLowerCase()} should reach (Esc to cancel).`) : '';
+    renderUnitCardNow();
+    if (mouseX >= 0) updateHover(mouseX, mouseY);
+    refreshLayer();
+  }
   /** The route a hovered hex would mean in the current targeting mode, for the preview. */
   function previewTo(cell: number): void {
     if (cell === previewCell) return;
     previewCell = cell;
     preview = null;
     if (!mode) return;
+    if (mode.kind === 'build') {
+      const bu = state.units[mode.unitId];
+      if (!bu) { mode = null; return; }
+      const mk = makeBuildOrder(state, bu, mode.item, cell);
+      if (!mk.order) { preview = { cells: [cell, cell], months: Infinity, label: mk.reason ?? 'cannot build there' }; return; }
+      const sum = orderSummary(state, bu, mk.order);
+      const mats = (['timber', 'stone'] as const).filter((k) => sum.materials[k] > 0.5).map((k) => `${Math.round(sum.materials[k])} ${k}`).join(' + ');
+      preview = { cells: mk.order.route.length > 1 ? mk.order.route : [mk.order.route[0], mk.order.route[0]], months: sum.months, label: `${sum.hexes} hex${sum.hexes === 1 ? '' : 'es'} · ≈ ${Math.max(1, Math.round(sum.months))} mo${mats ? ` · ${mats}` : ''}${sum.bridges ? ` · ${sum.bridges} bridge${sum.bridges === 1 ? '' : 's'}` : ''}` };
+      return;
+    }
     let start: { cell: number; bank: number } | null = null, points = 4, settle = false, label = '';
     if (mode.kind === 'order') {
       const u = state.units[mode.unitId];
@@ -369,7 +403,18 @@ export async function startApp(): Promise<void> {
   /** A click on `cell` while targeting. */
   function targetClicked(cell: number): void {
     if (!mode) return;
-    if (mode.kind === 'order') {
+    if (mode.kind === 'build') {
+      const bu = state.units[mode.unitId];
+      const item = mode.item;
+      mode = null; preview = null; previewCell = -1;
+      el('info-event').textContent = '';
+      if (bu) {
+        const mk = makeBuildOrder(state, bu, item, cell);
+        if (mk.order) act({ type: 'orderUnit', id: bu.id, order: null, build: mk.order });
+        else el('info-event').textContent = mk.reason ?? 'cannot build there';
+      }
+      renderUnitCardNow();
+    } else if (mode.kind === 'order') {
       const u = state.units[mode.unitId];
       const then = mode.then;
       mode = null; preview = null; previewCell = -1;
@@ -553,7 +598,7 @@ export async function startApp(): Promise<void> {
   function select(id: string | null): void {
     if (!id || !state.settlements[id]) { if (view?.kind === 'settlement' || view?.kind === 'cluster') closeView(); selectedId = null; refreshLayer(); return; }
     const keepTab = view?.kind === 'settlement' ? view.tab : undefined;
-    if (selectedUnitId) { selectedUnitId = null; unitCard.classList.add('hidden'); if (mode?.kind === 'order') { mode = null; preview = null; } }
+    if (selectedUnitId) { selectedUnitId = null; unitCard.classList.add('hidden'); if (mode?.kind === 'order' || mode?.kind === 'build') { mode = null; preview = null; } }
     openView('settlement', id, keepTab);
   }
   function focusSettlement(id: string): void {
@@ -600,6 +645,12 @@ export async function startApp(): Promise<void> {
     }
     for (let i = 0; i < months; i++) endTurn(state);
     const paths: UnitPath[] = [];
+    if (months === 1) {
+      for (const u of Object.values(state.units)) {
+        const tr = u.report.trail;
+        if (tr && tr.length > 1) paths.push({ id: u.id, cells: tr });
+      }
+    }
     for (const p of planned) {
       const u = state.units[p.id];
       if (!u || u.report.moved <= 0) continue;
@@ -788,9 +839,11 @@ export async function startApp(): Promise<void> {
     const workedBy = workAssign.get(cell);
     const workedText = workedBy && state.settlements[workedBy] ? ` · worked by ${state.settlements[workedBy].name}` : '';
     const here = unitsAt(state, cell);
+    const rl = state.infra?.roads[cell] ?? 0, br = !!state.infra?.bridges[cell];
+    const roadText = br ? ` · bridge${rl >= 2 ? ' · paved road' : ' · dirt road'}` : rl ? (rl >= 2 ? ' · paved road' : ' · dirt road') : '';
     const unitsText = here.length ? ` · ${here.length === 1 ? here[0].name : `${here.length} parties`}` : '';
     el('info-hex').textContent =
-      `${t.name}${r ? ` · ${r.name}` : ''} (${h.col}, ${h.row}) · move ${t.passable ? t.moveCost : '—'}${y ? ' · ' + y : ''}${workedText}${unitsText}`;
+      `${t.name}${r ? ` · ${r.name}` : ''} (${h.col}, ${h.row}) · move ${t.passable ? t.moveCost : '—'}${y ? ' · ' + y : ''}${roadText}${workedText}${unitsText}`;
     // a unit's shield under the cursor takes the hover; otherwise the settlement
     const wpt = camera.screenToWorld(sx, sy);
     const hu: Unit | null = mode ? null : unitAtWorld(state, unitLayer, wpt.x, wpt.y, camera.zoom);

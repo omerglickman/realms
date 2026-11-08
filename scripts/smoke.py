@@ -85,6 +85,34 @@ async def main() -> int:
             await pg.click('#unitcard [data-act=disband]'); await pg.wait_for_timeout(400)
             assert await pg.is_hidden('#unitcard'), 'the party did not disband on its own settlement'
             print('EVENT:', await pg.inner_text('#info-event'))
+        # ---- Phase 2 session 2: a work-band builds a dirt road on its hex ----
+        await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
+        await tab('clusters'); await pg.click('#modal .m-body a[data-cluster]'); await pg.wait_for_timeout(300)
+        await tab('members'); await pg.click('#modal .m-body a[data-focus]'); await pg.wait_for_timeout(400)
+        await tab('recruitment')
+        if await pg.query_selector('#modal .cube.avail[data-raise=workband]'):
+            await pg.click('#modal .cube.avail[data-raise=workband]'); await pg.wait_for_timeout(400)
+            await pg.click('#dialog [data-act=raise]'); await pg.wait_for_timeout(500)
+            assert await pg.is_visible('#unitcard'), 'unit card did not open for the work-band'
+            await pg.keyboard.press('Space'); await pg.wait_for_timeout(600)  # the band forms
+            assert await pg.query_selector('#unitcard [data-act=roadTo]'), 'the work-band card has no Road to…'
+            print('BAND CARD:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:220])
+            ok = False
+            for dx, dy in [(70, 10), (-70, 10), (10, 70), (10, -70), (110, 40), (-110, -40)]:
+                await pg.click('#unitcard [data-act=roadTo]'); await pg.wait_for_timeout(200)
+                assert 'Click the hex' in await pg.inner_text('#info-event'), 'Road to… did not start targeting'
+                await pg.mouse.move(750 + dx, 475 + dy); await pg.wait_for_timeout(250)
+                await pg.mouse.click(750 + dx, 475 + dy); await pg.wait_for_timeout(300)
+                if 'Building' in await pg.inner_text('#unitcard'): ok = True; break
+                print('ROAD TARGET REFUSED:', await pg.inner_text('#info-event'))
+                await pg.keyboard.press('Escape'); await pg.wait_for_timeout(150)
+                if await pg.is_hidden('#unitcard'): break
+            assert ok, 'the band did not take a road order'
+            print('BAND ORDER:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:260])
+            for _ in range(6):
+                await pg.keyboard.press('Space'); await pg.wait_for_timeout(500)
+            print('BAND AFTER:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:260])
+            await pg.screenshot(path='/tmp/smoke_band.png')
         # ---- tier upgrade (Session 15b): a village of the big cluster, if it is at the gate ----
         await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
         await tab('clusters'); await pg.click('#modal .m-body a[data-cluster]'); await pg.wait_for_timeout(300)

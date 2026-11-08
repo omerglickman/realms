@@ -589,3 +589,6 @@ table.data.hexes .job .ico { color: var(--oak-2); }
 table.data.hexes tr.idlerow td { color: var(--ink-3); background: rgba(0, 0, 0, 0.035); }
 table.data.hexes .idletag { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--verm); border: 1px solid currentColor; border-radius: 2px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
 table.data.hexes .idletag.part { color: var(--gold); }
+
+/* work-band build orders on the unit card (Session 16) */
+#unitcard .buildkind { font: inherit; font-size: 12px; padding: 2px 4px; border: 1px solid var(--rule); border-radius: 3px; background: var(--parchment, #f6eed8); color: var(--ink); }

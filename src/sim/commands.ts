@@ -19,6 +19,7 @@ import {
   type Unit, type UnitOrder, type RaiseSpec, type MusterTaken, raiseUnit, cancelRaise, routeFor, unitTypeDef, settleUnit, canSettle,
   disbandTarget, disbandInto, unitCell,
 } from './units';
+import { type BuildOrder, checkBuildOrder } from './workbands';
 import type { Payment } from './materials';
 import { addPopulation } from './demography';
 import { clusterRootOf } from './clusters';
@@ -141,6 +142,8 @@ export interface OrderUnitCommand {
   type: 'orderUnit';
   id: string;
   order: UnitOrder;
+  /** a work-band's building order (Session 16); giving either order clears the other, and `order: null` with no `build` clears both */
+  build?: BuildOrder | null;
 }
 
 /** Settlers found a village where they stand (rule 6). Inverse: unsettle. */
@@ -440,7 +443,11 @@ export function applyCommand(state: GameState, cmd: Command): Command {
     case 'orderUnit': {
       const u = state.units[cmd.id];
       if (!u) throw new Error(`No unit "${cmd.id}"`);
-      const prev = u.order;
+      const prev = u.order, prevBuild = u.build ?? null;
+      if (cmd.build) {
+        const chk = checkBuildOrder(state, u, cmd.build);
+        if (!chk.ok) throw new Error(`${u.name} cannot build: ${chk.reason}`);
+      }
       if (cmd.order) {
         const o = cmd.order;
         if (o.then === 'settle' && !unitTypeDef(u.type).canSettle) throw new Error(`${u.name} cannot found a settlement`);
@@ -450,7 +457,8 @@ export function applyCommand(state: GameState, cmd: Command): Command {
         }
       }
       u.order = cmd.order;
-      return { type: 'orderUnit', id: cmd.id, order: prev };
+      u.build = cmd.build ?? null;
+      return { type: 'orderUnit', id: cmd.id, order: prev, build: prevBuild };
     }
     case 'settleUnit': {
       const u = state.units[cmd.id];
@@ -476,9 +484,10 @@ export function applyCommand(state: GameState, cmd: Command): Command {
         disbandInto(state, u, d.target);
         return { type: 'undisband', unit: snapshot, into: d.target.id };
       }
-      const prev = u.order;
+      const prev = u.order, prevBuild = u.build ?? null;
       u.order = { kind: 'move', dest: cellIndex(state.map, d.target.col, d.target.row), then: 'disband', to: d.target.id };
-      return { type: 'orderUnit', id: cmd.id, order: prev };
+      u.build = null;
+      return { type: 'orderUnit', id: cmd.id, order: prev, build: prevBuild };
     }
     case 'undisband': {
       const s = state.settlements[cmd.into];

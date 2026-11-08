@@ -508,7 +508,7 @@ function recruitmentPage(ctx: Ctx): string {
   // the types: available (green) then unavailable (greyed)
   const taxPerHand = plan.taxableHands > 0 ? plan.taxPerYear / plan.taxableHands : 0;
   const opts = UNIT_TYPES.map((def) => {
-    if (!def.enabled) return { def, ok: false, reason: `${def.name} cannot be raised yet — ${def.id === 'workband' ? 'Phase 2 session 2' : 'Phase 2 session 3'}.`, check: null as ReturnType<typeof raiseCheck> | null };
+    if (!def.enabled) return { def, ok: false, reason: `${def.name} cannot be raised yet — coming in Phase 2 session 3.`, check: null as ReturnType<typeof raiseCheck> | null };
     const people = Math.min(defaultSize(state, def.id, s, null), Math.floor(ctx.pop * 0.5));
     const check = raiseCheck(state, { type: def.id, at: s.id, muster: [{ id: s.id, people: Math.max(10, people) }], provisionMonths: defaultProvisionMonths(def.id, month) });
     return { def, ok: check.ok, reason: check.reason ?? '', check };

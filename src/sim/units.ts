@@ -24,6 +24,7 @@ import { type Materials, emptyMaterials, MATERIAL_IDS, clusterStock, payFromClus
 import { clusterMembers } from './clusters';
 import { hexJobs, ECONOMY, type Job } from './economy';
 import { findRoute, stepsThisMonth, isRiver, OPEN, type Route } from './pathfinding';
+import { type BuildOrder, type WorkProject, buildMonth } from './workbands';
 
 // ---- data ----
 
@@ -40,6 +41,8 @@ export interface UnitTypeDef {
   defaultSize: number | 'destination';
   defaultProvisions: number | 'calendar';
   canSettle: boolean;
+  /** may it build roads and bridges (work-bands)? */
+  canBuild?: boolean;
   upkeepPerManPerMonth?: number;
   blurb?: string;
 }
@@ -90,6 +93,10 @@ export interface UnitReport {
   /** months of walking left on the current order, null when idle; Infinity when no route exists */
   monthsLeft: number | null;
   blocked: string | null;
+  /** hexes of road / bridge finished this month (work-bands) */
+  built?: number;
+  /** the hexes the unit stood on this month, in order, for the glide (builders) */
+  trail?: number[];
 }
 
 export function emptyUnitReport(): UnitReport {
@@ -113,6 +120,10 @@ export interface Unit {
   /** the settlement it was raised at */
   home: string;
   order: UnitOrder;
+  /** a work-band's standing order: build a road or bridge along a route (Session 16); exclusive with `order` */
+  build?: BuildOrder | null;
+  /** the project in hand: item, hex, progress 0–1, whether its materials are paid */
+  work?: WorkProject | null;
   raisedTurn: number;
   report: UnitReport;
 }
@@ -356,7 +367,7 @@ export function raiseUnit(state: GameState, spec: RaiseSpec): RaiseResult {
   const unit: Unit = {
     id, type: spec.type, name: spec.name ?? `${def.name} of ${at.name}`, faction: at.faction!,
     col: at.col, row: at.row, bank: OPEN, pop, provisions: food, provisionMonths: spec.provisionMonths,
-    home: at.id, order: null, raisedTurn: state.turn, report: emptyUnitReport(),
+    home: at.id, order: null, build: null, work: null, raisedTurn: state.turn, report: emptyUnitReport(),
   };
   if (spec.dest !== undefined && spec.dest !== null && spec.dest !== unitCell(state.map, unit)) {
     unit.order = { kind: 'move', dest: spec.dest, then: spec.then ?? (def.canSettle ? 'settle' : 'none') };
@@ -524,7 +535,7 @@ export function forage(state: GameState, u: Unit): number {
 /** Walk the unit along `route` for one month; returns the steps taken. */
 function walk(state: GameState, u: Unit, route: Route): number {
   const map = state.map;
-  const { steps } = stepsThisMonth(map, route.nodes, unitTypeDef(u.type).movePoints);
+  const { steps } = stepsThisMonth(state, unitCell(map, u), route.nodes, unitTypeDef(u.type).movePoints);
   if (steps > 0) {
     const n = route.nodes[steps - 1];
     u.col = n.cell % map.width; u.row = Math.floor(n.cell / map.width);
@@ -544,8 +555,10 @@ export function unitsMonth(state: GameState, month: number): void {
     if (!u) continue;
     const r = emptyUnitReport();
     const forming = isForming(state, u);
-    // 1. movement
-    if (u.order && !forming) {
+    // 1. movement — or a work-band's building (Session 16)
+    if (u.build && !forming) {
+      buildMonth(state, u, r);
+    } else if (u.order && !forming) {
       const here = unitCell(map, u);
       if (here !== u.order.dest) {
         const route = routeFor(state, u, u.order.dest);

@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.6 — 2026-11-08 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
+**Version 0.6a — 2026-11-08 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -208,7 +208,7 @@ Buildings for the professional army come later (Omer). Cathedral, School, Guildh
 
 Built by work-bands, costing money, materials and turns:
 
-- **Roads** of varying quality — PROPOSED: *track* (free, appears with use), *dirt road*, *paved road*. Affect movement, trade and food transport.
+- **Roads** — *dirt road* and *paved road* built by work-bands (§3.2b rule 7; built Session 16; the *track* that appears with use is not built). They affect movement now (§3.2b rule 5; the open numbers are §5.17); trade and food transport later (§5.15).
 - **Road-stations** (inns/relay posts) — PROPOSED: extend the distance over which food and trade move without loss; improve army supply.
 - **Watermills** — on River hexes; boost food/goods of the owning settlement.
 - **Forts** — garrison point, zone of control, protect villages from raids.
@@ -433,6 +433,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 13. **Phase 1 numbers** — tuning of food / materials / tax deferred until the Phase 2 sinks exist (Omer, 2026-11-07).
 14. ~~Forts and castles~~ — RESOLVED 2026-11-08: §3.5 (the seven-rank ladder, castle staff from the villages in reach, the siege reserve, forts); numbers draft.
 15. **Roads and food sharing** (§3.2b.8) — deferred to the end of Phase 2 because it bears on what a cluster is.
+17. **Roads — the numbers Claude chose** (Session 16, all *(draft)* in `data/infrastructure.json`; Omer to rule): (a) **the road's minimum cost.** Omer's rule — a road halves a hex's cost, *minimum 1* — means a road on plains, grassland or a river hex changes nothing (they already cost 1), so on the start position a road between Hugeopolis and Hillside saves 0–1 month and the one that matters (Hugeopolis → Omerburg, 9 → 5 months) matters only because of its **bridge**. The data has `movement.minCost`; PROPOSED **0.5**, which makes settlers cross a paved or dirt plain at eight hexes a month (the same 15-hex walk in 2 months instead of 4). (b) **Paved vs dirt.** Under minCost 1 a paved road (6 months and 60 stone a hex) buys nothing over a dirt one on any terrain a dirt road already makes cost 1.5; PROPOSED paved factor ⅓ (as built) — or let paved roads carry the future road food sharing (§5.15) and trade, and the dirt road the movement. (c) **Work speed** follows the band's people (300 = the data's months; up to ×3 for 900) — rule 2 says bigger bands "do more and eat more". (d) A **bridge is built from the bank beside it**, or by a band standing on an open river hex; it **carries a dirt road**. (e) **Materials are paid when work on a hex begins**, from the cluster whose influence covers the hex, else the realm; the band waits if neither has them; a cancelled project keeps its progress and the same order resumes it. (f) A **settlement's hex counts as a dirt road** for the link rule, and a step between two road hexes is priced at the *lower* of their levels. (g) Roads belong to no faction yet (one faction); ownership, upkeep and decay wait for §4.3.
 16. ~~Food down to a new village~~ — RESOLVED 2026-11-07: a manual **Send food** action in the cluster ledger, never automatic (§3.2b.6).
 
 Every DECIDED item above carries its date; the change log below lists what each version settled, and the DEVLOG entries hold the discussion and the measurements behind each decision.
@@ -468,6 +469,7 @@ Every DECIDED item above carries its date; the change log below lists what each 
 
 ## Change log
 
+- 0.6a (2026-11-08, Session 16): §3.4 roads as built; §5.17 opened — the road numbers Claude chose and the minimum-cost finding (no Omer decision).
 - 0.6 (2026-11-08, Session 15d): §3.5 castles and forts DECIDED from Omer's table — the seven-rank ladder, staff lent by the settlements in reach and paid by the treasury, the siege reserve filled but never overfilled, garrison capacity, forts by any military unit, ruin after a year unstaffed, the control zone for Phase 4; §5.14 resolved; glossary.
 
 - 0.5c (2026-11-07, Session 15c): §3.3 — an upgraded settlement stays under its old parent; a cluster with several top-tier settlements may choose its leader or split (Omer).

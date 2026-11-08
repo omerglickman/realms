@@ -7,9 +7,18 @@
 import type { GameState } from '../../sim/state';
 import { type Unit, unitTypeDef, isForming, unitCell, canSettle, disbandTarget, routeFor, UNITS } from '../../sim/units';
 import { totalPopulation, workingHands } from '../../sim/demography';
+import { makeBuildOrder, orderSummary } from '../../sim/workbands';
+import { infraItem, INFRA_ITEMS } from '../../sim/infrastructure';
 import { fmt, fmt1, esc, gauge, ICON } from './format';
 
+/** The road kind the player last chose on a work-band's card (dirt / paved), kept across cards. */
+export const buildPrefs: { kind: string } = { kind: 'dirt' };
+
 export interface UnitCardHost {
+  onBuildHere(id: string, item: string): void;
+  onRoadTo(id: string, item: string): void;
+  onBridgeAt(id: string): void;
+  onKind(): void;
   onMove(id: string): void;
   onSettleAt(id: string): void;
   onSettleHere(id: string): void;
@@ -21,6 +30,10 @@ export interface UnitCardHost {
 /** One-word state of a unit for the card and the status strip. */
 export function unitState(state: GameState, u: Unit): string {
   if (isForming(state, u)) return 'mustering';
+  if (u.build) {
+    if (u.report.blocked) return 'blocked';
+    return u.work ? `building ${infraItem(u.work.item).name.toLowerCase()}` : 'to the work';
+  }
   if (u.order) {
     if (u.report.blocked) return 'blocked';
     if (u.order.dest === unitCell(state.map, u)) return 'arrived';
@@ -54,6 +67,21 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
     rows.push(row('Bound for', `(${dcol}, ${drow}) ${what ? `<span class="dim">${what}</span>` : ''}`));
     rows.push(row('Arrives', left === null ? '<span class="warn">no way there</span>' : left === 0 ? 'there now' : `in ${left} month${left === 1 ? '' : 's'}${forming ? ' <span class="dim">after forming</span>' : ''}`));
   }
+  if (u.build) {
+    const sum = orderSummary(state, u, u.build);
+    const it = infraItem(u.build.item);
+    const mats = (['timber', 'stone'] as const).filter((k) => sum.materials[k] > 0.5).map((k) => `${fmt(sum.materials[k])} ${k}`).join(', ');
+    rows.push(row('Building', `${esc(it.name.toLowerCase())}${u.build.route.length > 1 ? ` <span class="dim">along ${u.build.route.length} hexes</span>` : ''}`));
+    rows.push(row('Still to do', `${sum.steps.length} job${sum.steps.length === 1 ? '' : 's'}${sum.bridges ? ` <span class="dim">· ${sum.bridges} bridge${sum.bridges === 1 ? '' : 's'}</span>` : ''} <span class="dim">· ≈ ${fmt1(sum.months)} month${sum.months >= 0.95 && sum.months < 1.05 ? '' : 's'}${mats ? ` · ${mats}` : ''}</span>`));
+  }
+  if (u.work && !u.build) {
+    const wi = infraItem(u.work.item);
+    rows.push(row('Unfinished', `${esc(wi.name.toLowerCase())} <span class="dim">(${u.work.cell % w}, ${Math.floor(u.work.cell / w)})</span> <b>${Math.round(u.work.progress * 100)} %</b> <span class="dim">· an order for the same work resumes it</span>`));
+  }
+  if (u.work && u.build) {
+    const wi = infraItem(u.work.item);
+    rows.push(row('At work on', `${esc(wi.name.toLowerCase())} <span class="dim">(${u.work.cell % w}, ${Math.floor(u.work.cell / w)})</span> <b>${Math.round(u.work.progress * 100)} %</b>`));
+  }
   rows.push(row('State', unitState(state, u) + (u.report.inBorders ? '' : ' <span class="dim">· outside the borders</span>')));
   const r = u.report;
   const warn: string[] = [];
@@ -66,6 +94,17 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
   const settleCheck = def.canSettle ? canSettle(state, u) : null;
   const disband = disbandTarget(state, u);
   const btns: string[] = [];
+  const kind = INFRA_ITEMS.some((i) => i.id === buildPrefs.kind && i.kind === 'road') ? buildPrefs.kind : 'dirt';
+  const hereOrder = def.canBuild ? makeBuildOrder(state, u, kind, null) : null;
+  if (!forming && def.canBuild) {
+    const opts = INFRA_ITEMS.filter((i) => i.kind === 'road').map((i) => `<option value="${i.id}" ${i.id === kind ? 'selected' : ''}>${esc(i.name)}</option>`).join('');
+    const ki = infraItem(kind);
+    const costText = Object.entries(ki.cost).map(([k, v]) => `${v} ${k}`).join(' + ');
+    btns.push(`<select class="buildkind" data-act="kind" title="${esc(ki.blurb ?? '')} ${ki.months} months and ${costText} a hex for a band of ${300}.">${opts}</select>`);
+    btns.push(`<button class="btn small primary" data-act="buildHere" ${hereOrder?.order ? `title="Build the ${esc(ki.name.toLowerCase())} on this hex"` : `disabled title="${esc(hereOrder?.reason ?? '')}"`}>Build here</button>`);
+    btns.push(`<button class="btn small" data-act="roadTo" title="Click a hex: the band lays the ${esc(ki.name.toLowerCase())} all the way, with bridges where it must">Road to…</button>`);
+    btns.push(`<button class="btn small" data-act="bridgeAt" title="Click a river hex beside the band: a bridge">Bridge at…</button>`);
+  }
   if (!forming) {
     btns.push(`<button class="btn small" data-act="move" title="Walk to a hex you click on the map">${ICON.walk} Move</button>`);
     if (def.canSettle) {
@@ -82,6 +121,10 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
     ${btns.length ? `<div class="pop-actions">${btns.join('')}</div>` : ''}
     ${settleCheck && !settleCheck.ok && !forming ? `<div class="pop-hint">${esc(settleCheck.reason ?? '')}</div>` : ''}
   `;
+  root.querySelector<HTMLSelectElement>('[data-act=kind]')?.addEventListener('change', (e) => { buildPrefs.kind = (e.target as HTMLSelectElement).value; host.onKind(); });
+  root.querySelector('[data-act=buildHere]')?.addEventListener('click', () => host.onBuildHere(u.id, kind));
+  root.querySelector('[data-act=roadTo]')?.addEventListener('click', () => host.onRoadTo(u.id, kind));
+  root.querySelector('[data-act=bridgeAt]')?.addEventListener('click', () => host.onBridgeAt(u.id));
   root.querySelector('[data-act=move]')?.addEventListener('click', () => host.onMove(u.id));
   root.querySelector('[data-act=settleAt]')?.addEventListener('click', () => host.onSettleAt(u.id));
   root.querySelector('[data-act=settleHere]')?.addEventListener('click', () => host.onSettleHere(u.id));

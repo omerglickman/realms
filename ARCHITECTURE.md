@@ -13,13 +13,13 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 
 ## Turn order (one month)
 
-`turn.ts endTurn` → `units.ts unitsMonth` (Phase 2: every unit in id order — walk its route for the month and carry out the arrival order (settle / disband); then eat: inside own borders from the covering settlement's cluster, topping the bags up to the chosen months; outside, forage hex + ring 1 and eat the bags; hunger when empty) → `economy.ts economyMonth` (January: harvest factors; per settlement in rank order — villages before towns before cities: plan labour → produce → tithe up → consume + hunger → gather, tax, goods, sales, construction → spoil & cap; then the cluster stockpile-cap pass; surplus up; abandonment; famine migration; yearly totals) → in December `demographyYear` (epidemic roll, births/deaths/aging with the granary brake, the pull factor, faction year roll-over, pop history).
+`turn.ts endTurn` → `units.ts unitsMonth` (Phase 2: every unit in id order — walk its route for the month and carry out the arrival order (settle / disband); then eat (a work-band with a `build` order walks to its job and works instead — `workbands.ts buildMonth`): inside own borders from the covering settlement's cluster, topping the bags up to the chosen months; outside, forage hex + ring 1 and eat the bags; hunger when empty) → `economy.ts economyMonth` (January: harvest factors; per settlement in rank order — villages before towns before cities: plan labour → produce → tithe up → consume + hunger → gather, tax, goods, sales, construction → spoil & cap; then the cluster stockpile-cap pass; surplus up; abandonment; famine migration; yearly totals) → in December `demographyYear` (epidemic roll, births/deaths/aging with the granary brake, the pull factor, faction year roll-over, pop history).
 
 ## `src/sim/` — one line each
 
 | File | Job |
 |---|---|
-| `state.ts` | `GameState` (version 6), `createGameState`, `calendar`, `logEvent`, serialize/deserialize with migrations v1→v6 |
+| `state.ts` | `GameState` (version 8; `infra` since Session 16), `createGameState`, `calendar`, `logEvent`, serialize/deserialize with migrations v1→v8 |
 | `rng.ts` | seeded sfc32: `seedRng`, `nextFloat`, `nextU32`, `nextGaussian` |
 | `hex.ts` | pointy-top hexes, axial ↔ odd-r offset, rings, distance — the only file that knows geometry |
 | `map.ts` / `mapfile.ts` | `MapData` (terrain + resource index arrays), bounds, neighbours; map file v2 read/write |
@@ -34,9 +34,11 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `clusters.ts` | derived clusters from parent links: `clustersOf`, `clusterOf`, `clusterRootOf`, `clusterMembers`, `clusterInfluenceCells`, `realmReport` — never stored |
 | `factions.ts` | `Faction` (treasury, stock, yearly ledger `FactionYear`), `initialFactions`, colours |
 | `noise.ts` | the realism knobs read live from data (sampling, epidemic, harvest variance, pull factor): `noise()`, `setNoise`, `NO_NOISE` |
-| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`); units (Session 14): `raiseUnit` ⇄ `cancelRaise`, `orderUnit` (its own inverse; validates the route), `settleUnit` ⇄ `unsettle`, `disbandUnit` ⇄ `undisband` (or a move order home), `sendFood` (same cluster; own inverse; logs an event); `commandTouchesUnits`; tier upgrades (Session 15b): `upgradeSettlement` ⇄ `cancelUpgrade` ⇄ `restoreUpgrade`, `finishUpgrade` ⇄ `revertUpgrade`; `setParents` (cluster leader / split, Session 15c; self-inverse) |
+| `commands.ts` | `applyCommand(state, cmd) → inverse`: terrain/resource edits, found/remove/restore/rename/edit settlement, `queueBuilding` ⇄ `cancelBuilding` ⇄ `restoreProject`, `transferMaterials` (`factionStockKey`); units (Session 14): `raiseUnit` ⇄ `cancelRaise`, `orderUnit` (move order and/or a work-band `build` order; its own inverse; validates), `settleUnit` ⇄ `unsettle`, `disbandUnit` ⇄ `undisband` (or a move order home), `sendFood` (same cluster; own inverse; logs an event); `commandTouchesUnits`; tier upgrades (Session 15b): `upgradeSettlement` ⇄ `cancelUpgrade` ⇄ `restoreUpgrade`, `finishUpgrade` ⇄ `revertUpgrade`; `setParents` (cluster leader / split, Session 15c; self-inverse) |
 | `units.ts` | Phase 2 (DESIGN §3.2b): `Unit` (type, faction, hex + river bank, cohorts, provisions, provisionMonths, home, order, report), `UNIT_TYPES` from `data/units.json`; sizes and defaults (`destinationHands`, `defaultSize`, `defaultProvisionMonths`); raising with a muster (`musterSources`, `raiseCheck`, `raiseUnit`, `cancelRaise`, `takeMen`); settling (`canFoundAt`, `canSettle`, `settleUnit`, `villageName`); disbanding (`disbandTarget`, `disbandInto`); the field (`coveringSettlement`, `forage`); `unitsMonth` |
-| `pathfinding.ts` | A* over (hex, bank) nodes: `stepCost` (terrain `moveCost`; mountains = the month's points; lake/sea impassable), `riverBanks` (runs of land between water / map-edge neighbours; exactly two → banks; a settlement bridges — `isBridged`), `stepsFrom`, `findRoute` → `Route {nodes, cost, months}`, `stepsThisMonth` / `walkMonths` (a step needs its full cost, a unit that has not moved yet may always take one) |
+| `infrastructure.ts` | Session 16 (DESIGN §3.2b rule 7, §3.4): `data/infrastructure.json` (`INFRA`, `infraItem`), `InfraState` {roads by cell (1 dirt, 2 paved), bridges} on `state.infra`, `roadLevelAt` (a settlement's hex counts as dirt), `roadLink` (the lower level of two hexes), `stepCostBetween` — the movement rule (terrain cost × the road factor, never under `minCost`; mountains a whole month without a road link), `takesWholeMonth`, `minStep` |
+| `workbands.ts` | Session 16: a work-band's build order (`BuildOrder` {item, route, i}, `WorkProject` {item, cell, progress, paid} on the unit), `makeBuildOrder` (plans "road from X to Y" with `planRoadRoute`, bridges inserted), `pendingSteps` / `orderSummary` (jobs, materials, months), `workRate` (people / `work.refPeople`), `buildMonth` (walk to the job, pay materials from the covering cluster then the realm, work the rest of the month, carry on to the next hex the same month; a bridge is built from the bank beside it), `checkBuildOrder` |
+| `pathfinding.ts` | A* over (hex, bank) nodes: `stepsFrom` prices every step with `stepCostBetween` (roads); `needsBridge`, `planRoadRoute` (A* over cells for a road: rivers crossable at `bridgePenalty`, existing roads at `reuse`), `stepCost` (terrain only, for destination checks; mountains = the month's points; lake/sea impassable), `riverBanks` (runs of land between water / map-edge neighbours; exactly two → banks; a settlement bridges — `isBridged` — a settlement or a built bridge), `findRoute` → `Route {nodes, cost, months}`, `stepsThisMonth(state, start, path, …)` / `walkMonths(state, start, path, …)` (a step needs its full cost, a unit that has not moved yet may always take one) |
 | `upgrades.ts` | tier upgrades (DESIGN §3.2b rule 10, Session 15b): `upgradeStep`, `canUpgrade` (gate, money, cluster materials), `startUpgrade`, `upgradeMonth` (fixed months, no builders; called from `economyMonth`), `completeUpgrade` (tier, hall, granary; keeps the old parent by override), `revertTier`, `clusterPeers` |
 | `scenario.ts` | scenario file ↔ `GameState`, `rebaseAsStart` |
 | `turn.ts` | `endTurn`: units, then economy, then December's demography |
@@ -51,11 +53,12 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `icons.ts` | the icon set (UI-DESIGN.md §4): SVG bodies (resources, tiers, units, buildings, interface), `icon()` for the DOM, `iconTexture` / `preloadIconTextures` for the map (badge and mark styles) |
 | `zoomLevels.ts` | the four zoom levels: which tiers show markers and names, when resources show (UI-DESIGN.md §6) |
 | `render/unitLayer.ts` | Phase 2 (Session 15): one heater shield per occupied hex (faction colour, type icon, count for a group, 60 % while forming, offset beside a settlement marker, vermilion dot when blocked), selection / hover rings, the selected unit's remaining route and the targeting preview as dotted lines, the glide (`animate` + `tick`), `unitAtWorld` hit test, `shieldAt` for the card |
+| `render/infraLayer.ts` | Session 16: roads (dirt ribbon, paved band) and bridges (deck) between hex centres, drawn under the settlements; redrawn when `state.infra` or the zoom bucket changes |
 | `render/settlementLayer.ts` | influence zones, faction border, cluster outlines, worked-hex hatching, faction-disc markers with tier icons, mill / wharf badges on hexes, labels by zoom level (`setLabelFont`) |
 | `panels/format.ts` | shared display helpers: `fmt`, `esc`, tier words, `foodMonths`, `clusterLine`, `costText`, `projectText`, gauges / bars / stacks / stat tiles / `kv` tables, the sparkline, the inline-SVG `ICON` set |
 | `panels/hud.ts` | the ledger strip (Session 13): date, treasury, people, food, realm stockpile tiles with hover tips; clicks open the realm ledger |
 | `panels/hoverCard.ts` | the settlement hover card |
-| `panels/unitCard.ts` | the pinned unit card (Session 15): people, food gauge, home, bound for / arrives, `unitState`, warnings; Move · Settle at… · Settle here · Disband · Cancel order |
+| `panels/unitCard.ts` | the pinned unit card (Session 15): people, food gauge, home, bound for / arrives, `unitState`, warnings; Move · Settle at… · Settle here · Disband · Cancel order; for work-bands (Session 16) the road-kind select, Build here · Road to… · Bridge at… and the Building / Still to do / At work on rows (`buildPrefs`) |
 | `panels/raiseDialog.ts` | the raise dialog (Session 15): `RaiseDraft`, `newRaiseDraft` / `distribute` (spare hands first, raising settlement first), `draftSpec`; size slider with the destination reckoning, provisions, destination + village name, muster rows, cost chips, Raise gated by `raiseCheck` |
 | `panels/modal.ts` | the modal shell (`ModalShell.show(key, spec, host)`, `wireLinks`) |
 | `panels/tooltip.ts` | the one shared tooltip (`data-tip` + a hidden `.tip` child) |
@@ -75,6 +78,7 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `testmap.ts` | cities on the real map |
 | `start.ts` | Omer's starting position with knob presets and overrides (`--preset`, `--tithe`, `--brake`, `--prosperous`, `--caps`, `--tax`, `--builder 1` scripted builder that ships materials, `--settlers 1|2 --reach N` the settler-spammer with the sprawl table, `--csv`) — the A/B tool |
 | `settlers.ts` | the settler-spammer (Session 14): per cluster root, one party at a time from the members' spare hands (2 = also 10 % of everyone) to the best unclaimed site within reach (food of the hexes nobody works, ≥ 5 free hexes, route ≤ 6 months); `fieldReport` |
+| `roads.ts` | `npm run sim -- --scenario roads --from A --to B [--level dirt|paved] [--people 300]` — one band lays a road between two settlements of the start position; plan, months, and the walk before / after (also with `minCost` 0.5) |
 | `inspect.ts` | list a scenario's settlements |
 | `mapdiff.ts` | `npm run mapdiff -- <file>` — diff an exported map against the canonical one |
 
@@ -94,9 +98,10 @@ Repo-only document (not mirrored to the Project). Updated **in place** whenever 
 | `settlements.json` | tiers (rings, gates), abandonment, `upgrades.steps` (money, timber, stone, months per step; the metropolis step a placeholder), metropolis prerequisites (proposed) |
 | `buildings.json` | mandatory halls/granaries per tier; buildable buildings (cost incl. money, months, hands, requires, effects, stockCap) |
 | `factions.json` | the player faction (placeholder name/colour) |
-| `units.json` | unit types (settlers enabled; work-band, levy data only), provisions rule, foraging shares, the partial-staffing curve, muster / disband reach, settle rule, naming placeholder |
+| `infrastructure.json` | road and bridge items (months, materials), the work-rate rule (`refPeople`, `maxRate`), the movement rule (`minCost`, road factors), route-planning weights (`bridgePenalty`, `reuse`) |
+| `units.json` | unit types (settlers and work-bands enabled; levy data only), provisions rule, foraging shares, the partial-staffing curve, muster / disband reach, settle rule, naming placeholder |
 | `terrain.json`, `resources.json` | index-stable tables |
 
 ## Save/state versions
 
-v1 map+clock · v2 settlements · v3 factions, pop history · v4 stocks, projects · v5 faction ledger, `paidMoney` · v6 units · v7 `settlement.upgrade`. `deserializeState` migrates forward; a test covers it.
+v1 map+clock · v2 settlements · v3 factions, pop history · v4 stocks, projects · v5 faction ledger, `paidMoney` · v6 units · v7 `settlement.upgrade` · v8 `infra` (roads, bridges). `deserializeState` migrates forward; a test covers it.

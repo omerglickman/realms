@@ -17,6 +17,7 @@ import { inBounds, idx } from './map';
 import { TERRAIN, terrainIndex } from './terrain';
 import { AXIAL_DIRECTIONS, axialDistance, axialToOffset, offsetToAxial } from './hex';
 import { settlementIdAt } from './settlements';
+import { hasBridge, stepCostBetween, takesWholeMonth, minStep, INFRA, roadLink } from './infrastructure';
 
 const RIVER = terrainIndex('river');
 const MOUNTAINS = terrainIndex('mountains');
@@ -56,10 +57,10 @@ export function isRiver(map: MapData, cell: number): boolean {
   return map.terrain[cell] === RIVER;
 }
 
-/** Does something bridge this river hex? A settlement standing on it (DECIDED 2026-11-07); built bridges come in session 2. */
+/** Does something bridge this river hex? A settlement standing on it (DECIDED 2026-11-07) or a built bridge (Session 16). */
 export function isBridged(state: GameState, cell: number): boolean {
   const map = state.map;
-  return settlementIdAt(state, cell % map.width, Math.floor(cell / map.width)) !== null;
+  return hasBridge(state, cell) || settlementIdAt(state, cell % map.width, Math.floor(cell / map.width)) !== null;
 }
 
 const WATER = new Set([RIVER, terrainIndex('lake'), terrainIndex('sea')]);
@@ -90,6 +91,11 @@ export function riverBanks(state: GameState, cell: number): [number[], number[]]
   }
   if (runs.length !== 2) return null;
   return [runs[0], runs[1]];
+}
+
+/** Does crossing this river hex need a bridge — two distinct banks and nothing bridging it? (Open source / fork hexes need none.) */
+export function needsBridge(state: GameState, cell: number): boolean {
+  return isRiver(state.map, cell) && riverBanks(state, cell) !== null;
 }
 
 /** Which bank of river hex `cell` the land hex `from` lies on (0/1), or -1 if the hex is open or `from` is not beside it. */
@@ -124,7 +130,7 @@ export function stepsFrom(state: GameState, node: PathNode, movePoints: number):
   const aIsRiver = isRiver(map, A);
   for (const N of neighbourCells(map, A)) {
     if (N === null) continue;
-    const cost = stepCost(map, N, movePoints);
+    const cost = stepCostBetween(state, A, N, movePoints);
     if (cost === null) continue;
     const nIsRiver = isRiver(map, N);
     if (onBank && !nIsRiver && !onBank.includes(N)) continue; // may leave only onto its own bank
@@ -204,7 +210,7 @@ export function findRoute(state: GameState, start: PathNode, dest: number, moveP
   if (start.cell === dest) return { nodes: [], cost: 0, months: 0 };
   if (stepCost(map, dest, movePoints) === null) return null;
   const goal = axialOfCell(map, dest);
-  const h = (cell: number) => axialDistance(axialOfCell(map, cell), goal);
+  const h = (cell: number) => axialDistance(axialOfCell(map, cell), goal) * minStep();
   const g = new Map<number, number>();
   const came = new Map<number, number>();
   const nodes = new Map<number, PathNode>();
@@ -224,7 +230,7 @@ export function findRoute(state: GameState, start: PathNode, dest: number, moveP
       while (cur !== sk) { path.push(nodes.get(cur)!); cur = came.get(cur)!; }
       path.reverse();
       const cost = g.get(k)!;
-      return { nodes: path, cost, months: walkMonths(map, path, movePoints) };
+      return { nodes: path, cost, months: walkMonths(state, start.cell, path, movePoints) };
     }
     const gk = g.get(k)!;
     for (const { node: n, cost } of stepsFrom(state, node, movePoints)) {
@@ -241,33 +247,88 @@ export function findRoute(state: GameState, start: PathNode, dest: number, moveP
 }
 
 /**
- * One month of walking: how many steps of `path` a unit with `points` left can
- * take. A step needs its full cost, except that a unit which has not moved yet
- * this month may always take one step; entering mountains spends every point.
- * Returns the steps taken and the points left.
+ * One month of walking: how many steps of `path` (starting from hex `start`) a
+ * unit with `points` left can take. A step needs its full cost, except that a
+ * unit which has not moved yet this month may always take one step; entering
+ * mountains without a road spends every point. Returns the steps taken and the
+ * points left.
  */
-export function stepsThisMonth(map: MapData, path: PathNode[], movePoints: number, points = movePoints): { steps: number; left: number } {
-  let left = points, steps = 0;
+export function stepsThisMonth(state: GameState, start: number, path: PathNode[], movePoints: number, points = movePoints): { steps: number; left: number } {
+  let left = points, steps = 0, prev = start;
+  const eps = 1e-9;
   for (const n of path) {
-    const cost = stepCost(map, n.cell, movePoints);
+    const cost = stepCostBetween(state, prev, n.cell, movePoints);
     if (cost === null) break;
-    if (isMountain(map, n.cell)) { if (left < 1) break; left = 0; steps++; break; }
-    if (left >= cost) left -= cost;
+    if (takesWholeMonth(state, prev, n.cell)) { if (left < 1) break; left = 0; steps++; break; }
+    if (left + eps >= cost) left = Math.max(0, left - cost);
     else if (left === movePoints) left = 0;
     else break;
-    steps++;
-    if (left <= 0) break;
+    steps++; prev = n.cell;
+    if (left <= eps) break;
   }
   return { steps, left };
 }
 
-/** Months a unit needs to walk `path` from a fresh month. */
-export function walkMonths(map: MapData, path: PathNode[], movePoints: number): number {
-  let months = 0, i = 0;
+/** Months a unit needs to walk `path` from hex `start` from a fresh month. */
+export function walkMonths(state: GameState, start: number, path: PathNode[], movePoints: number): number {
+  let months = 0, i = 0, prev = start;
   while (i < path.length) {
-    const { steps } = stepsThisMonth(map, path.slice(i), movePoints);
+    const { steps } = stepsThisMonth(state, prev, path.slice(i), movePoints);
     if (steps === 0) return Infinity;
+    prev = path[i + steps - 1].cell;
     i += steps; months++;
   }
   return months;
+}
+
+// ---- planning a road (Session 16; DESIGN §3.2b rule 7: "road from X to Y" is one order) ----
+
+const SEA_LAKE = new Set([terrainIndex('lake'), terrainIndex('sea')]);
+
+/**
+ * The hexes a work-band should lay a road over from `from` to `to`: A* over
+ * cells, rivers crossable (each unbridged river hex costs `planning.bridgePenalty`
+ * extra — it will get a bridge), mountains crossable, lake and sea not; a hex
+ * that already carries a road of `level` or better costs `planning.reuse`.
+ * Returns the cells after `from` in walking order, or null when no way exists.
+ */
+export function planRoadRoute(state: GameState, from: number, to: number, level: number): number[] | null {
+  const map = state.map;
+  if (from === to) return [];
+  if (SEA_LAKE.has(map.terrain[to])) return null;
+  const goal = axialOfCell(map, to);
+  const g = new Map<number, number>([[from, 0]]);
+  const came = new Map<number, number>();
+  const open = new Heap();
+  open.push(axialDistance(axialOfCell(map, from), goal) * 0.4, from);
+  const closed = new Set<number>();
+  while (open.size) {
+    const c = open.pop();
+    if (closed.has(c)) continue;
+    closed.add(c);
+    if (c === to) {
+      const out: number[] = [];
+      let cur = c;
+      while (cur !== from) { out.push(cur); cur = came.get(cur)!; }
+      return out.reverse();
+    }
+    const gc = g.get(c)!;
+    for (const n of neighbourCells(map, c)) {
+      if (n === null || closed.has(n) || SEA_LAKE.has(map.terrain[n])) continue;
+      const have = state.infra?.roads[n] ?? 0;
+      let step: number;
+      if (have >= level && roadLink(state, c, n) > 0) step = INFRA.planning.reuse;
+      else {
+        step = TERRAIN[map.terrain[n]].moveCost;
+        if (roadLink(state, c, n) > 0) step *= 0.5;
+        if (needsBridge(state, n)) step += INFRA.planning.bridgePenalty;
+      }
+      const ng = gc + step;
+      const old = g.get(n);
+      if (old !== undefined && old <= ng) continue;
+      g.set(n, ng); came.set(n, c);
+      open.push(ng + axialDistance(axialOfCell(map, n), goal) * INFRA.planning.reuse + n * 1e-9, n);
+    }
+  }
+  return null;
 }

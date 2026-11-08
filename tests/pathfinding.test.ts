@@ -48,8 +48,8 @@ describe('routes and costs', () => {
     map.terrain[at(3, 4)] = M;
     // 2,4 → 3,4 (mountain) → 4,4
     const path = [{ cell: at(3, 4), bank: OPEN }, { cell: at(4, 4), bank: OPEN }];
-    expect(stepsThisMonth(map, path, 4)).toEqual({ steps: 1, left: 0 });
-    expect(walkMonths(map, path, 4)).toBe(2);
+    expect(stepsThisMonth(state, at(2, 4), path, 4)).toEqual({ steps: 1, left: 0 });
+    expect(walkMonths(state, at(2, 4), path, 4)).toBe(2);
     const r = findRoute(state, { cell: at(2, 4), bank: OPEN }, at(4, 4), 4)!;
     expect(r.cost).toBe(3); // the mountain would cost 4 + 1; three plains hexes round it cost 3
     expect(r.nodes.some((n) => n.cell === at(3, 4))).toBe(false);
@@ -61,10 +61,10 @@ describe('routes and costs', () => {
   });
 
   it('a unit that has not moved yet may always take one step, even into terrain dearer than its points', () => {
-    const { map, at } = world();
+    const { map, state, at } = world();
     map.terrain[at(3, 4)] = F;
-    expect(stepsThisMonth(map, [{ cell: at(3, 4), bank: OPEN }, { cell: at(4, 4), bank: OPEN }], 2)).toEqual({ steps: 1, left: 0 });
-    expect(stepsThisMonth(map, [{ cell: at(2, 4), bank: OPEN }, { cell: at(3, 4), bank: OPEN }], 2)).toEqual({ steps: 1, left: 1 }); // plains 1, then forest 3 > 1 left: stop
+    expect(stepsThisMonth(state, at(2, 4), [{ cell: at(3, 4), bank: OPEN }, { cell: at(4, 4), bank: OPEN }], 2)).toEqual({ steps: 1, left: 0 });
+    expect(stepsThisMonth(state, at(1, 4), [{ cell: at(2, 4), bank: OPEN }, { cell: at(3, 4), bank: OPEN }], 2)).toEqual({ steps: 1, left: 1 }); // plains 1, then forest 3 > 1 left: stop
   });
 });
 
