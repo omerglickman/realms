@@ -18,6 +18,9 @@ const DIRT = 0x8a6238;
 const STONE = 0xc9c1ad;
 const STONE_EDGE = 0x5a5246;
 const DECK = 0xc8a266;
+/** How far a road may wander sideways, as a share of the hex-to-hex distance (Omer 2026-11-08: slightly meandering, not straight). */
+const MEANDER = 0.17;
+const BRIDGE_BEND = 0.25; // a deck stays nearly straight
 
 export class InfraLayer {
   readonly root = new Container();
@@ -64,17 +67,29 @@ export class InfraLayer {
       }
       if (!linked) dots.push(cell);
     }
-    const line = (a: number, b: number, width: number, color: number, alpha = 1) => {
+    // a road wanders a little: a cubic S-curve from centre to centre whose two
+    // bends come from a fixed hash of the pair, so it looks the same on every redraw
+    const hash01 = (n: number): number => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x); };
+    const line = (a: number, b: number, width: number, color: number, alpha = 1, bend = 1) => {
       const pa = centre(a), pb = centre(b);
-      g.moveTo(pa.x, pa.y).lineTo(pb.x, pb.y).stroke({ width, color, alpha, cap: 'round', join: 'round' });
+      const dx = pb.x - pa.x, dy = pb.y - pa.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len, ny = dx / len;
+      const seed = Math.min(a, b) * 7919 + Math.max(a, b);
+      const sign = a < b ? 1 : -1; // same curve whichever way the pair is given
+      const o1 = (hash01(seed) - 0.5) * 2 * MEANDER * len * bend * sign;
+      const o2 = (hash01(seed + 0.5) - 0.5) * 2 * MEANDER * len * bend * sign;
+      g.moveTo(pa.x, pa.y)
+        .bezierCurveTo(pa.x + dx / 3 + nx * o1, pa.y + dy / 3 + ny * o1, pa.x + 2 * dx / 3 + nx * o2, pa.y + 2 * dy / 3 + ny * o2, pb.x, pb.y)
+        .stroke({ width, color, alpha, cap: 'round', join: 'round' });
     };
     // casings first, then fills, so crossings join cleanly
     for (const s of segs) {
-      if (s.bridge) line(s.a, s.b, 5.2 * k, INK);
+      if (s.bridge) line(s.a, s.b, 5.2 * k, INK, 1, BRIDGE_BEND);
       else line(s.a, s.b, (s.lvl >= 2 ? 4.2 : 3.6) * k, INK, s.lvl >= 2 ? 1 : 0.85);
     }
     for (const s of segs) {
-      if (s.bridge) line(s.a, s.b, 3.8 * k, DECK);
+      if (s.bridge) line(s.a, s.b, 3.8 * k, DECK, 1, BRIDGE_BEND);
       else if (s.lvl >= 2) { line(s.a, s.b, 3.4 * k, STONE_EDGE); line(s.a, s.b, 2.2 * k, STONE); }
       else line(s.a, s.b, 2.3 * k, DIRT);
     }

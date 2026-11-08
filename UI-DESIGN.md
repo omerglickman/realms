@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — UI Design
 
-**Version 1.7 — 2026-11-08 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13–13f and built through Session 15. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
+**Version 1.7a — 2026-11-08 — Status: ACTIVE.** The look and the layout of the game's interface, as decided in Sessions 13–13f and built through Session 15. Read this whenever a session touches `src/ui/` or adds anything the player will see; amend it (with a dated entry in the change log) whenever a UI decision is made. DESIGN.md says what the game *is*; this document says what it *looks like*. Nothing here changes a game rule.
 
 Omer's brief (2026-11-05): the bottom lines (funds, people, resources) always visible in a clear place that hides little of the map; everything else in hover summaries or modals that present resources, buildings, economic activity and demographics in an orderly, friendly way, with graphics; headers in a hand resembling Carolingian minuscule; a medieval palette. Design left to Claude; Omer amends.
 
@@ -118,7 +118,7 @@ The hex grid hides below 0.5. Thresholds are starting values; tune them in `ZOOM
 
 Other map marks (unchanged from Sessions 7–10): influence zones as a light faction fill with a solid border; cluster outlines inset and lighter; the hovered / selected settlement's worked hexes outlined white with its influence edge dotted; in settle mode every worked hex hatched.
 
-**Roads and bridges on the map (Session 16):** drawn by `render/infraLayer.ts` between the terrain and the settlement layer. A road is a ribbon from hex centre to hex centre between two *linked* hexes (both built, or one a settlement's hex — a settlement counts as a dirt road): a **dirt road** a brown ribbon (`#8a6238`) with a thin ink casing; a **paved road** a pale stone band (`#c9c1ad`) with dark edges (`#5a5246`) and a heavier casing; a **bridge** a tan deck (`#c8a266`) with a heavy ink casing along the road through the river hex. An unlinked road hex is a dot. Line weights are in world units scaled by `1/√zoom` (0.55–1.6×) so a road stays a thin line when zoomed out and does not fatten when zoomed in. The hex's status-line text names a road or bridge on it. Build previews reuse the unit route preview (dotted white line, label at the end).
+**Roads and bridges on the map (Session 16; meander Session 16b):** drawn by `render/infraLayer.ts` between the terrain and the settlement layer. A road is a ribbon from hex centre to hex centre between two *linked* hexes (both built, or one a settlement's hex — a settlement counts as a dirt road): a **dirt road** a brown ribbon (`#8a6238`) with a thin ink casing; a **paved road** a pale stone band (`#c9c1ad`) with dark edges (`#5a5246`) and a heavier casing; a **bridge** a tan deck (`#c8a266`) with a heavy ink casing along the road through the river hex. **A road wanders (Omer 2026-11-08):** each segment is a cubic S-curve from centre to centre whose two sideways bends (up to 17 % of the hex distance) come from a fixed hash of the two hexes, so the road looks the same on every redraw and never shifts when the map is redrawn; a bridge deck bends a quarter as much, so it stays square across the river. An unlinked road hex is a dot. Line weights are in world units scaled by `1/√zoom` (0.55–1.6×) so a road stays a thin line when zoomed out and does not fatten when zoomed in. The hex's status-line text names a road or bridge on it. Build previews reuse the unit route preview (dotted white line, label at the end).
 
 ## 7. Open UI questions
 
@@ -133,6 +133,7 @@ Other map marks (unchanged from Sessions 7–10): influence zones as a light fac
 
 ## Change log
 
+- 1.7a (2026-11-08, Session 16b): §6 roads meander (Omer) — a seeded S-curve per segment, bridges nearly straight.
 - 1.7 (2026-11-08, Session 16): §5 the work-band's unit card (Build here with a road-kind select, Road to…, Bridge at…, the Building / Still to do / At work on / Unfinished rows); §6 roads and bridges on the map.
 - 1.6b (2026-11-07, Session 15c): §5 the cluster ledger's Leadership block.
 - 1.6a (2026-11-07, Session 15b): §5 the upgrade card; the hex table's worked-first order and idle marks (Omer).

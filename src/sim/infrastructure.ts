@@ -25,7 +25,7 @@ export interface InfraItem {
 
 interface InfraData {
   work: { refPeople: number; maxRate: number };
-  movement: { minCost: number; factor: Record<string, number> };
+  movement: { minCost: Record<string, number>; factor: Record<string, number> };
   planning: { bridgePenalty: number; reuse: number };
   items: InfraItem[];
 }
@@ -77,13 +77,16 @@ export function roadLink(state: GameState, from: number, to: number): number {
 const r2 = (x: number): number => Math.round(x * 100) / 100;
 
 /** The cheapest a step can be (the A* heuristic's unit). */
-export function minStep(): number { return Math.min(1, INFRA.movement.minCost); }
+export function minStep(): number { return Math.min(1, ...Object.values(INFRA.movement.minCost)); }
+
+/** The least a road link of this level may cost per step (DECIDED 2026-11-08: dirt 0.5, paved 0.25). */
+function minCostFor(link: number): number { return INFRA.movement.minCost[String(link)] ?? 1; }
 
 /**
  * Movement points to step from `from` onto `to` for a unit with `movePoints` a
  * month; null if impassable. Without a road link: terrain `moveCost`, mountains
  * the whole month. With one: terrain `moveCost` × the road's factor, never
- * under `movement.minCost` (mountains too — a road makes them an ordinary hill).
+ * under the link level's `movement.minCost` (mountains too — a road makes them an ordinary hill).
  */
 export function stepCostBetween(state: GameState, from: number, to: number, movePoints: number): number | null {
   const map: MapData = state.map;
@@ -91,12 +94,12 @@ export function stepCostBetween(state: GameState, from: number, to: number, move
   const link = roadLink(state, from, to);
   if (ti === MOUNTAINS) {
     if (link <= 0) return movePoints; // one hex a month (DECIDED 2026-11-07)
-    return Math.max(INFRA.movement.minCost, r2(TERRAIN[ti].moveCost * (INFRA.movement.factor[String(link)] ?? 1)));
+    return Math.max(minCostFor(link), r2(TERRAIN[ti].moveCost * (INFRA.movement.factor[String(link)] ?? 1)));
   }
   const t = TERRAIN[ti];
   if (!t.passable) return null;
   if (link <= 0) return t.moveCost;
-  return Math.max(INFRA.movement.minCost, r2(t.moveCost * (INFRA.movement.factor[String(link)] ?? 1)));
+  return Math.max(minCostFor(link), r2(t.moveCost * (INFRA.movement.factor[String(link)] ?? 1)));
 }
 
 /** Does entering `to` from `from` take the unit's whole month (mountains without a road)? */

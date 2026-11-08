@@ -58,18 +58,22 @@ describe('roads and bridges on the map', () => {
     expect(back.infra).toEqual({ roads: {}, bridges: {} });
   });
 
-  it('a road halves the cost of rough ground between two road hexes, never under minCost; mountains stop being a month', () => {
+  it('a road halves the cost of rough ground between two road hexes, never under the road minimum (dirt 0.5, paved 0.25); mountains stop being a month', () => {
     const { map, state, at } = world();
     map.terrain[at(3, 4)] = F; map.terrain[at(4, 4)] = M;
     expect(stepCostBetween(state, at(2, 4), at(3, 4), 4)).toBe(3);
     state.infra.roads[at(2, 4)] = 1; state.infra.roads[at(3, 4)] = 1; state.infra.roads[at(4, 4)] = 1;
     expect(stepCostBetween(state, at(2, 4), at(3, 4), 4)).toBe(1.5);
-    expect(stepCostBetween(state, at(1, 4), at(2, 4), 4)).toBe(1); // plains: already 1 (minCost 1)
+    state.infra.roads[at(1, 4)] = 1;
+    expect(stepCostBetween(state, at(1, 4), at(2, 4), 4)).toBe(0.5); // plains: 1 × 0.5, at the dirt minimum
     expect(stepCostBetween(state, at(3, 4), at(4, 4), 4)).toBe(2); // mountains 4 × 0.5, not the whole month
     state.infra.roads[at(3, 4)] = 2;
     expect(stepCostBetween(state, at(2, 4), at(3, 4), 4)).toBe(1.5); // link = the lower level
     state.infra.roads[at(2, 4)] = 2;
     expect(stepCostBetween(state, at(2, 4), at(3, 4), 4)).toBe(1); // paved both: 3 × 0.3333 ≈ 1
+    expect(stepCostBetween(state, at(1, 4), at(2, 4), 4)).toBe(0.5); // plains, link = dirt
+    state.infra.roads[at(1, 4)] = 2;
+    expect(stepCostBetween(state, at(1, 4), at(2, 4), 4)).toBe(0.33); // plains, paved both: 1 × ⅓ (above the 0.25 floor)
   });
 
   it('a road makes a route shorter in months', () => {

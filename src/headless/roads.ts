@@ -4,8 +4,7 @@
 //   npm run sim -- --scenario roads --from Hugeopolis --to Hillside [--level dirt|paved] [--people 300] [--file scenarios/start.json]
 // Prints the plan (hexes, bridges, materials, band-months), the months the band
 // took, and how many months settlers (4 points) and a work-band (5) need for the
-// same walk before the road, after it, and after it with `minCost` 0.5 (the
-// reading where a road also speeds plains — PROPOSED, see the DEVLOG).
+// same walk before the road and after it.
 
 import { readFileSync } from 'node:fs';
 import { loadScenarioFile } from '../sim/scenario';
@@ -61,9 +60,5 @@ const ev = state.events.filter((e) => e.turn >= t0 && (e.kind === 'built' || e.k
 if (ev.length) console.log('  ' + ev.join('\n  '));
 console.log('  walk', from.name, '→', to.name);
 console.log(`    before: settlers ${before.settlers}; band ${before.band}`);
-console.log(`    after (minCost ${INFRA.movement.minCost}): settlers ${walk(4)}; band ${walk(5)}`);
-const saved = INFRA.movement.minCost;
-INFRA.movement.minCost = 0.5;
-console.log(`    after (minCost 0.5):  settlers ${walk(4)}; band ${walk(5)}`);
-INFRA.movement.minCost = saved;
+console.log(`    after: settlers ${walk(4)}; band ${walk(5)}`);
 if (alive) console.log(`  band ends at ${alive.col},${alive.row}; cell ${unitCell(state.map, alive)}`);
