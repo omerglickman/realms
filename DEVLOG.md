@@ -18,12 +18,12 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 - **Numbers to remember:** model scale ×3 (a village 900, a town 9,000, a city 24,000; farm hex 600 fed / 90 hands); gates 1,500 / 6,000 / 36,000; influence rings 1/3/5/6; settlers 4 move points, work-band 5; a band of 300 lays a dirt-road hex in 2 months; a dirt step on plains costs 0.5 point (settlers: 8 hexes a month), paved 0.33.
 - **Next steps (in order):**
   1. **Omer plays the Session 16b build**; open under DESIGN §5.17: what a paved road is for and whether its factor (⅓, so 0.33 on plains) should be ¼ to reach the 0.25 floor; work speed, bridges from the bank, materials per hex.
-  1b. **Docs:** DESIGN.md (~69 KB) is over the 25K-token single-read limit that the Project mirror needs — Omer and Claude agreed (Session 16b) to plan its split next; until then the Project copy is written inline.
-  2. **Session 2b — castles and forts** per DESIGN §3.5 (read it whole; `data/castles.json`; castle kinds on a seven-rank ladder — append castle tiers to `TIERS` with explicit ranks so saved tier indexes stay valid; castle service as a labour-planner job; the siege reserve; garrison capacity; fortify order; ruin / fort decay; pathfinding hook). Quarries / lumber camps (×2 a hex's material output; needs `economy.ts` gathering to read a per-hex multiplier) and watchtowers can ride along or follow.
+  1b. **Docs:** DESIGN.md is split (Session 16c) into DESIGN.md (core + index + open decisions + glossary), DESIGN-units / -settlements / -people-economy / -history; every Project doc is under ~35 KB. Keep it that way: a file nearing 35 KB gets split again.
+  2. **Session 2b — castles and forts** per DESIGN-units.md §3.5 (read it whole; `data/castles.json`; castle kinds on a seven-rank ladder — append castle tiers to `TIERS` with explicit ranks so saved tier indexes stay valid; castle service as a labour-planner job; the siege reserve; garrison capacity; fortify order; ruin / fort decay; pathfinding hook). Quarries / lumber camps (×2 a hex's material output; needs `economy.ts` gathering to read a per-hex multiplier) and watchtowers can ride along or follow.
   3. Session 3 — levies (`takeMen` exists) with upkeep; session 4 if needed — groups, hierarchical pathfinding, tuning; **roads and food sharing** at the end of the phase (§5.15).
   4. **Government & Institutions design session** (DESIGN §4.3) — after Phase 2: opens with the sprawl curve and the §4.3 hooks list.
   5. Housekeeping: DEVLOG-archive-2.md is at ~43 KB — **the next archive batch (Session 20) opens DEVLOG-archive-3.md.**
-- **Open questions for Omer:** DESIGN §5.17 (paved roads' factor and purpose, work speed, bridges from the bank, materials per hex); how to split DESIGN.md; whether an upgrade may run beside a building project; the castle numbers in §3.5 (all draft); the river-mouth reading (Session 14); the unit marker shape; the raise dialog's muster list for a metropolis; draft terrain yield rows; village naming ("New <home>" a placeholder for §4.10).
+- **Open questions for Omer:** DESIGN §5.17 (paved roads' factor and purpose, work speed, bridges from the bank, materials per hex); whether an upgrade may run beside a building project; the castle numbers in §3.5 (all draft); the river-mouth reading (Session 14); the unit marker shape; the raise dialog's muster list for a metropolis; draft terrain yield rows; village naming ("New <home>" a placeholder for §4.10).
 
 ---
 
@@ -265,3 +265,13 @@ Sessions 0–13e (planning, Phase 0, the headless Phase 1 model, the ×3 scale, 
 **Build delivered:** `realms.html` (Session 16b).
 
 **Next session should:** plan the DESIGN.md split with Omer (see Current state 1b), then session 2b castles.
+
+## 2026-11-08 — Session 16c — DESIGN.md split into area files
+
+**Omer's brief:** he did not know how a split works and left the plan to Claude ("do as you think optimal").
+
+**Done:** DESIGN.md (69 KB, over the single-read limit the Project mirror needs) is now DESIGN.md (25 KB: reading rules, an index, §1–2, §3.1, §4.4–4.10, §5 open decisions, §6 glossary), **DESIGN-units.md** (§3.2, 3.2b, 3.4, 3.5; 16 KB), **DESIGN-settlements.md** (§3.3; 10 KB), **DESIGN-people-economy.md** (§4.1–4.3; 16 KB), **DESIGN-history.md** (the change log; 5 KB). Section numbers unchanged; text moved verbatim (version 0.7). CLAUDE.md's start and close steps point at the new files. All five mirrored to the Project (the old Project DESIGN.md was still v0.6, so the mirror also brings in 0.6a/0.6b).
+
+**Tests & build:** unchanged (162/162; docs only). **Commit:** `docs: split DESIGN.md into area files (Session 16c)`. **Build delivered:** none new.
+
+**Next session should:** take Omer's answer on the paved-road factor (§5.17b) and his look at the meandering roads; then session 2b castles (DESIGN-units.md §3.5).
