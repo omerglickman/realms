@@ -24,7 +24,7 @@ export function renderHoverCard(root: HTMLElement, state: GameState, s: Settleme
     ${gauge(cap > 0 ? months / cap : 0, { marks: [cap > 0 ? 3 / cap : 0], title: `${fmt(s.food)} food; the mark is the 3-month reserve` })}
     ${row('Land', `${worked.length} hexes · feeds ${fmt(plan.plannedPerYear)}/yr`)}
     ${plan.privateHands > 0 ? row('Tax', `${fmt(plan.taxPerYear)} coins/yr`) : ''}
-    ${row(parent ? 'Under' : 'Parent', parent ? `${esc(parent.name)} <span class="dim">(${tierName(parent)})</span>` : TIERS[s.tier].rank < 2 ? '<span class="dim">none in range</span>' : '<span class="dim">independent</span>')}
+    ${row(parent ? 'Under' : 'Parent', parent ? `${esc(parent.name)} <span class="dim">(${tierName(parent)})</span>` : TIERS[s.tier].rank < 3 ? '<span class="dim">none in range</span>' : '<span class="dim">independent</span>')}
     ${c && c.root !== s.id && (parent === null || parent.id !== c.root) ? row('Cluster', esc(state.settlements[c.root].name)) : ''}
     ${s.build ? row('Building', esc(projectText(s)!)) : ''}
     ${s.upgrade ? row('Rising to', `${esc(TIERS[s.upgrade.to].name.toLowerCase())} <span class="dim">(${Math.round(100 * s.upgrade.progress)} %)</span>`) : ''}

@@ -134,6 +134,26 @@ async def main() -> int:
             await pg.fill('#sf-amount', '300'); await pg.click('#sf-go'); await pg.wait_for_timeout(300)
             ev = await pg.inner_text('#info-event'); print('SEND FOOD:', ev)
             assert 'sent 300 food' in ev, 'send food did not happen'
+        # ---- a castle placed by command (Session 18): its ledger, a month of service, its hover card ----
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
+        cid = await pg.evaluate('''() => {
+          const w = window.__realms, st = w.state();
+          const ss = Object.values(st.settlements).filter(s => s.tier === 0);
+          for (const v of ss) for (const [dc, dr] of [[2,0],[-2,0],[0,2],[0,-2],[3,1],[-3,-1]]) {
+            const n = Object.keys(w.state().settlements).length;
+            w.act({ type: 'foundSettlement', settlement: { name: 'Smoke Keep', tier: 4, col: v.col + dc, row: v.row + dr, population: 0 } });
+            if (Object.keys(w.state().settlements).length > n) { const id = Object.values(w.state().settlements).find(x => x.name === 'Smoke Keep').id; w.focus(id); return id; }
+          }
+          return null; }''')
+        assert cid, 'could not place a castle'
+        await pg.wait_for_timeout(400)
+        for _ in range(3):
+            await pg.keyboard.press('Space'); await pg.wait_for_timeout(400)
+        ct = await panel(); print('CASTLE:', *lines(ct, 'Smoke Keep', 'staff', 'Garrison', 'Hands', 'reserve', 'upkeep'), sep='\n  ')
+        print(ct[:400].replace(chr(10),' | ')); assert 'castle' in ct.lower(), 'castle modal did not open'
+        await pg.screenshot(path='/tmp/smoke_castle.png')
+        await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
+        await tab('treasury'); print('LEDGER:', *lines(await panel(), 'castles'), sep='\n  ')
         await b.close()
     if errs:
         print('CONSOLE ERRORS:', *errs, sep='\n  '); return 1

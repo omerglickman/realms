@@ -81,6 +81,8 @@ export function popByTierText(popByTier: number[], members: Settlement[]): strin
   for (let i = TIERS.length - 1; i >= 0; i--) if (popByTier[i] > 0.5) parts.push(`${fmt(popByTier[i])} in ${counts[i] === 1 ? 'the ' : ''}${tierPlural(TIERS[i].name, counts[i] || 2)}`);
   return parts.join(' · ');
 }
+/** Tier indexes that hold people (castles are manned, not populated), low to high. */
+export const PEOPLE_TIERS: number[] = TIERS.map((t, i) => (t.castle ? -1 : i)).filter((i) => i >= 0);
 /** Tier label for a legend: "metropolis" when there is one, "metropolises" when more. */
 export function tierLabel(tier: number, members: Settlement[]): string {
   const n = members.filter((m) => m.tier === tier).length;

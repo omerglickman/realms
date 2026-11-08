@@ -105,6 +105,19 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
     btns.push(`<button class="btn small" data-act="roadTo" title="Click a hex: the band lays the ${esc(ki.name.toLowerCase())} all the way, with bridges where it must">Road to…</button>`);
     btns.push(`<button class="btn small" data-act="bridgeAt" title="Click a river hex beside the band: a bridge">Bridge at…</button>`);
   }
+  if (!forming && def.canBuild) {
+    // castles: built where the band stands (a ruin is rebuilt at half price; a fort under it saves a quarter of the time)
+    for (const ci of INFRA_ITEMS.filter((i) => i.kind === 'castle')) {
+      const mk = makeBuildOrder(state, u, ci.id, null);
+      let tip = mk.reason ?? '';
+      if (mk.order) {
+        const sm = orderSummary(state, u, mk.order);
+        const mats = (['timber', 'stone'] as const).filter((k) => sm.materials[k] > 0.5).map((k) => `${fmt(sm.materials[k])} ${k}`).join(' + ');
+        tip = `≈ ${fmt1(sm.months)} months · ${fmt(sm.money)} coins${mats ? ` + ${mats}` : ''}`;
+      }
+      btns.push(`<button class="btn small" data-act="castle" data-item="${ci.id}" ${mk.order ? '' : 'disabled '}title="${esc(tip)}">${ICON.castle1 ?? ICON.hammer} ${esc(ci.name.replace(/^Build /i, ''))}</button>`);
+    }
+  }
   if (!forming) {
     btns.push(`<button class="btn small" data-act="move" title="Walk to a hex you click on the map">${ICON.walk} Move</button>`);
     if (def.canSettle) {
@@ -123,6 +136,7 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
   `;
   root.querySelector<HTMLSelectElement>('[data-act=kind]')?.addEventListener('change', (e) => { buildPrefs.kind = (e.target as HTMLSelectElement).value; host.onKind(); });
   root.querySelector('[data-act=buildHere]')?.addEventListener('click', () => host.onBuildHere(u.id, kind));
+  root.querySelectorAll<HTMLElement>('[data-act=castle]').forEach((b) => b.addEventListener('click', () => host.onBuildHere(u.id, b.dataset.item!)));
   root.querySelector('[data-act=roadTo]')?.addEventListener('click', () => host.onRoadTo(u.id, kind));
   root.querySelector('[data-act=bridgeAt]')?.addEventListener('click', () => host.onBridgeAt(u.id));
   root.querySelector('[data-act=move]')?.addEventListener('click', () => host.onMove(u.id));

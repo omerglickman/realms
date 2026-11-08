@@ -10,7 +10,8 @@
 
 import { Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
 import type { GameState } from '../../sim/state';
-import { TIERS, influenceCells, workedCellsBySettlement, computeWorkAssignment, type Settlement } from '../../sim/settlements';
+import { fortCells } from '../../sim/forts';
+import { TIERS, isRuin, influenceCells, workedCellsBySettlement, computeWorkAssignment, type Settlement } from '../../sim/settlements';
 import { clustersOf, clusterInfluenceCells } from '../../sim/clusters';
 import { factionColor } from '../../sim/factions';
 import { colorToNumber } from '../../sim/terrain';
@@ -50,7 +51,8 @@ export interface LayerView {
   settling: boolean;
 }
 
-const MARKER_SCALE = [0.42, 0.6, 0.78, 0.95];
+// by ladder rank: village · small castle · town · medium castle · city · large castle · metropolis
+const MARKER_SCALE = [0.42, 0.5, 0.6, 0.7, 0.78, 0.88, 0.95];
 
 const LABEL_STYLE = new TextStyle({
   fontFamily: 'Lugrasimo, Georgia, serif',
@@ -123,7 +125,7 @@ export class SettlementLayer {
   }
 
   /** Tier icon ids (src/ui/icons.ts) by rank. */
-  static readonly TIER_ICON = ['village', 'town', 'city', 'metropolis'];
+  static readonly TIER_ICON = ['village', 'castle1', 'town', 'castle2', 'city', 'castle3', 'metropolis'];
 
   setZonesVisible(v: boolean): void { this.showZones = v; this.zones.visible = v; this.clusters.visible = v; }
   get zonesVisible(): boolean { return this.showZones; }
@@ -148,6 +150,11 @@ export class SettlementLayer {
       let set = byFaction.get(key);
       if (!set) { set = new Set(); byFaction.set(key, set); }
       for (const i of influenceCells(map, s)) set.add(i);
+    }
+    for (const f of Object.values(state.forts ?? {})) { // a fort extends the border by one ring (DESIGN §3.5)
+      let set = byFaction.get(f.faction);
+      if (!set) { set = new Set(); byFaction.set(f.faction, set); }
+      for (const i of fortCells(state, f)) set.add(i);
     }
     const borderWidth = Math.max(1.2, 1.8 / view.zoom);
     for (const [fid, set] of byFaction) {
@@ -255,16 +262,27 @@ export class SettlementLayer {
       }
     }
 
+    // forts (Session 18): a small keep on the hex, in the faction colour's border already drawn above
+    for (const f of Object.values(state.forts ?? {})) {
+      const p = offsetToPixel(f.col, f.row, HEX_SIZE);
+      const sp = new Sprite(iconTexture('castle1', MAP_BADGE));
+      sp.anchor.set(0.5);
+      sp.width = badgeD * 1.2; sp.height = badgeD * 1.2;
+      sp.position.set(p.x, p.y);
+      this.hexBadges.addChild(sp);
+    }
+
     // ---- markers: a faction-colour disc with the tier's icon (Session 13b); hover/selection ring ----
     this.markers.clear();
     const seenIcons = new Set<string>();
     for (const s of list) {
       if (!markersOn(s)) continue;
       const p = offsetToPixel(s.col, s.row, HEX_SIZE);
-      const color = colorToNumber(factionColor(state.factions, s.faction));
+      const ruin = isRuin(s);
+      const color = ruin ? 0x7a756a : colorToNumber(factionColor(state.factions, s.faction));
       const r = SettlementLayer.markerRadius(s, view.zoom);
       this.markers.circle(p.x, p.y, r);
-      this.markers.fill(color);
+      this.markers.fill({ color, alpha: ruin ? 0.7 : 1 });
       this.markers.stroke({ width: Math.max(1, 1.2 / view.zoom), color: 0x000000, alpha: 0.8 });
       if (s.id === view.selected || s.id === view.hover) {
         this.markers.circle(p.x, p.y, r + Math.max(2, 2.5 / view.zoom));
@@ -281,6 +299,7 @@ export class SettlementLayer {
       } else if (sp.texture !== tex) sp.texture = tex;
       const d = r * 1.6;
       sp.width = d; sp.height = d;
+      sp.alpha = ruin ? 0.55 : 1;
       sp.position.set(p.x, p.y);
     }
     for (const [id, sp] of this.iconById) {

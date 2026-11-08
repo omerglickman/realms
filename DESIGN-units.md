@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design: Units, Roads and Castles
 
-**Part of the design contract — version 0.7c — 2026-11-08.** Sections 3.2, 3.2b, 3.4, 3.5. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
+**Part of the design contract — version 0.7d — 2026-11-08.** Sections 3.2, 3.2b, 3.4, 3.5. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
 
 ---
 
@@ -75,3 +75,14 @@ Large castles are meant to be as rare as metropolises: hard to build, costly to 
 **Fort.** The "fortify" order of any military unit: one month, 30 timber from the covering cluster (else the realm), no coins. A fort extends the border by one ring, holds 100 men, has no staff and no cluster, and **disappears 12 months after the last unit leaves**. A castle may be built on it.
 
 **Control zone (Phase 4; hooked in Phase 2).** Enemy units inside a castle's rings move at half speed and take attrition; the castle's own hex cannot be crossed by an enemy until the castle is taken — a castle on a bridge or a pass closes it. Protection of the villages in its rings against raids and an order bonus come with warfare. In Phase 2 only the pathfinding hook is built (a castle hex blocks other factions).
+
+**As built (Session 18; decided by Omer 2026-11-08 unless marked PLACEHOLDER).**
+- **Forts and garrisons come after military units.** A garrison is the military units standing in a castle or fort, so nobody can garrison before the levy exists. The fort's code (`fortify`, decay, border, absorption into a castle) is built but no unit type carries the `canFortify` flag, so nothing can create a fort on the map yet. A fort under a castle still saves 25 % of the build time. The instant fortify is a PLACEHOLDER.
+- **Castle hexes (DECIDED):** a castle works its **own hex and its best neighbours** by the usual contested-hex order (medium: own hex; large: own hex + two best ring-1 hexes — `workHexes` 0 / 1 / 3 in `data/settlements.json`).
+- **Map editor (DECIDED):** castles of every size can be placed directly (Settle tool; no population field — a castle holds no people).
+- **Parent resolution (PLACEHOLDER, Claude):** a castle never takes a village away from a covering town or city. Without this a medium castle would sever villages from their town, because the ladder parent is chosen by rank. Food, tithe, migration and abandonment follow the nearest *non-castle* ancestor (`foodParentOf`); a castle takes no tithe and its reserve is filled first from the surplus that passes it.
+- **Service before fields (Claude's reading of "after the home's own buildings and before its fields"):** a settlement's lent hands come out of the hands left after its buildings, before the fields; no settlement lends more than a third.
+- **Upgrade cost (PLACEHOLDER):** the upgrade step costs the *difference* between the two kinds, and its progress rate is the spare hands in reach ÷ the step's hands (small → medium 150, medium → large 450), capped at 1.
+- **Treasury (PLACEHOLDER):** wages and upkeep are taken from the treasury even if it goes negative; there is no consequence yet (to be decided with the economy overhaul / government).
+- **Pathfinding hook (built):** another faction's standing castle hex is impassable (`blockedByCastle`); ruins are open ground.
+

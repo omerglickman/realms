@@ -50,7 +50,7 @@ function put(u: Unit, map: { width: number }, cell: number) {
 describe('roads and bridges on the map', () => {
   it('state carries an empty infra and v7 saves migrate', () => {
     const { state } = world();
-    expect(STATE_VERSION).toBe(9);
+    expect(STATE_VERSION).toBe(10);
     expect(state.infra).toEqual({ roads: {}, bridges: {}, sites: {} });
     const old = JSON.parse(serializeState(state));
     delete old.infra; old.version = 7;

@@ -22,14 +22,19 @@ export function zoomLevel(zoom: number): 0 | 1 | 2 | 3 {
   return 3;
 }
 
-/** Which settlement ranks (0 village … 3 metropolis) show a marker / a name at this zoom. */
+/**
+ * Which ladder ranks show a marker / a name at this zoom. The ladder (Session 18, DESIGN §3.5) is
+ * village 0 · small castle 1 · town 2 · medium castle 3 · city 4 · large castle 5 · metropolis 6;
+ * a castle follows the settlement just below it (a small castle like a village, a medium one like a
+ * town) except that a large castle, like a city, is always shown.
+ */
 export function showMarker(rank: number, zoom: number): boolean {
   const l = zoomLevel(zoom);
-  return rank >= 2 || (rank === 1 && l <= 2) || (rank === 0 && l <= 1);
+  return rank >= 4 || ((rank === 2 || rank === 3) && l <= 2) || (rank <= 1 && l <= 1);
 }
 export function showName(rank: number, zoom: number): boolean {
   const l = zoomLevel(zoom);
-  return rank >= 2 || (rank === 1 && l <= 1) || (rank === 0 && l === 0);
+  return rank >= 4 || ((rank === 2 || rank === 3) && l <= 1) || (rank <= 1 && l === 0);
 }
 export function showResources(zoom: number): boolean {
   return zoomLevel(zoom) <= 2;

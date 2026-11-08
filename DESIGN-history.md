@@ -1,11 +1,12 @@
 # Realms, Kings and Other Stuff — Design: Change Log
 
-**Part of the design contract — version 0.7 — 2026-11-08.** The version history of the design contract. Read only when asked who decided what, and when; the DECIDED items in the other files carry their own dates. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
+**Part of the design contract — version 0.7d — 2026-11-08.** The version history of the design contract. Read only when asked who decided what, and when; the DECIDED items in the other files carry their own dates. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
 
 ---
 
 ## Change log
 
+- 0.7d (2026-11-08, Session 18): §3.5 castles built — Omer decided: forts / garrisons wait for military units (fort code present, nothing can create one); a castle works its own hex + best neighbours; castles can be placed in the map editor. Claude's PLACEHOLDERS recorded in §3.5: parent-resolution refinement, service-before-fields reading, upgrade cost as a difference, negative treasury. ROADMAP v0.7 (the new work order) supersedes the phase list; §5.4 Government session now step 4.
 - 0.7c (2026-11-08, Session 17b): §3.4 quarry placement (a mineable resource — stone, iron, silver, salt — or mountains) and lumber-camp placement (any land but mountains) DECIDED by Omer; intended yields noted for the economic overhaul.
 - 0.7b (2026-11-08, Session 17): §3.4 quarries and lumber camps are map entities now (editor-placed, no economic effect until the economic overhaul); Omer.
 - 0.7a (2026-11-08, Session 16d): paved road factor ¼ DECIDED by Omer (§3.2b rule 5); §5.17(b) resolved.

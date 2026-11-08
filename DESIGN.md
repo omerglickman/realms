@@ -217,7 +217,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 1. ~~Desert terrain~~ — RESOLVED 2026-11-05: not now; perhaps a future iteration.
 2. The yield rows marked *draft* in the §3.1 terrain table — the ones Omer has not ruled on: River as grassland (fertility 4, pasture 1), Tundra pasture 1, Swamp fertility 1 / timber 1, Forest fertility 1, Hills timber 1, Woodland and Grassland pasture 1. Confirm or change.
 3. ~~Whether the 6 factions are hand-designed or generated~~ — RESOLVED 2026-11-05: hand-designed; player faction alone until the mechanics work (§4.8). Still OPEN: the culture groups and naming schemes (later).
-4. **Government & Institutions** detailed design — a dedicated design session **after Phase 2, before Phase 3** (moved 2026-11-07; §4.3 is a sketch only).
+4. **Government & Institutions** detailed design — a dedicated design session at **step 4 of the work order** (ROADMAP v0.7, 2026-11-08: after castles, the levy, and the time-scale / economy / demography overhaul; it now also covers characters and the one-faction naming scheme; §4.3 is a sketch only).
 5. ~~Hall names~~ — RESOLVED 2026-11-05: Moot Hall (village) and Great Hall (metropolis).
 6. ~~River farming + fishing~~ — RESOLVED 2026-11-05: yes, both.
 7. ~~Metropolis prerequisites~~ — accepted as a draft 2026-11-05; revisit with roads.

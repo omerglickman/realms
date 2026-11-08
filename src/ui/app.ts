@@ -17,6 +17,7 @@ import { Camera } from './camera';
 import { Editor } from './editor/editor';
 import { renderHud } from './panels/hud';
 import { renderHoverCard } from './panels/hoverCard';
+import { castleSpec, wireCastle, renderCastleHover } from './panels/castleModal';
 import { ModalShell, wireLinks, type ModalSpec } from './panels/modal';
 import { settlementSpec, wireSettlement } from './panels/settlementModal';
 import { clusterSpec, wireSend, wireSendFood, wireLeadership } from './panels/clusterModal';
@@ -32,7 +33,7 @@ import { inBounds, getTerrain, getResource, idx } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
 import { resourceByIndex } from '../sim/resources';
 import { loadMapFile } from '../sim/mapfile';
-import { settlementIdAt, computeWorkAssignment } from '../sim/settlements';
+import { settlementIdAt, computeWorkAssignment, isCastle } from '../sim/settlements';
 import { SettlementLayer as SL } from './render/settlementLayer';
 import testmapJson from '../../maps/testmap.json';
 import startJson from '../../scenarios/start.json';
@@ -174,7 +175,7 @@ export async function startApp(): Promise<void> {
     const s = id ? state.settlements[id] : null;
     if (!s) { popover.classList.add('hidden'); popoverId = null; return; }
     popoverId = id;
-    renderHoverCard(popover, state, s);
+    if (isCastle(s)) renderCastleHover(popover, state, s); else renderHoverCard(popover, state, s);
     popover.style.borderLeftColor = state.factions[s.faction ?? '']?.color ?? '#4a2f1a';
     popover.classList.remove('hidden');
     positionPopover();
@@ -526,6 +527,18 @@ export async function startApp(): Promise<void> {
     if (view.kind === 'settlement') {
       const s = state.settlements[view.id];
       if (!s) { closeView(); return; }
+      if (isCastle(s)) {
+        spec = castleSpec(state, s, editor.active);
+        const croot = modal.show(`castle:${s.id}`, spec, modalHost);
+        wireCastle(croot, s, {
+          onRename: (id, name) => { editor.editSettlement(id, { name }); },
+          onRemove: (id) => { editor.removeSettlement(id); closeView(); },
+          onUpgrade: (id) => act({ type: 'upgradeSettlement', id }),
+          onCancelUpgrade: (id) => act({ type: 'cancelUpgrade', id }),
+        }, editor.active);
+        wireLinks(croot, links);
+        return;
+      }
       spec = settlementSpec(state, s, view.tab, editor.active);
       const root = modal.show(`settlement:${s.id}:${view.tab}`, spec, modalHost);
       wireSettlement(root, state, s, {
@@ -618,6 +631,9 @@ export async function startApp(): Promise<void> {
     }
     stateChanged();
   }
+
+  // test hook for scripts/smoke.py (no game logic goes through it except `act`)
+  (window as unknown as { __realms: unknown }).__realms = { state: () => state, act, focus: focusSettlement };
 
   // ---- menu ----
   const menu = el<HTMLDivElement>('menu');
@@ -871,7 +887,7 @@ export async function startApp(): Promise<void> {
 
   /** After turns ran the hovered settlement's numbers changed: redraw the card in place. */
   function renderPopoverIfStale(): void {
-    if (popoverId && popoverId === hoverId && state.settlements[popoverId]) renderHoverCard(popover, state, state.settlements[popoverId]);
+    if (popoverId && popoverId === hoverId && state.settlements[popoverId]) { const hs = state.settlements[popoverId]; if (isCastle(hs)) renderCastleHover(popover, state, hs); else renderHoverCard(popover, state, hs); }
   }
 
   // ---- frame loop: culling + perf readout; redraw the settlement layer when the zoom changes ----

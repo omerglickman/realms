@@ -4,13 +4,13 @@
 
 import type { GameState } from '../../sim/state';
 import { calendar } from '../../sim/state';
-import { TIERS, canOverrideParent, type Settlement, type YearTotals } from '../../sim/settlements';
+import { TIERS, canOverrideParent, isCastle, type Settlement, type YearTotals } from '../../sim/settlements';
 import { clusterPeers } from '../../sim/upgrades';
 import { totalPopulation } from '../../sim/demography';
 import { type Cluster, type ClusterNode } from '../../sim/clusters';
 import { clusterStock, clusterCap, MATERIAL_IDS, type Materials } from '../../sim/materials';
 import { titheShare } from '../../sim/economy';
-import { fmt, fmt1, signed, esc, tierGlyph, tierName, tierBreakdown, tierLabel, popByTierText, foodMonths, projectText, gauge, hbar, stack, stat, kv, ICON } from './format';
+import { fmt, fmt1, signed, esc, tierGlyph, tierName, tierBreakdown, tierLabel, PEOPLE_TIERS, popByTierText, foodMonths, projectText, gauge, hbar, stack, stat, kv, ICON } from './format';
 import type { ModalSpec } from './modal';
 
 export const CLUSTER_TABS = [
@@ -140,7 +140,7 @@ function memberRows(state: GameState, node: ClusterNode, depth: number): string 
   const r = s.report;
   const warn = r.hungerDeaths > 0.5 ? `<span class="warn" title="${fmt(r.hungerDeaths)} starved last month">${ICON.skull}</span>` : '';
   const proj = s.build ? `<span class="dim" title="${esc(projectText(s) ?? '')}">${ICON.hammer}</span>` : '';
-  const row = `<tr class="d${depth}"><td>${tierGlyph(s.tier)}<a href="#" data-focus="${s.id}">${esc(s.name)}</a></td><td class="dimrow">${TIERS[s.tier].name.toLowerCase()}</td><td class="r">${fmt(pop)}</td><td>${hbar(months, 24, months < 3 ? 'c5' : months < 6 ? 'c3' : 'c2', `${fmt1(months)} months of food`)} <span class="num">${fmt1(months)}</span></td><td class="r">${s.buildings.length - 2 > 0 ? s.buildings.length - 2 : '<span class="dim">—</span>'}</td><td class="r">${r.privateHands > 0.5 ? fmt(r.tax * 12) : '<span class="dim">—</span>'}</td><td>${proj} ${warn}</td></tr>`;
+  const row = `<tr class="d${depth}"><td>${tierGlyph(s.tier)}<a href="#" data-focus="${s.id}">${esc(s.name)}</a></td><td class="dimrow">${TIERS[s.tier].name.toLowerCase()}</td>${isCastle(s) ? `<td class="r"><span class="dim">—</span></td><td><span class="dim">reserve ${fmt(s.food)}</span></td>` : `<td class="r">${fmt(pop)}</td><td>${hbar(months, 24, months < 3 ? 'c5' : months < 6 ? 'c3' : 'c2', `${fmt1(months)} months of food`)} <span class="num">${fmt1(months)}</span></td>`}<td class="r">${s.buildings.length - 2 > 0 ? s.buildings.length - 2 : '<span class="dim">—</span>'}</td><td class="r">${r.privateHands > 0.5 ? fmt(r.tax * 12) : '<span class="dim">—</span>'}</td><td>${proj} ${warn}</td></tr>`;
   return row + node.children.map((k) => memberRows(state, k, depth + 1)).join('');
 }
 
@@ -185,7 +185,7 @@ function overviewPage(state: GameState, c: Cluster, privateHands: number): strin
   ];
   if (t.hungerDeathsLastMonth > 0.5) rows.push(['Last month', `<b class="warn">${fmt(t.hungerDeathsLastMonth)} starved</b> somewhere in the cluster`]);
   return `<div class="stats">${stats}</div>
-    <h3>People by tier</h3>${stack(TIERS.map((_, i) => ({ label: tierLabel(i, members), value: t.popByTier[i], cls: `c${4 - i}` })).reverse())}
+    <h3>People by tier</h3>${stack(PEOPLE_TIERS.map((i) => ({ label: tierLabel(i, members), value: t.popByTier[i], cls: `c${4 - i}` })).reverse())}
     <h3>The year</h3>${kv(rows)}
     ${c.faction === state.playerFaction ? leadershipBlock(state, c) : ''}
     <p class="note">A cluster is an independent settlement with everything subordinate to it. Food flows only inside a cluster: villages tithe ${Math.round(100 * titheShare())} % of what they grow to their parent as they grow it, and send their surplus up after the harvest; migrants and the yearly pull go the same way.</p>`;

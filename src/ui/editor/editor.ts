@@ -151,11 +151,11 @@ export class Editor {
     const state = this.host.getState();
     const existing = settlementIdAt(state, col, row);
     if (existing) { this.host.onSelect(existing); return; }
-    const check = canSettleAt(state, col, row);
+    const check = canSettleAt(state, col, row, this.settleTier);
     if (!check.ok) { el('editor-msg').textContent = `Cannot place here: ${check.reason}.`; return; }
     const tier = TIERS[this.settleTier];
     const popInput = el<HTMLInputElement>('settle-pop');
-    const population = Math.max(1, Math.round(Number(popInput.value) || DEFAULT_POP[tier.id] || 900));
+    const population = tier.castle ? 0 : Math.max(1, Math.round(Number(popInput.value) || DEFAULT_POP[tier.id] || 900));
     const nameInput = el<HTMLInputElement>('settle-name');
     const name = nameInput.value.trim() || this.nextName();
     this.execute({ type: 'foundSettlement', settlement: { name, tier: this.settleTier, col, row, population } });
@@ -164,7 +164,7 @@ export class Editor {
     const wanted = workRangeCells(state.map, placed).length;
     const got = (workedCellsBySettlement(state).get(id) ?? []).length;
     const note = got < wanted ? ` ⚠ only ${got} of its ${wanted} hexes are free — the rest are worked by a higher tier (DESIGN §3.3).` : '';
-    el('editor-msg').textContent = `Placed ${name} (${tier.name}, ${population.toLocaleString('en-US')} people).${note}`;
+    el('editor-msg').textContent = tier.castle ? `Placed ${name} (${tier.name.toLowerCase()}; hands come from the settlements around it).${note}` : `Placed ${name} (${tier.name}, ${population.toLocaleString('en-US')} people).${note}`;
     nameInput.value = ''; // next one gets an automatic name unless typed
     this.host.onSelect(id);
   }
@@ -551,10 +551,16 @@ export class Editor {
     });
     sel.value = String(this.settleTier);
     const pop = el<HTMLInputElement>('settle-pop');
-    pop.value = String(DEFAULT_POP[TIERS[this.settleTier].id] ?? 900);
+    const syncPop = () => {
+      const t = TIERS[this.settleTier];
+      pop.disabled = !!t.castle;
+      pop.value = t.castle ? '0' : String(DEFAULT_POP[t.id] ?? 900);
+      pop.title = t.castle ? 'A castle holds no people of its own: nearby settlements lend it hands' : '';
+    };
+    syncPop();
     sel.addEventListener('change', () => {
       this.settleTier = Number(sel.value) || 0;
-      pop.value = String(DEFAULT_POP[TIERS[this.settleTier].id] ?? 900);
+      syncPop();
       this.setTool('settle');
     });
     el('tool-settle').addEventListener('click', () => this.setTool('settle'));

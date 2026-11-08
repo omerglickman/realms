@@ -21,7 +21,9 @@ import { TERRAIN } from './terrain';
 import { RESOURCES } from './resources';
 import {
   type Settlement, TIERS, buildingDef, workedCellsBySettlement, resolveAllParents, settlementsByRank, emptyReport, emptyYearTotals, POP_HISTORY_YEARS, abandonBelow,
+  isCastle, isRuin, foodParentOf, newCastleState,
 } from './settlements';
+import { CASTLES, castleKindOf, castleNeed, allocateService, type ServicePlan } from './castles';
 import { logEvent } from './state';
 import { isFishable, isShore } from './water';
 import { MATERIALS, MATERIAL_IDS, clusterStock, clusterCap, realmCap, takeFromCluster, emptyMaterials, type Materials } from './materials';
@@ -57,41 +59,10 @@ export function setTaxRate(x: number): void {
   PRIVATE.taxPerHandPerYear = x;
 }
 
-const FISH_RES = RESOURCES.findIndex((r) => r.id === 'fish');
-const GAME_RES = RESOURCES.findIndex((r) => r.id === 'game');
-
-export type JobKind = 'farm' | 'herd' | 'fish' | 'hunt';
+import { hexJobs, type Job, type JobKind } from './hexjobs';
+export { hexJobs };
+export type { Job, JobKind };
 export type GatherKind = 'timber' | 'stone';
-
-export interface Job {
-  kind: JobKind;
-  cell: number;
-  /** people fed per year at full labour */
-  fedPerYear: number;
-  /** hands for full labour */
-  hands: number;
-}
-
-/** The food jobs a single hex offers (DESIGN §3.1, §4.2). */
-export function hexJobs(map: MapData, cell: number): Job[] {
-  const t = TERRAIN[map.terrain[cell]];
-  const res = map.resource[cell];
-  const jobs: Job[] = [];
-  if (t.fertility > 0) {
-    jobs.push({ kind: 'farm', cell, fedPerYear: ECONOMY.farming.fedPerYearByFertility[t.fertility], hands: ECONOMY.farming.hands });
-  }
-  if (t.pasture > 0) {
-    jobs.push({ kind: 'herd', cell, fedPerYear: ECONOMY.herding.fedPerYearByPasture[t.pasture], hands: ECONOMY.herding.hands });
-  }
-  if (isFishable(map, cell)) {
-    if (res === FISH_RES) jobs.push({ kind: 'fish', cell, fedPerYear: ECONOMY.fishing.withFish.fedPerYear, hands: ECONOMY.fishing.withFish.hands });
-    else jobs.push({ kind: 'fish', cell, fedPerYear: ECONOMY.fishing.fedPerYear, hands: ECONOMY.fishing.hands });
-  }
-  if (res === GAME_RES) {
-    jobs.push({ kind: 'hunt', cell, fedPerYear: ECONOMY.hunting.fedPerYear, hands: ECONOMY.hunting.hands });
-  }
-  return jobs;
-}
 
 /** A materials job a hex offers (Session 11): timber by terrain yield, stone on a Stone hex. */
 export interface GatherJob {
@@ -148,6 +119,8 @@ export interface LabourPlan {
   hands: number;
   buildings: StaffedBuilding[];
   staffedHands: number;
+  /** Session 18: hands lent to the castles in reach (after the buildings, before the fields; DESIGN §3.5) */
+  serviceHands: number;
   jobs: StaffedJob[];
   fieldHands: number;
   /** SPARE hands: not needed by buildings or fields (they build and gather, and are the crowding / migration pool) */
@@ -188,7 +161,7 @@ export interface LabourPlan {
  * then gather timber and stone (Session 11). Vacancies count the hands that
  * buildings, fields and construction wanted but did not get.
  */
-export function planLabour(map: MapData, s: Settlement, cells: number[]): LabourPlan {
+export function planLabour(map: MapData, s: Settlement, cells: number[], serviceHands = 0): LabourPlan {
   const hands = workingHands(s.pop);
   let left = hands;
   let vacancies = 0;
@@ -205,6 +178,9 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
     if (def.family === 'hall') hallStaffing = fraction;
   }
   const staffedHands = hands - left;
+  // castle service (DESIGN §3.5): after the home's own buildings, before its fields
+  const service = Math.max(0, Math.min(left, serviceHands));
+  left -= service;
   const effects = sumEffects(buildings);
 
   const jobs: Job[] = [];
@@ -260,7 +236,7 @@ export function planLabour(map: MapData, s: Settlement, cells: number[]): Labour
   const taxLostPerYear = priv ? (privateHands - taxableHands) * PRIVATE.taxPerHandPerYear * adminQuality : 0;
   const goodsPerYear = taxableHands * PRIVATE.goodsPerHandPerYear * adminQuality * effects.goodsMult;
   const salesSharePerYear = priv ? PRIVATE.salesSharePerYear + effects.salesShare : 0; // goods become money only through a Market (Omer, Session 12c)
-  return { hands, buildings, staffedHands, jobs: staffed, fieldHands, idleHands, landCapacity, plannedPerYear, granaryStaffing, effects, constructionHands, constructionFraction, gather, gatherHands, vacancies,
+  return { hands, buildings, staffedHands, serviceHands: service, jobs: staffed, fieldHands, idleHands, landCapacity, plannedPerYear, granaryStaffing, effects, constructionHands, constructionFraction, gather, gatherHands, vacancies,
     privateHands, taxableHands, adminQuality, taxPerYear, goodsPerYear, taxLostPerYear, salesSharePerYear };
 }
 
@@ -367,10 +343,12 @@ export function economyMonth(state: GameState, month: number): void {
   const plans = new Map<string, LabourPlan>();
   const order = settlementsByRank(state);
   const titheIn = new Map<string, number>();
+  const service = allocateService(state, worked);
 
   // produce (→ tithe up) → consume → spoil & cap
   for (const s of order) {
-    const plan = planLabour(state.map, s, worked.get(s.id) ?? []);
+    if (isCastle(s)) { castleMonth(state, s, worked.get(s.id) ?? [], service, month); continue; }
+    const plan = planLabour(state.map, s, worked.get(s.id) ?? [], service.given.get(s.id) ?? 0);
     plans.set(s.id, plan);
     const r = emptyReport();
     r.titheIn = titheIn.get(s.id) ?? 0;
@@ -400,7 +378,7 @@ export function economyMonth(state: GameState, month: number): void {
     // their parents (villages → towns → cities), so the grain arrives before the parent eats.
     const tithe = titheShare();
     if (tithe > 0 && r.produced > 0 && s.parent) {
-      const p = state.settlements[s.parent];
+      const p = foodParentOf(state, s); // a castle takes no tithe (DESIGN §3.5)
       if (p) {
         const take = r.produced * tithe;
         s.food -= take;
@@ -495,20 +473,29 @@ export function economyMonth(state: GameState, month: number): void {
     f.year.months += 1;
   }
 
-  // share surplus up (villages first, then towns, so a chain works in one month)
+  // share surplus up (villages first, then towns, so a chain works in one month). The castles above a
+  // settlement fill their reserves first, up to the room they have (DESIGN §3.5); the rest goes to its
+  // nearest ancestor that is not a castle.
   for (const s of order) {
-    if (!s.parent) continue;
-    const p = state.settlements[s.parent];
-    if (!p) continue;
-    const surplus = s.food - reserveFood(s, month);
+    if (isCastle(s) || !s.parent) continue;
+    let surplus = s.food - reserveFood(s, month);
     if (surplus <= 0) continue;
-    const room = p.report.capacity - p.food;
-    const give = Math.max(0, Math.min(surplus, room));
-    if (give <= 0) continue;
-    s.food -= give;
-    p.food += give;
-    s.report.sent += give;
-    p.report.received += give;
+    const seen = new Set<string>([s.id]);
+    let p = state.settlements[s.parent];
+    while (p && !seen.has(p.id) && surplus > 1e-9) {
+      seen.add(p.id);
+      const room = p.report.capacity - p.food;
+      const give = Math.max(0, Math.min(surplus, room));
+      if (give > 0) {
+        s.food -= give;
+        p.food += give;
+        s.report.sent += give;
+        p.report.received += give;
+        surplus -= give;
+      }
+      if (!isCastle(p)) break;
+      p = p.parent ? state.settlements[p.parent] : undefined as unknown as Settlement;
+    }
   }
 
   abandonEmptySettlements(state);
@@ -517,8 +504,8 @@ export function economyMonth(state: GameState, month: number): void {
   // next harvest, has idle hands and a parent → 10 % of idle hands leave with dependants
   const mig = DEMOGRAPHY.migration;
   for (const s of order) {
-    if (!s.parent) continue;
-    const p = state.settlements[s.parent];
+    if (isCastle(s) || !s.parent) continue;
+    const p = foodParentOf(state, s);
     if (!p) continue;
     const plan = plans.get(s.id)!;
     if (plan.idleHands <= 0 || plan.hands <= 0) continue;
@@ -544,6 +531,59 @@ export function economyMonth(state: GameState, month: number): void {
 }
 
 /**
+ * One month of a castle (DESIGN §3.5, Session 18). It has no residents: the
+ * hands that staff it were lent by the settlements in its reach (`allocateService`),
+ * and staffing (got / need) scales its worked hexes and its garrison capacity.
+ * It produces food from its hexes into its own reserve, the treasury pays wages
+ * per staffed hand and a yearly upkeep (PLACEHOLDER: the treasury may go
+ * negative — nothing yet makes a bankrupt realm do anything), the reserve spoils
+ * like a granary and is capped at `capacity` people for `reserve.months` months,
+ * and a castle nobody serves for `ruin.afterMonths` months becomes a ruin.
+ */
+export function castleMonth(state: GameState, s: Settlement, cells: number[], service: ServicePlan, month: number): void {
+  const c = s.castle ?? (s.castle = newCastleState());
+  const r = emptyReport();
+  if (c.ruin) { c.staffing = 0; c.gotHands = 0; c.wages = 0; c.upkeep = 0; c.garrisonCapacity = 0; s.report = r; return; }
+  const kind = castleKindOf(s);
+  const f = s.faction ? state.factions[s.faction] : undefined;
+  const info = service.byCastle.get(s.id) ?? { need: 0, got: 0, staffing: 0, reach: 0, from: [] };
+  c.staffing = info.staffing;
+  c.gotHands = info.got;
+  c.needHands = info.need;
+  c.garrisonCapacity = kind.capacity * info.staffing;
+  c.unstaffedMonths = info.got > 1e-9 ? 0 : c.unstaffedMonths + 1;
+  if (c.unstaffedMonths >= CASTLES.ruin.afterMonths) {
+    c.ruin = true; c.staffing = 0; c.gotHands = 0; c.garrisonCapacity = 0; c.wages = 0; c.upkeep = 0;
+    s.food = 0; s.parent = null; s.upgrade = null;
+    logEvent(state, 'ruin', `${s.name} fell into ruin — nobody was left to serve it.`);
+    s.report = r;
+    return;
+  }
+  // its worked hexes, staffed in proportion (the partial-staffing curve of a food hex)
+  const jobs = castleNeed(state, s, cells).jobs.map((j) => ({ ...j, staffing: info.staffing, fraction: staffingOutput(info.staffing) }));
+  const plan = planLabour(state.map, s, []);
+  plan.jobs = jobs;
+  plan.landCapacity = jobs.reduce((t, j) => t + j.fedPerYear, 0);
+  plan.plannedPerYear = jobs.reduce((t, j) => t + j.fedPerYear * j.fraction, 0);
+  r.landCapacity = plan.landCapacity;
+  r.produced = monthlyProduction(plan, month, s.harvestFactor);
+  s.food += r.produced;
+  // money: wages for the hands in service and the yearly upkeep
+  c.wages = info.got * CASTLES.service.wagePerHandPerMonth;
+  c.upkeep = kind.upkeepPerYear / 12;
+  if (f) { f.treasury -= c.wages + c.upkeep; f.year.upkeep += c.wages + c.upkeep; }
+  // the reserve: granary spoilage by staffing, capped at the siege reserve
+  const g = granaryTerms(info.staffing);
+  r.spoiled = s.food * g.spoilage;
+  s.food -= r.spoiled;
+  r.capacity = kind.capacity * CASTLES.reserve.months * ECONOMY.foodPerPersonPerMonth;
+  if (s.food > r.capacity) { r.spoiled += s.food - r.capacity; s.food = r.capacity; }
+  s.report = r;
+  // an upgrade in place runs at the share of its hands that are there (spare hands in reach, a band on the hex)
+  if (s.upgrade) upgradeMonth(state, s);
+}
+
+/**
  * Abandonment (DECIDED 2026-11-05): a settlement below ABANDON_BELOW people is
  * removed; whoever is left walks to its parent (people are conserved when
  * there is one); its granary is lost. Logged as an event.
@@ -553,9 +593,10 @@ export function abandonEmptySettlements(state: GameState): string[] {
   const threshold = abandonBelow();
   if (!(threshold > 0)) return gone;
   for (const s of settlementsByRank(state)) {
+    if (isCastle(s)) continue; // a castle has no residents; its fate is the ruin rule
     const n = totalPopulation(s.pop);
     if (n >= threshold) continue;
-    const p = s.parent ? state.settlements[s.parent] : null;
+    const p = foodParentOf(state, s);
     if (p && n > 0) { addPopulation(p.pop, s.pop); p.report.migrantsIn += n; }
     delete state.settlements[s.id];
     gone.push(s.id);
@@ -573,7 +614,7 @@ export function abandonEmptySettlements(state: GameState): string[] {
  */
 export function demographyYear(state: GameState): void {
   const k = noise();
-  const list = Object.values(state.settlements).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const list = Object.values(state.settlements).filter((s) => !isCastle(s)).sort((a, b) => (a.id < b.id ? -1 : 1));
   // the year's sufficiency per settlement, before anything is reset (the trickle checks the parent's)
   for (const s of list) s.report.sufficiency = s.yearMonths > 0 ? s.yearSufficiency / s.yearMonths : 1;
   for (const s of list) {
@@ -606,8 +647,8 @@ export function demographyYear(state: GameState): void {
       prosperous.set(p.id, spare >= k.trickleProsperousSpare);
     }
     for (const s of settlementsByRank(state)) {
-      if (!s.parent) continue;
-      const p = state.settlements[s.parent];
+      if (isCastle(s) || !s.parent) continue;
+      const p = foodParentOf(state, s);
       if (!p) continue;
       if (k.trickleRequireFedParent && p.report.sufficiency < 0.999) continue;
       if (k.trickleRequireProsperous && !prosperous.get(p.id)) continue;

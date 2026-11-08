@@ -30,8 +30,8 @@ function found(state: GameState, name: string, tier: string, population: number)
 }
 
 describe('tier upgrades (DESIGN §3.2b rule 10)', () => {
-  it('data: three steps, village → town → city → metropolis, the last a placeholder', () => {
-    expect(UPGRADES.map((u) => `${u.from}>${u.to}`)).toEqual(['village>town', 'town>city', 'city>metropolis']);
+  it('data: village → town → city → metropolis (the last a placeholder), then the two castle steps', () => {
+    expect(UPGRADES.map((u) => `${u.from}>${u.to}`)).toEqual(['village>town', 'town>city', 'city>metropolis', 'small_castle>medium_castle', 'medium_castle>large_castle']);
     expect(UPGRADES[0]).toMatchObject({ money: 10000, timber: 300, stone: 150, months: 12 });
     expect(UPGRADES[1]).toMatchObject({ money: 40000, timber: 600, stone: 600, months: 24 });
     expect(UPGRADES[2].placeholder).toBe(true);

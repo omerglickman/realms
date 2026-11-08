@@ -17,7 +17,7 @@ import { idx, inBounds } from './map';
 import { axialDistance, axialRange, axialToOffset, offsetToAxial, type Axial } from './hex';
 import { TERRAIN, terrainIndex } from './terrain';
 import {
-  type Settlement, TIERS, tierIndex, buildingDef, settlementAxial, settlementIdAt, makeSettlement, type FoundOptions,
+  type Settlement, TIERS, tierIndex, buildingDef, settlementAxial, settlementIdAt, makeSettlement, type FoundOptions, isCastle, isRuin,
 } from './settlements';
 import { type Population, emptyPopulation, totalPopulation, workingHands, takeSlice, addPopulation, applyHunger, DEMOGRAPHY, BAND_IDS } from './demography';
 import { type Materials, emptyMaterials, MATERIAL_IDS, clusterStock, payFromCluster, type Payment, addMaterials } from './materials';
@@ -43,6 +43,8 @@ export interface UnitTypeDef {
   canSettle: boolean;
   /** may it build roads and bridges (work-bands)? */
   canBuild?: boolean;
+  /** may it fortify the hex it stands on (Session 18, DESIGN §3.5)? Military units only; none yet */
+  canFortify?: boolean;
   upkeepPerManPerMonth?: number;
   blurb?: string;
 }
@@ -237,7 +239,7 @@ export function musterSources(state: GameState, id: string): { settlement: Settl
   for (const s of Object.values(state.settlements)) {
     if (s.faction === at.faction && axialDistance(c, settlementAxial(s)) <= UNITS.muster.withinHexes) ids.add(s.id);
   }
-  return [...ids].map((sid) => state.settlements[sid]).filter(Boolean).map((s) => ({
+  return [...ids].map((sid) => state.settlements[sid]).filter((s) => s && !isCastle(s)).map((s) => ({
     settlement: s,
     spareHands: s.report.idleHands,
     distance: axialDistance(c, settlementAxial(s)),
@@ -401,7 +403,7 @@ export function cancelRaise(state: GameState, r: { unitId: string; taken: Muster
 
 /** The route a unit would take to `dest`, or null. */
 export function routeFor(state: GameState, u: Unit, dest: number): Route | null {
-  return findRoute(state, { cell: unitCell(state.map, u), bank: u.bank }, dest, unitTypeDef(u.type).movePoints);
+  return findRoute(state, { cell: unitCell(state.map, u), bank: u.bank }, dest, unitTypeDef(u.type).movePoints, u.faction);
 }
 
 export interface SettleCheck { ok: boolean; reason?: string }
@@ -495,7 +497,7 @@ export function coveringSettlement(state: GameState, faction: string, cell: numb
   const here = offsetToAxial(cell % map.width, Math.floor(cell / map.width));
   let best: Settlement | null = null, bestD = Infinity, bestRank = -1;
   for (const s of Object.values(state.settlements)) {
-    if (s.faction !== faction) continue;
+    if (s.faction !== faction || isRuin(s)) continue;
     const d = axialDistance(here, settlementAxial(s));
     if (d > TIERS[s.tier].influenceRings) continue;
     const rank = TIERS[s.tier].rank;
@@ -610,7 +612,7 @@ export function unitsMonth(state: GameState, month: number): void {
       for (const mid of order) {
         if (want <= 1e-9) break;
         const s = state.settlements[mid];
-        if (!s) continue;
+        if (!s || isCastle(s)) continue; // a castle's reserve is for its garrison and a siege (DESIGN §3.5)
         const take = Math.min(s.food, want);
         s.food -= take; want -= take; got += take;
       }

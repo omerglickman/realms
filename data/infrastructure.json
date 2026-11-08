@@ -1,5 +1,5 @@
 {
-  "_comment": "Infrastructure built by work-bands (DESIGN §3.2b rule 7, §3.4; DECIDED by Omer 2026-11-07, numbers DRAFT, ×3 scale). `items`: what a band can build on a hex — months for a band of `work.refPeople` people (a bigger band is proportionally faster up to `work.maxRate`, a smaller one slower), materials paid when work on that hex begins (from the cluster whose influence covers it, else from the realm stockpile; the project waits if neither has them). A paved road goes over a dirt road; a bridge goes on a river hex, is built from the bank beside it, and carries a dirt road. Movement (rule 5): a unit stepping from one road hex to another pays the terrain's cost times the road's factor, never less than `movement.minCost` for the link's level (DECIDED by Omer 2026-11-08: dirt road minimum 0.5, paved road minimum 0.25 — so on plains a dirt road doubles a unit's speed). A settlement hex counts as a dirt road for this. Mountains are one hex a month unless a road links them, then they cost 4 × the factor. `planning.bridgePenalty`: extra route cost the planner adds for a bridge still to be built, so 'road from X to Y' prefers existing bridges, settlements and short crossings; `planning.reuse`: the cost of stepping onto a hex that already has the road. `sites`: quarries and lumber camps (Session 17, Omer 2026-11-08) — map entities placed from the editor's Infrastructure tab; their economic influence is NOT decided (the economic/demographic overhaul will), so for now they are only on the map and in saves.",
+  "_comment": "Infrastructure built by work-bands (DESIGN §3.2b rule 7, §3.4; DECIDED by Omer 2026-11-07, numbers DRAFT, ×3 scale). `items`: what a band can build on a hex — months for a band of `work.refPeople` people (a bigger band is proportionally faster up to `work.maxRate`, a smaller one slower), materials paid when work on that hex begins (from the cluster whose influence covers it, else from the realm stockpile; the project waits if neither has them). A paved road goes over a dirt road; a bridge goes on a river hex, is built from the bank beside it, and carries a dirt road. Movement (rule 5): a unit stepping from one road hex to another pays the terrain's cost times the road's factor, never less than `movement.minCost` for the link's level (DECIDED by Omer 2026-11-08: dirt road minimum 0.5, paved road minimum 0.25 — so on plains a dirt road doubles a unit's speed). A settlement hex counts as a dirt road for this. Castles (Session 18, DESIGN §3.5) are built the same way, one per hex, on the hex the band stands on; their months and prices are filled in from data/castles.json at load. Mountains are one hex a month unless a road links them, then they cost 4 × the factor. `planning.bridgePenalty`: extra route cost the planner adds for a bridge still to be built, so 'road from X to Y' prefers existing bridges, settlements and short crossings; `planning.reuse`: the cost of stepping onto a hex that already has the road. `sites`: quarries and lumber camps (Session 17, Omer 2026-11-08) — map entities placed from the editor's Infrastructure tab; their economic influence is NOT decided (the economic/demographic overhaul will), so for now they are only on the map and in saves.",
   "work": {
     "refPeople": 300,
     "maxRate": 3
@@ -53,6 +53,36 @@
         "stone": 30
       },
       "blurb": "Joins both banks of a river hex and carries a dirt road across."
+    },
+    {
+      "id": "castle_small",
+      "kind": "castle",
+      "tier": "small_castle",
+      "level": 0,
+      "name": "Small castle",
+      "months": 0,
+      "cost": {},
+      "blurb": "A keep with a small garrison and two rings of influence; the seat of a handful of villages. Months and cost come from data/castles.json."
+    },
+    {
+      "id": "castle_medium",
+      "kind": "castle",
+      "tier": "medium_castle",
+      "level": 0,
+      "name": "Medium castle",
+      "months": 0,
+      "cost": {},
+      "blurb": "A castle with walls, a worked hex and three rings of influence; the seat of a town's lands. Months and cost come from data/castles.json."
+    },
+    {
+      "id": "castle_large",
+      "kind": "castle",
+      "tier": "large_castle",
+      "level": 0,
+      "name": "Large castle",
+      "months": 0,
+      "cost": {},
+      "blurb": "A great castle: three worked hexes, five rings of influence, a city's overlord. Rare and ruinously costly. Months and cost come from data/castles.json."
     }
   ],
   "sites": [

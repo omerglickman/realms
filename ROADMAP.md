@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.6f — 2026-11-08 — Status: ACTIVE (Phase 2 in progress: session 1 — units and movement — done in Sessions 14–15; session 2 — work-bands, roads and bridges — done in Session 16, plus quarries and lumber camps as editor-placed map entities in Sessions 17–17b; session 2b castles next; the Government & Institutions design session after Phase 2)**
+**Version 0.7 — 2026-11-08 — Status: ACTIVE (Omer's work order of 2026-11-08 replaces the old phases: 1 castles — done in Session 18; 2 military units / levy next; 3 time-scale, economy and demography overhaul + threat + battles; 4 government, institutions and characters; 5 AI and diplomacy; 6 further mechanisms)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -179,61 +179,22 @@ Suggested order (each session ends with a build): (1) numbers first — propose 
 
 **Acceptance**: a faction with a city and several villages survives and grows over 20 years; a city with no villages starves. Omer can read why from the panels. ✔ (Numbers to be tuned after Phase 2.)
 
-### Phase 2 — Units, movement and building the land (≈ 3–4 sessions) — IN PROGRESS
+### Phase 2 — Units, movement and building the land — DONE except levies (moved to step 2 below)
 
-Goal: a game loop — people leave settlements as units, move, and change the land and the demography; the system built in Phase 1 is both what they cost and what they act on.
+Done: units and movement (Sessions 14–15), tier upgrades (15b–c), work-bands, roads, bridges (16), quarries and lumber camps as editor-placed map entities (17–17b; no economic effect yet), **castles (Session 18; DESIGN §3.5)**. The levy (old session 3) is now step 2. Fog of war and the Web Worker stay in step 5. Moved out of Phase 2 earlier (2026-11-07): administrative capacity and government → step 4.
 
-**Why before Government & Institutions (Omer's decision 2026-11-07):** units are the economy's missing *sinks* (the Session 12 finding that money does not bind), and administrative capacity — the centrepiece of §4.3 — is a brake on *how many settlements a realm can run*; until settlers exist there is nothing to brake and no measurement of how fast a realm sprawls on its own. Phase 2 therefore runs **without** any administrative-capacity placeholder: the demographic cost of founding (≈ 900 people per village) is the only brake, and the headless sprawl measurement at the end of Phase 2 is the opening exhibit of the design session.
+### The work order (Omer, 2026-11-08 — replaces the old Phases 3–6)
 
-Session plan (one feature cluster each; each ends with a build):
+Omer's principle: **get to a game first, then improve it** — not a complicated simulator that is turned into something fun later. Build the components, play, tune the pace by feel (accelerate or decelerate what is dull), rather than designing a pacing curve in advance. One feature cluster per session as always; each step ends with a playable build.
 
-1. **Units and movement** — the unit entity (faction, hex, people as cohorts, provisions, movement points, home, order), commands (raise with muster, move, settle, disband), movement points with terrain costs from `data/terrain.json` (mountains one hex a month; river hexes as two bank nodes, crossed only by a bridge or a settlement), A* to a destination over several months, foraging outside the borders; **settlers** as the first type (destination-based default size, calendar default for provisions), founding via `foundSettlement`; UI per UI-DESIGN 1.5: the **Recruitment** tab and raise dialog, shield markers with the gliding move animation, the unit card with Move / Settle / Disband and the route preview, **Send food** in the cluster ledger. Headless: a scripted settler-spamming builder → the 40-year sprawl curve. **Done:** 1a the sim (Session 14 — units, pathfinding, settlers, foraging, the staffing curve, Send food, the settler-spammer and the sprawl curve) and 1b the UI (Session 15 — the Recruitment page, the raise dialog, shield markers with the glide, the unit card, Send food in the cluster ledger).
-2. **Work-bands and roads — DONE (Session 16): work-bands raisable, dirt and paved roads, bridges, "road from X to Y", roads in pathfinding, the road layer and the unit card's build orders; quarries and lumber camps exist since Sessions 17–17b as map entities placed from the map editor's Infrastructure tab (quarry on stone / iron / silver / salt or mountains, camp on any land but mountains) with no economic effect yet — what they yield, and whether work-bands build them, waits for the economic / demographic overhaul (they need the economy's gathering to read a per-hex multiplier); watchtowers wait for fog of war (Phase 5).** Original scope: work-bands build on the hex they stand on from `data/infrastructure.json`: roads and bridges first (movement only; food sharing by road at the end of the phase), then quarries / lumber camps on resource hexes, watchtowers if cheap. **Castles (DESIGN §3.5, decided 2026-11-08)** are their own cluster of work — likely a session 2b: the castle kind on the seven-rank ladder (`data/castles.json`), castle service in the labour planner, the siege reserve, garrison capacity, build / upgrade / ruin, the fortify order and the fort's decay, the pathfinding hook; castle icons already exist (UI-DESIGN §4).
-3. **Levies** — one generic **levy** unit (men 15–44 from a settlement; raise / move / upkeep in coins and food / disband home) with no roster, facilities or combat (Phase 4). *Tier upgrades (village → town → city as a player command with the population gate + money + materials + months) were pulled forward and built in Session 15b at Omer's request, with a placeholder metropolis step; administrative capacity is added when §4.3 exists.*
-4. (if needed) Groups (stack, split, move together), hierarchical pathfinding, tuning of the Phase 1 + 2 numbers against the headless curves with Omer.
+1. **Castles — DONE (Session 18).** Seven-rank ladder, castle service from the settlements in reach, siege reserve, wages and upkeep, ruin, work-band construction and in-place upgrades, forts (code only: `fortify` exists but no unit can use it), the pathfinding hook, editor placement, castle UI. Open items for later steps: garrisons and fortify orders (need military units), the castle numbers (all draft).
+2. **Military units, starting with the levy.** A generic levy (men 15–44 from a settlement; raise / move / upkeep in coins and food / disband home); garrison in castles and forts (capacity from `data/castles.json`, fed from the castle reserve); the `fortify` order for military units. With this the basic components of a playable realm are all in the game: land, people, food, materials, money, roads, castles, an army.
+3. **Time-scale, economy and demography overhaul.** Now that every basic component exists, re-examine how they work together and reshape the mechanics so that building a realm — a viable economy, a flourishing population and basic defence (there is no enemy yet) — is **fun, easy to understand (legible information), challenging (tradeoffs and risks; not everything is doable at once) and achievable in a reasonable number of turns** (Civ and Total War games run 300–500 turns; that is the length a player should expect). Includes: **the length of the year** (12 turns a year is probably too long — settling a place and watching it grow into a city with its own cluster takes 60–80 years today, more than a whole game; Omer leans to a shorter year and a somewhat higher, less realistic, growth so the realm visibly grows in real time — discuss when this step starts, tune by playing); what quarries and lumber camps do; the cluster / tithe / pull numbers; the "§4.3 hooks" list. **After a baseline kingdom works:** an **outside threat** (bandits / raiders) and a **general battle and siege resolution** — the principles of open battles and attacks on settlements and castles mostly taken from Omer's Imperium project, with adjustments (Omer to supply or describe it).
+4. **Government and institutions** (DESIGN §4.3) — an added layer of levers for nuance and a personalised experience; some tuning arises from it. **Includes characters** (it is a part of this mechanic): generation, skills, traits, positions (ruler, governors, commanders; officials staffing institutions), lifecycle, succession, loyalty as numbers. **Naming scheme for one faction**: a long list of first names and a long list of family names, built with a later stage in mind where several families are the nobility, try to get jobs for their kin, and have their loyalty influenced by it (so a character carries a family, and families are entities). Administrative capacity and the sprawl curve open the design session.
+5. **AI and diplomacy.** With an MVP in hand the computer must play with and against us: layered AI (economic → expansion → military → diplomatic), faction personas, relations and treaties, a diplomacy screen, fog of war, the simulation in a Web Worker if AI turns are slow, victory condition. Playing against a real opponent has a different rhythm, so the pace is re-tuned here. Headless balancing of AI-only games.
+6. **Additional mechanisms:** public order, rebellions and uprisings (rebel factions), events, culture, migration, real map generation, art and music, tutorial, naval units, save slots; the long-term goal of directly playable battles. Order and content to be decided as we go.
 
-Kickoff: done — DESIGN §3.2b is DECIDED in full (2026-11-07) and the Phase 2 UI is in UI-DESIGN 1.5; session 1 starts on the code. Every Phase 2 session keeps a **"§4.3 hooks"** list in its DEVLOG entry — each number or rule that the Government & Institutions session must later own (administration quality, the tithe as a policy, the realm cap, upkeep, capacity costs…).
-
-Moved out of Phase 2 (2026-11-07): fog of war (meaningless with one faction) and the Web Worker (needed only when AI turns are slow) → Phase 5. Administrative capacity, government forms and the first institutions → the design session below, then Phase 3.
-
-**Acceptance**: Omer can expand the faction from one city to a region of villages connected by roads, with the cost visible in people and tax; a village that sends settlers and a levy visibly shrinks and recovers; the headless sprawl curve over 40 years is on the table.
-
-### Design session — Government & Institutions (after Phase 2, before Phase 3)
-
-A chat devoted to DESIGN §4.3: government forms, the institution list and prerequisites, the policy list and trade-offs, administrative capacity — opened with the Phase 2 sprawl measurement and the accumulated "§4.3 hooks" list. Output: DESIGN.md §4.3 moved from PROPOSED to DECIDED, `data/institutions.json` drafted, and the first institutions, policies and administrative capacity scheduled (as a Phase 2b or the first part of Phase 3 — institutions need the characters who staff them).
-
-### Phase 3 — Characters (≈ 2 sessions)
-
-- Character generation from faction properties; skills, traits, age.
-- Positions: ruler, offices, governors, commanders; effects wired into economy and order.
-- Lifecycle: aging, death, heir and succession; loyalty/ambition as numbers (events later).
-- Character panel and court screen.
-
-**Acceptance**: appointing a good governor visibly improves a city; the ruler's death triggers a succession with consequences.
-
-### Phase 4 — Warfare (≈ 3–4 sessions)
-
-- Military unit roster from `data/units.json`; levies vs professionals; facility requirements; upkeep.
-- Recruitment draws from settlement demographics and lowers working hands/order.
-- Battle resolution v1 (point system + randomness + commander + terrain) with a readable battle report.
-- Supply/attrition, sieges, raids.
-- Public order and revolts (rebel factions).
-
-**Acceptance**: a war between the player and a scripted enemy on the test map can be fought and won/lost; levying a village measurably hurts its food.
-
-### Phase 5 — Diplomacy and AI (≈ 4–5 sessions)
-
-- Relations, treaties, client and subjugated states; diplomacy screen.
-- AI in layers: economic (build, grow, feed) → expansion (settle, roads) → military (defend, raid, conquer) → diplomatic. Faction personas.
-- Fog of war (simple) and the simulation moved into a Web Worker — both moved here from Phase 2 (2026-11-07).
-- Victory condition and end screen.
-- Headless balancing: 20 AI-only games, stats reviewed with Omer.
-
-**Acceptance**: a full game from start to victory is playable against AI factions that expand, trade, and fight.
-
-### Phase 6 — Polish and depth (open-ended)
-
-Candidates, ordered by Omer: events, culture, migration, real procedural map generation, better art, music, tutorial/help, performance passes, naval units, save slots, and the long-term goal of **directly playable battles**.
+**Acceptance of steps 1–3 together (the first "game"):** Omer can found and grow a realm from the starting position in a few hundred turns, with a clear picture of what limits him at each moment and a real choice of what to build next.
 
 ---
 
@@ -250,6 +211,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.7 (2026-11-08, Session 18): the work order rewritten at Omer's direction — castles → levy → time-scale / economy / demography overhaul (+ outside threat, battle and siege resolution from Imperium) → government, institutions and characters (+ naming scheme) → AI and diplomacy → further mechanisms; old Phases 3–6 and the stand-alone Government design session folded into it.
 - 0.6f (2026-11-08, Sessions 17–17b): quarries and lumber camps are map entities (editor Infrastructure tab); their economic effect is left to the economic / demographic overhaul.
 - 0.6e (2026-11-08, Session 16): Phase 2 session 2 done — work-bands, roads, bridges; quarries / lumber camps and watchtowers deferred.
 - 0.6d (2026-11-08, Session 15d): castles decided (DESIGN §3.5); session 2 scope split into roads (2) and castles (2b).

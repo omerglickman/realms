@@ -64,7 +64,7 @@ export function settlementSpec(state: GameState, s: Settlement, tab: string, edi
   const c = clusterLine(state, s);
   const cal = calendar(state.turn);
   const subBits = [
-    parent ? `under <a href="#" data-focus="${parent.id}">${esc(parent.name)}</a> (${tierName(parent).toLowerCase()})` : TIERS[s.tier].rank < 2 ? '<span class="dim">no parent in range</span>' : 'independent',
+    parent ? `under <a href="#" data-focus="${parent.id}">${esc(parent.name)}</a> (${tierName(parent).toLowerCase()})` : TIERS[s.tier].rank < 3 ? '<span class="dim">no parent in range</span>' : 'independent',
     c ? `<a href="#" data-cluster="${c.root}">${esc(c.text)}</a>` : '',
     `hex (${s.col}, ${s.row})`,
   ].filter(Boolean);
@@ -368,7 +368,7 @@ function landPage(ctx: Ctx): string {
 function economyPage(ctx: Ctx): string {
   const { state, s, plan } = ctx;
   const r = s.report;
-  const isTown = plan.privateHands > 0 || TIERS[s.tier].rank >= 1;
+  const isTown = plan.privateHands > 0 || TIERS[s.tier].rank >= 2;
   const pool = clusterStock(state, s.id), cap = clusterCap(state, s.id);
   const freeHands = Math.max(0, plan.idleHands - plan.constructionHands - plan.gatherHands);
   const stats = [

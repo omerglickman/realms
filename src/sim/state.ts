@@ -11,9 +11,10 @@ import { type Faction, initialFactions, emptyFactionYear, PLAYER_FACTION } from 
 import { emptyMaterials } from './materials';
 import type { Unit } from './units';
 import { type InfraState, emptyInfra } from './infrastructure';
+import type { Fort } from './forts';
 
-/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). v6: + units (Phase 2, Session 14). v7: + settlement.upgrade (Session 15b). v8: + infra, roads and bridges (Session 16). v9: + infra.sites, quarries and lumber camps (Session 17). */
-export const STATE_VERSION = 9;
+/** v1: map + clock. v2: + settlements. v3: + factions, settlement population history. v4: + materials stocks and build projects (Session 11). v5: + faction yearly flows, money on projects (Session 11b). v6: + units (Phase 2, Session 14). v7: + settlement.upgrade (Session 15b). v8: + infra, roads and bridges (Session 16). v9: + infra.sites, quarries and lumber camps (Session 17). v10: + forts, and castles as settlements with `castle` state (Session 18). */
+export const STATE_VERSION = 10;
 
 export interface GameState {
   version: number;
@@ -30,6 +31,8 @@ export interface GameState {
   units: Record<string, Unit>;
   /** Roads and bridges built by work-bands (Phase 2 session 2, DESIGN §3.4). */
   infra: InfraState;
+  /** Forts (Session 18, DESIGN §3.5): a military unit's fortify order; not settlements, no cluster. */
+  forts: Record<string, Fort>;
   /** Id of the faction the player controls (fixed for now — DESIGN §4.8). */
   playerFaction: string;
   /** Counter for generated entity ids. */
@@ -66,6 +69,7 @@ export function createGameState(seed: string, map: MapData): GameState {
     settlements: {},
     units: {},
     infra: emptyInfra(),
+    forts: {},
     factions: initialFactions(),
     playerFaction: PLAYER_FACTION,
     nextId: 1,
@@ -139,6 +143,11 @@ export function deserializeState(json: string): GameState {
     if (s.infra) (s.infra as { sites?: unknown }).sites = {};
     s.version = 9;
   }
+  if (s.version === 9) {
+    // Session 18: forts (castles are settlements and need nothing)
+    s.forts = {};
+    s.version = 10;
+  }
   if (s.version !== STATE_VERSION) {
     throw new Error(`Save version ${s.version} not supported (expected ${STATE_VERSION})`);
   }
@@ -146,6 +155,7 @@ export function deserializeState(json: string): GameState {
   if (!s.units) s.units = {};
   if (!s.infra) s.infra = emptyInfra();
   if (!s.infra.sites) s.infra.sites = {};
+  if (!s.forts) s.forts = {};
   if (!s.factions) s.factions = initialFactions();
   if (!s.playerFaction) s.playerFaction = PLAYER_FACTION;
   if (typeof s.nextId !== 'number') s.nextId = 1;

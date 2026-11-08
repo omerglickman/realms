@@ -9,10 +9,12 @@ import type { GameState } from './state';
 import { calendar } from './state';
 import { economyMonth, demographyYear } from './economy';
 import { unitsMonth } from './units';
+import { fortsMonth } from './forts';
 
 export function endTurn(state: GameState): GameState {
   const { month } = calendar(state.turn);
   unitsMonth(state, month);
+  fortsMonth(state);
   economyMonth(state, month);
   if (month === 11) demographyYear(state);
   state.turn += 1;

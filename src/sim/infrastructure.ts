@@ -11,15 +11,18 @@ import { TERRAIN, terrainIndex } from './terrain';
 import { settlementIdAt } from './settlements';
 import { resourceByIndex } from './resources';
 import type { Materials } from './materials';
+import { castleKind } from './castles';
 
 export interface InfraItem {
   id: string;
-  kind: 'road' | 'bridge';
+  kind: 'road' | 'bridge' | 'castle';
+  /** castles: the settlement tier id the item builds (months and cost are read from data/castles.json) */
+  tier?: string;
   /** road level it gives (1 dirt, 2 paved); 0 for a bridge */
   level: number;
   name: string;
   months: number;
-  cost: Partial<Materials>;
+  cost: Partial<Materials> & { money?: number };
   requires?: string;
   blurb?: string;
 }
@@ -38,6 +41,10 @@ interface InfraData {
 
 export const INFRA: InfraData = infraData as unknown as InfraData;
 export const INFRA_ITEMS: readonly InfraItem[] = INFRA.items;
+// castles take their months and price from data/castles.json (one place for the numbers)
+for (const it of INFRA_ITEMS) {
+  if (it.kind === 'castle' && it.tier) { const b = castleKind(it.tier).build; it.months = b.months; it.cost = { timber: b.timber, stone: b.stone, money: b.money }; }
+}
 
 export const SITE_KINDS: readonly SiteInfo[] = INFRA.sites;
 export function siteInfo(kind: string): SiteInfo | undefined { return SITE_KINDS.find((x) => x.id === kind); }

@@ -17,6 +17,7 @@ import { inBounds, idx } from './map';
 import { TERRAIN, terrainIndex } from './terrain';
 import { AXIAL_DIRECTIONS, axialDistance, axialToOffset, offsetToAxial } from './hex';
 import { settlementIdAt } from './settlements';
+import { castleAt } from './castles';
 import { hasBridge, stepCostBetween, takesWholeMonth, minStep, INFRA, roadLink } from './infrastructure';
 
 const RIVER = terrainIndex('river');
@@ -120,8 +121,14 @@ export function isMountain(map: MapData, cell: number): boolean {
   return map.terrain[cell] === MOUNTAINS;
 }
 
+/** DESIGN §3.5 (Phase 2 hook): a standing castle of another faction closes its hex to the unit. */
+export function blockedByCastle(state: GameState, cell: number, faction: string): boolean {
+  const c = castleAt(state, cell);
+  return !!c && c.faction !== null && c.faction !== faction;
+}
+
 /** The nodes a unit may step to from `node` and what each step costs. */
-export function stepsFrom(state: GameState, node: PathNode, movePoints: number): { node: PathNode; cost: number }[] {
+export function stepsFrom(state: GameState, node: PathNode, movePoints: number, faction?: string): { node: PathNode; cost: number }[] {
   const map = state.map;
   const out: { node: PathNode; cost: number }[] = [];
   const A = node.cell;
@@ -130,6 +137,7 @@ export function stepsFrom(state: GameState, node: PathNode, movePoints: number):
   const aIsRiver = isRiver(map, A);
   for (const N of neighbourCells(map, A)) {
     if (N === null) continue;
+    if (faction && blockedByCastle(state, N, faction)) continue; // DESIGN §3.5: another faction's castle hex cannot be crossed
     const cost = stepCostBetween(state, A, N, movePoints);
     if (cost === null) continue;
     const nIsRiver = isRiver(map, N);
@@ -204,7 +212,7 @@ function axialOfCell(map: MapData, cell: number) {
  * `movePoints` a month, or null when none exists. Deterministic: ties break on
  * the node key.
  */
-export function findRoute(state: GameState, start: PathNode, dest: number, movePoints: number): Route | null {
+export function findRoute(state: GameState, start: PathNode, dest: number, movePoints: number, faction?: string): Route | null {
   const map = state.map;
   if (dest < 0 || dest >= map.terrain.length) return null;
   if (start.cell === dest) return { nodes: [], cost: 0, months: 0 };
@@ -233,7 +241,7 @@ export function findRoute(state: GameState, start: PathNode, dest: number, moveP
       return { nodes: path, cost, months: walkMonths(state, start.cell, path, movePoints) };
     }
     const gk = g.get(k)!;
-    for (const { node: n, cost } of stepsFrom(state, node, movePoints)) {
+    for (const { node: n, cost } of stepsFrom(state, node, movePoints, faction)) {
       const nk = key(n);
       if (closed.has(nk)) continue;
       const ng = gk + cost;

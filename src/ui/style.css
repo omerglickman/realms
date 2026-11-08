@@ -361,6 +361,11 @@ table.data .d3 td:first-child { padding-left: 54px; }
 .tier-ico.t1 { border-radius: 50%; }
 .tier-ico.t2 { transform: rotate(45deg); width: 9px; height: 9px; }
 .tier-ico.t3 { clip-path: polygon(50% 0, 100% 38%, 82% 100%, 18% 100%, 0 38%); width: 12px; height: 12px; }
+/* castles (Session 18): squares with battlements, growing with the kind; t4 small · t5 medium · t6 large */
+.tier-ico.t4, .tier-ico.t5, .tier-ico.t6 { border-radius: 1px; clip-path: polygon(0 100%, 0 20%, 20% 20%, 20% 0, 40% 0, 40% 20%, 60% 20%, 60% 0, 80% 0, 80% 20%, 100% 20%, 100% 100%); background: var(--oak); }
+.tier-ico.t4 { width: 8px; height: 8px; margin: 0 7px 0 1px; }
+.tier-ico.t5 { width: 10px; height: 10px; }
+.tier-ico.t6 { width: 12px; height: 12px; }
 
 /* building cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }

@@ -71,7 +71,7 @@ function runBuilder(st: GameState): void {
   const f = st.factions[st.playerFaction];
   for (const s of Object.values(st.settlements).sort((a, b) => TIERS[b.tier].rank - TIERS[a.tier].rank || (a.id < b.id ? -1 : 1))) {
     if (s.build) continue;
-    for (const b of PRIORITY[TIERS[s.tier].rank] ?? []) {
+    for (const b of PRIORITY[s.tier] ?? []) {
       if (s.buildings.includes(b)) continue;
       let check = canBuild(st, s, b);
       if (!check.ok && check.lacking && f && s.faction === f.id) {
@@ -104,7 +104,8 @@ console.log(`knobs: sampling ${knobs.vitalSampling} · harvest sd ${knobs.harves
 const startTurn = state.turn;
 
 const list = (): Settlement[] => Object.values(state.settlements);
-const rankOf = (s: Settlement) => TIERS[s.tier].rank;
+// settlement tiers only (castles have no residents): 0 village · 1 town · 2 city · 3 metropolis — the tier index
+const rankOf = (s: Settlement) => s.tier;
 const groups: [string, (s: Settlement) => boolean][] = [
   ['metropolis', (s) => rankOf(s) === 3],
   ['cities', (s) => rankOf(s) === 2],

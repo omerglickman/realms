@@ -13,6 +13,8 @@ import { logEvent } from './state';
 import { TIERS, UPGRADES, tierIndex, type Settlement, type UpgradeDef, type UpgradeProject } from './settlements';
 import { totalPopulation } from './demography';
 import { clusterStock, payFromCluster, MATERIAL_IDS, type Materials, emptyMaterials } from './materials';
+import { upgradeHandsAvailable } from './castles';
+import { isCastle } from './settlements';
 
 /** The upgrade step a settlement of this tier may take, or null at the top. */
 export function upgradeStep(tier: number): UpgradeDef | null {
@@ -69,7 +71,9 @@ export function upgradeMonth(state: GameState, s: Settlement): void {
   if (!s.upgrade) return;
   const step = upgradeStep(s.tier);
   const months = step ? Math.max(1, step.months) : 12;
-  s.upgrade.progress += 1 / months;
+  // a castle is raised by hands (the spare hands of the settlements in reach, a band on the hex): fewer, slower
+  const rate = isCastle(s) && step?.hands ? Math.min(1, upgradeHandsAvailable(state, s) / step.hands) : 1;
+  s.upgrade.progress += rate / months;
   if (s.upgrade.progress >= 1 - 1e-9) completeUpgrade(state, s);
 }
 
@@ -77,8 +81,10 @@ export function upgradeMonth(state: GameState, s: Settlement): void {
 export function completeUpgrade(state: GameState, s: Settlement): void {
   if (!s.upgrade) return;
   const from = TIERS[s.tier], to = TIERS[s.upgrade.to];
-  s.buildings = s.buildings.filter((b) => b !== from.hall && b !== from.granary);
-  s.buildings.unshift(to.hall, to.granary);
+  if (!isCastle(s)) {
+    s.buildings = s.buildings.filter((b) => b !== from.hall && b !== from.granary);
+    s.buildings.unshift(to.hall, to.granary);
+  }
   s.tier = s.upgrade.to;
   s.upgrade = null;
   // Omer 2026-11-07: the settlement stays in its cluster under its old parent even when it now matches its tier
@@ -89,8 +95,10 @@ export function completeUpgrade(state: GameState, s: Settlement): void {
 /** Undo a completed upgrade exactly (for the command layer): the previous tier and buildings come back. */
 export function revertTier(s: Settlement, fromTier: number, project: UpgradeProject, parentOverride: string | null): void {
   const to = TIERS[s.tier], from = TIERS[fromTier];
-  s.buildings = s.buildings.filter((b) => b !== to.hall && b !== to.granary);
-  s.buildings.unshift(from.hall, from.granary);
+  if (!isCastle(s)) {
+    s.buildings = s.buildings.filter((b) => b !== to.hall && b !== to.granary);
+    s.buildings.unshift(from.hall, from.granary);
+  }
   s.tier = fromTier;
   s.upgrade = project;
   s.parentOverride = parentOverride;

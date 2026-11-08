@@ -9,7 +9,7 @@ import { totalPopulation } from '../../sim/demography';
 import { realmReport } from '../../sim/clusters';
 import { clusterStock, realmCap } from '../../sim/materials';
 import { taxRate } from '../../sim/economy';
-import { fmt, fmt1, pct, signed, esc, tierBreakdown, tierLabel, tierGlyph, foodMonths, gauge, hbar, stack, stat, kv, ICON, sparkSvg } from './format';
+import { fmt, fmt1, pct, signed, esc, tierBreakdown, tierLabel, PEOPLE_TIERS, tierGlyph, foodMonths, gauge, hbar, stack, stat, kv, ICON, sparkSvg } from './format';
 import { stockBars, sendForm, yearFoodText } from './clusterModal';
 import type { ModalSpec } from './modal';
 
@@ -73,7 +73,7 @@ function overviewPage(state: GameState, r: Report): string {
   const stats = [
     stat(ICON.people, 'People', fmt(r.population), growth !== null ? `${pct(growth)} last year` : `${r.clusters.length} clusters`),
     stat(ICON.granary, 'Food', `${fmt1(months)} <small>months</small>`, `${fmt(r.food)} in all granaries` + (r.lastYear ? ` · ${signed(r.lastYear.produced - r.lastYear.consumed)} last year` : ''), gauge(months / 24, { marks: [3 / 24] })),
-    stat(ICON.coin, 'Treasury', `${fmt(f?.treasury ?? 0)} <small>coins</small>`, ly ? `${signed(ly.tax + ly.sales - ly.spent)} last year · +${fmt(f?.year.tax ?? 0)} tax so far this year` : `+${fmt(f?.year.tax ?? 0)} tax this year`),
+    stat(ICON.coin, 'Treasury', `${fmt(f?.treasury ?? 0)} <small>coins</small>`, ly ? `${signed(ly.tax + ly.sales - ly.spent - (ly.upkeep ?? 0))} last year · +${fmt(f?.year.tax ?? 0)} tax so far this year` : `+${fmt(f?.year.tax ?? 0)} tax this year`),
     stat(ICON.goods, 'Stockpile', `${fmt(f?.stock.timber ?? 0)} <small>timber</small>`, `${fmt(f?.stock.stone ?? 0)} stone · ${fmt(f?.stock.goods ?? 0)} goods`),
   ].join('');
   const warnings: string[] = [];
@@ -91,7 +91,7 @@ function overviewPage(state: GameState, r: Report): string {
   ];
   return `<div class="stats">${stats}</div>
     ${warnings.length ? `<p>${warnings.join('<br>')}</p>` : ''}
-    <h3>People by tier</h3>${stack(TIERS.map((_, i) => ({ label: tierLabel(i, members), value: r.popByTier[i], cls: `c${4 - i}` })).reverse())}
+    <h3>People by tier</h3>${stack(PEOPLE_TIERS.map((i) => ({ label: tierLabel(i, members), value: r.popByTier[i], cls: `c${4 - i}` })).reverse())}
     <h3>The year</h3>${kv(rows)}`;
 }
 
@@ -122,7 +122,7 @@ function peoplePage(state: GameState, r: Report): string {
     stat(ICON.walk, 'Moved to towns', fmt(trickle), 'the yearly pull from prosperous parents'),
     stat(ICON.skull, 'Starved', fmt(r.lastYear?.hungerDeaths ?? 0), `last year${epidemics ? ` · ${epidemics} epidemic${epidemics === 1 ? '' : 's'}` : ''}`),
   ].join('');
-  const bars = TIERS.map((_, i) => `<div class="bl">${tierGlyph(i)}${tierLabel(i, members)}</div>${hbar(r.popByTier[i], r.population, `c${4 - i}`)}<div class="bv">${fmt(r.popByTier[i])} <span class="dim">(${Math.round(100 * r.popByTier[i] / Math.max(1, r.population))} %)</span></div>`).reverse().join('');
+  const bars = PEOPLE_TIERS.map((i) => `<div class="bl">${tierGlyph(i)}${tierLabel(i, members)}</div>${hbar(r.popByTier[i], r.population, `c${4 - i}`)}<div class="bv">${fmt(r.popByTier[i])} <span class="dim">(${Math.round(100 * r.popByTier[i] / Math.max(1, r.population))} %)</span></div>`).reverse().join('');
   const biggest = members.slice().sort((a, b) => totalPopulation(b.pop) - totalPopulation(a.pop)).slice(0, 12);
   const rows = biggest.map((s) => `<tr><td>${tierGlyph(s.tier)}<a href="#" data-focus="${s.id}">${esc(s.name)}</a></td><td class="r">${fmt(totalPopulation(s.pop))}</td><td class="r">${s.report.births ? fmt(s.report.births) : ''}</td><td class="r">${s.report.deaths ? fmt(s.report.deaths) : ''}</td><td class="r">${s.report.trickleIn > 0.5 ? `+${fmt(s.report.trickleIn)}` : s.report.trickleOut > 0.5 ? `−${fmt(s.report.trickleOut)}` : ''}</td><td class="r">${fmt1(foodMonths(s))}</td></tr>`).join('');
   return `<div class="stats">${stats}</div>
@@ -153,16 +153,17 @@ function treasuryPage(state: GameState, r: Report): string {
   const f = state.factions[state.playerFaction];
   if (!f) return '<p class="note">No faction.</p>';
   const y = f.year, ly = f.lastYear;
-  const net = (k: typeof y) => k.tax + k.sales - k.spent;
+  const up = (k: typeof y) => k.upkeep ?? 0;
+  const net = (k: typeof y) => k.tax + k.sales - k.spent - up(k);
   const stats = [
     stat(ICON.coin, 'Treasury', `${fmt(f.treasury)} <small>coins</small>`, 'the realm\'s money; clusters hold grain and materials, never coin'),
     stat(ICON.scroll, 'Tax base', fmt(privateHands(state, r)), `private hands × ${taxRate()} coins a year × administration`),
     stat(ICON.goods, 'Sales', `${fmt(y.sales)} <small>this year</small>`, ly ? `${fmt(ly.sales)} last year · only Markets sell goods` : 'only Markets sell goods'),
-    stat(ICON.hammer, 'Spent', `${fmt(y.spent)} <small>this year</small>`, ly ? `${fmt(ly.spent)} last year, on buildings` : 'on buildings'),
+    stat(ICON.hammer, 'Spent', `${fmt(y.spent)} <small>this year</small>`, ly ? `${fmt(ly.spent)} last year, on buildings and castles` : 'on buildings and castles'),
   ].join('');
-  const ledger = `<table class="data"><tr><th></th><th class="r">tax</th><th class="r">sales</th><th class="r">spent</th><th class="r">net</th></tr>
-    <tr><td>This year <span class="dim">(${y.months} month${y.months === 1 ? '' : 's'})</span></td><td class="r">+${fmt(y.tax)}</td><td class="r">+${fmt(y.sales)}</td><td class="r">−${fmt(y.spent)}</td><td class="r ${net(y) >= 0 ? 'good' : 'warn'}">${signed(net(y))}</td></tr>
-    ${ly ? `<tr><td>Last year</td><td class="r">+${fmt(ly.tax)}</td><td class="r">+${fmt(ly.sales)}</td><td class="r">−${fmt(ly.spent)}</td><td class="r ${net(ly) >= 0 ? 'good' : 'warn'}">${signed(net(ly))}</td></tr>` : ''}</table>`;
+  const ledger = `<table class="data"><tr><th></th><th class="r">tax</th><th class="r">sales</th><th class="r">spent</th><th class="r" title="castle wages and upkeep">castles</th><th class="r">net</th></tr>
+    <tr><td>This year <span class="dim">(${y.months} month${y.months === 1 ? '' : 's'})</span></td><td class="r">+${fmt(y.tax)}</td><td class="r">+${fmt(y.sales)}</td><td class="r">−${fmt(y.spent)}</td><td class="r">${up(y) > 0.5 ? `−${fmt(up(y))}` : ''}</td><td class="r ${net(y) >= 0 ? 'good' : 'warn'}">${signed(net(y))}</td></tr>
+    ${ly ? `<tr><td>Last year</td><td class="r">+${fmt(ly.tax)}</td><td class="r">+${fmt(ly.sales)}</td><td class="r">−${fmt(ly.spent)}</td><td class="r">${up(ly) > 0.5 ? `−${fmt(up(ly))}` : ''}</td><td class="r ${net(ly) >= 0 ? 'good' : 'warn'}">${signed(net(ly))}</td></tr>` : ''}</table>`;
   const byCluster = r.clusters.filter((c) => (c.totals.lastYear?.tax ?? c.totals.year.tax) > 0.5).map((c) => {
     const t = c.totals.lastYear ?? c.totals.year;
     const ph = c.members.reduce((a, id) => a + state.settlements[id].report.privateHands, 0);

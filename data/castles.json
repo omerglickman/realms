@@ -1,0 +1,41 @@
+{
+  "_comment": "Castles (DESIGN §3.5, DECIDED by Omer 2026-11-08; ALL NUMBERS DRAFT, ×3 scale). The three castle kinds are tiers 4–6 of data/settlements.json (rank: small 1, medium 3, large 5 on the ladder village · small castle · town · medium castle · city · large castle · metropolis). A castle has no residents: `staffHands` are the people who run it, living in the settlements within its influence rings and counted as castle service in their home's labour plan (after the home's buildings, before its fields; no settlement gives more than `service.maxShareOfHands` of its hands); the castle's worked hexes (`workHexes` in settlements.json: its own hex first, then the best free neighbours) need the hands of their best food job each, on top. Staffing (hands got / hands needed) scales the castle's hexes and its garrison capacity. The treasury pays `service.wagePerHandPerMonth` per staffed hand plus `upkeepPerYear`. The reserve is a granary sized for `capacity` people for `reserve.months` months. A castle with nobody in its service for `ruin.afterMonths` months becomes a ruin (no influence, no capacity), rebuildable at `ruin.rebuildCostShare` of the cost. Building: a work-band, `build.months` at a band of 300 (data/infrastructure.json items castle_small / castle_medium / castle_large). Forts (`fort`): the fortify order of a military unit — none exists yet (levies come in the next session), so the command is built but no unit type has `canFortify`.",
+  "service": {
+    "maxShareOfHands": 0.3333,
+    "wagePerHandPerMonth": 0.1
+  },
+  "reserve": {
+    "months": 12
+  },
+  "ruin": {
+    "afterMonths": 12,
+    "rebuildCostShare": 0.5
+  },
+  "kinds": {
+    "small_castle": {
+      "staffHands": 30,
+      "capacity": 300,
+      "upkeepPerYear": 200,
+      "build": { "months": 12, "money": 5000, "timber": 300, "stone": 300 }
+    },
+    "medium_castle": {
+      "staffHands": 75,
+      "capacity": 500,
+      "upkeepPerYear": 600,
+      "build": { "months": 24, "money": 20000, "timber": 600, "stone": 900 }
+    },
+    "large_castle": {
+      "staffHands": 200,
+      "capacity": 1200,
+      "upkeepPerYear": 2000,
+      "build": { "months": 48, "money": 80000, "timber": 1200, "stone": 2400 }
+    }
+  },
+  "fort": {
+    "capacity": 100,
+    "influenceRings": 1,
+    "fortifyTimber": 30,
+    "decayMonths": 12,
+    "buildTimeSaved": 0.25
+  }
+}
