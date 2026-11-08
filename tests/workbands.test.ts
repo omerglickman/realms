@@ -70,10 +70,10 @@ describe('roads and bridges on the map', () => {
     state.infra.roads[at(3, 4)] = 2;
     expect(stepCostBetween(state, at(2, 4), at(3, 4), 4)).toBe(1.5); // link = the lower level
     state.infra.roads[at(2, 4)] = 2;
-    expect(stepCostBetween(state, at(2, 4), at(3, 4), 4)).toBe(1); // paved both: 3 × 0.3333 ≈ 1
+    expect(stepCostBetween(state, at(2, 4), at(3, 4), 4)).toBe(0.75); // paved both: 3 × ¼
     expect(stepCostBetween(state, at(1, 4), at(2, 4), 4)).toBe(0.5); // plains, link = dirt
     state.infra.roads[at(1, 4)] = 2;
-    expect(stepCostBetween(state, at(1, 4), at(2, 4), 4)).toBe(0.33); // plains, paved both: 1 × ⅓ (above the 0.25 floor)
+    expect(stepCostBetween(state, at(1, 4), at(2, 4), 4)).toBe(0.25); // plains, paved both: 1 × ¼, at the paved minimum
   });
 
   it('a road makes a route shorter in months', () => {

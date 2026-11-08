@@ -6,7 +6,8 @@
 
 ## Change log
 
-- 0.7 (2026-11-08, Session 16b): DESIGN.md split into a core file and area files (units / settlements / people-economy / history); no rule changed, section numbers kept.
+- 0.7a (2026-11-08, Session 16d): paved road factor ¼ DECIDED by Omer (§3.2b rule 5); §5.17(b) resolved.
+- 0.7 (2026-11-08, Session 16c): DESIGN.md split into a core file and area files (units / settlements / people-economy / history); no rule changed, section numbers kept.
 - 0.6b (2026-11-08, Session 16b): §3.2b rule 5 and §3.4 — the road minimum costs DECIDED by Omer (dirt 0.5, paved 0.25); §5.17(a) resolved, (b) narrowed.
 - 0.6a (2026-11-08, Session 16): §3.4 roads as built; §5.17 opened — the road numbers Claude chose and the minimum-cost finding (no Omer decision).
 - 0.6 (2026-11-08, Session 15d): §3.5 castles and forts DECIDED from Omer's table — the seven-rank ladder, staff lent by the settlements in reach and paid by the treasury, the siege reserve filled but never overfilled, garrison capacity, forts by any military unit, ruin after a year unstaffed, the control zone for Phase 4; §5.14 resolved; glossary.
