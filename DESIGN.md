@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.5c — 2026-11-07 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
+**Version 0.6 — 2026-11-08 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -213,7 +213,38 @@ Built by work-bands, costing money, materials and turns:
 - **Watermills** — on River hexes; boost food/goods of the owning settlement.
 - **Forts** — garrison point, zone of control, protect villages from raids.
 - **Bridges** (DECIDED 2026-11-07) — the only way across a river hex; built by work-bands, included automatically in a "road from X to Y" order. PROPOSED: **mines/quarries/lumber camps** (unlock a resource hex), **watchtowers** (vision).
-- **Forts and castles with clusters of their own** (Omer, 2026-11-07) — OPEN, to be designed before Phase 2 session 2.
+- **Forts and castles** — DECIDED 2026-11-08, see §3.5.
+
+### 3.5 Castles and forts (DECIDED by Omer 2026-11-08; numbers *(draft)* for `data/castles.json`)
+
+Omer's vision (his table, 2026-11-07) organized with Claude's proposals, all accepted 2026-11-08.
+
+**The ladder.** Castles are settlements of a second *kind* on the same tier ladder, which now has seven ranks, lowest to highest: **village · small castle · town · medium castle · city · large castle · metropolis**. Subordination, clusters, influence zones, borders and the leadership rule (§3.3) work unchanged over the ladder: a large castle inside a city's rings is the city's **parent** and heads the cluster; a medium castle parents towns; a small castle parents villages. Different tiers never choose a leader — the ladder decides.
+
+| | Fort | Small castle | Medium castle | Large castle |
+|---|---|---|---|---|
+| Built by | any military unit ("fortify") | work-band | work-band | work-band |
+| Rank | none — not a settlement, no cluster | above village | above town | above city |
+| Staff (hands, from nearby villages) | 0 | 30 | 75 + 90 for its hex | 200 + 270 for its three hexes |
+| Military capacity (garrison) | 100 | 300 | 500 | 1,200 |
+| Work zone | — | — | 1 hex (ring 1, contested by rank) | 3 hexes (ring 1) |
+| Influence zone | 1 ring | 2 rings | 3 rings | 5 rings |
+| Build *(draft)* | 1 month · 30 timber · no coins | 12 months · 5,000 coins · 300 timber / 300 stone | 24 · 20,000 · 600 / 900 | 48 · 80,000 · 1,200 / 2,400 |
+| Upkeep *(draft)* | none | 200 coins/yr + wages | 600/yr + wages | 2,000/yr + wages |
+
+Large castles are meant to be as rare as metropolises: hard to build, costly to keep; building one next to a city is allowed but will starve the orbit.
+
+**Staff.** A castle has no residents of its own: the people who run it live in the villages (and towns) within its **influence rings** and count as *castle service* in their home's labour plan — fed, counted and born at home. The planner fills the castle's hands **after the home's own buildings and before its fields**, splitting the requirement across the settlements in reach in proportion to their hands, with **no settlement giving more than a third of its hands**. Staffing fraction scales everything the castle does (its worked hexes, its capacity, later its effects). The treasury pays **wages** per staffed hand per month *(draft 0.1 coin)*; a town's private hands in castle service pay no tax (the same dent as construction). A castle with **no staff at all for 12 months** (no settlement left in reach) becomes a **ruin**: no influence, no capacity; rebuildable at half cost *(draft)*.
+
+**Food.** A castle keeps a **reserve** for a siege: a granary sized to feed its full capacity for *12 months (draft)*, with spoilage as any granary. It is filled first from its **own worked hexes** (medium and large), then from the **surplus of its subordinates** — only up to the reserve and the spoilage it loses, never beyond; what the castle does not need flows on as usual to the subordinates' nearest non-castle ancestor (or stays home). A castle takes **no tithe**. The **garrison eats from the reserve**; staff eat at home.
+
+**Garrison.** Units standing on the castle hex are inside it and move in and out freely; up to the capacity they are *garrisoned* — inside the borders, fed from the reserve, the walls' bonus in Phase 4; beyond it they are camped outside. Their pay is the unit's own upkeep (§3.2b.9). When government exists (§4.3) a castle may also house a governor and his administration.
+
+**Building and upgrading.** A work-band builds a castle on the hex it stands on: any land hex not occupied by a settlement and not inside a higher tier's work zone — **hills and mountains included**; no minimum distance. Built on an existing fort the work takes **25 % less time**. A castle is **upgraded in place** (small → medium → large) as a project on the castle, built by the spare hands of its cluster within reach, a work-band standing on the hex adding its hands when those are short.
+
+**Fort.** The "fortify" order of any military unit: one month, 30 timber from the covering cluster (else the realm), no coins. A fort extends the border by one ring, holds 100 men, has no staff and no cluster, and **disappears 12 months after the last unit leaves**. A castle may be built on it.
+
+**Control zone (Phase 4; hooked in Phase 2).** Enemy units inside a castle's rings move at half speed and take attrition; the castle's own hex cannot be crossed by an enemy until the castle is taken — a castle on a bridge or a pass closes it. Protection of the villages in its rings against raids and an order bonus come with warfare. In Phase 2 only the pathfinding hook is built (a castle hex blocks other factions).
 
 ---
 
@@ -400,7 +431,7 @@ Population carries a culture tag; ruling a settlement of foreign culture lowers 
 11. ~~Money and the private economy~~ — RESOLVED 2026-11-05 (Session 12c): building prices ×5; gatherers and professional soldiers join construction, levies, settlers and work-bands as uses that cost tax; cap numbers left to Claude (realm cap doubled); goods become money only through a Market.
 12. ~~Phase 2 kickoff~~ — RESOLVED 2026-11-07 (Session 13f): the twelve rules of §3.2b decided by Omer, the sub-points confirmed the same day (continuous staffing curve; foraging 20 % / 30 %; river banks as described, a settlement on a river counts as a bridge; muster from neighbours added; the raising materials and the disband refusal accepted as drafted).
 13. **Phase 1 numbers** — tuning of food / materials / tax deferred until the Phase 2 sinks exist (Omer, 2026-11-07).
-14. **Forts and castles** as holders of clusters of their own, fed by villages (Omer, 2026-11-07) — before Phase 2 session 2.
+14. ~~Forts and castles~~ — RESOLVED 2026-11-08: §3.5 (the seven-rank ladder, castle staff from the villages in reach, the siege reserve, forts); numbers draft.
 15. **Roads and food sharing** (§3.2b.8) — deferred to the end of Phase 2 because it bears on what a cluster is.
 16. ~~Food down to a new village~~ — RESOLVED 2026-11-07: a manual **Send food** action in the cluster ledger, never automatic (§3.2b.6).
 
@@ -423,6 +454,8 @@ Every DECIDED item above carries its date; the change log below lists what each 
 - **Stockpile** — a cluster's pooled timber, stone and goods (the sum of its members' stocks), held up to its **cap** (raised by Warehouses). The **realm stockpile** is the faction's: fed by what the clusters hold above their caps, capped itself, shipped by the player.
 - **Metropolis** — the fourth settlement tier: a city of 36,000+ upgraded to 6 rings of influence and unique features.
 - **Model scale** — all people-counts (yields, hands, sizes) are ×3 the original draft (§5.8); the tier gates 1,500 / 6,000 are not.
+- **Castle** — a settlement of the second kind (small / medium / large) on the tier ladder between the settlement tiers; staffed by the villages in its rings, holding a garrison and a siege reserve, heading a cluster (§3.5). A **fort** is a unit's own fortification: a ring of border, 100 men, gone a year after it is left.
+- **Castle service** — hands a village or town lends to a castle in its rings, paid by the treasury, counted at home.
 - **Group** — several units on one hex acting as one; an *army* is a group of military units.
 - **Administrative capacity** — how much a faction can govern before corruption and disorder rise.
 - **Government form** — the faction's type of state; sets what institutions and policies are available.
@@ -434,6 +467,8 @@ Every DECIDED item above carries its date; the change log below lists what each 
 ---
 
 ## Change log
+
+- 0.6 (2026-11-08, Session 15d): §3.5 castles and forts DECIDED from Omer's table — the seven-rank ladder, staff lent by the settlements in reach and paid by the treasury, the siege reserve filled but never overfilled, garrison capacity, forts by any military unit, ruin after a year unstaffed, the control zone for Phase 4; §5.14 resolved; glossary.
 
 - 0.5c (2026-11-07, Session 15c): §3.3 — an upgraded settlement stays under its old parent; a cluster with several top-tier settlements may choose its leader or split (Omer).
 

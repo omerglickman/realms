@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Roadmap, Technical Framework and Working Agreement
 
-**Version 0.6b — 2026-11-07 — Status: ACTIVE (Phase 2 in progress: session 1 — units and movement — done in Sessions 14–15; session 2 next; the Government & Institutions design session after Phase 2)**
+**Version 0.6d — 2026-11-08 — Status: ACTIVE (Phase 2 in progress: session 1 — units and movement — done in Sessions 14–15; session 2 next; the Government & Institutions design session after Phase 2)**
 
 This document says *how* we build the game described in DESIGN.md, in what order, and how each chat session must behave. DEVLOG.md records what actually happened.
 
@@ -188,7 +188,7 @@ Goal: a game loop — people leave settlements as units, move, and change the la
 Session plan (one feature cluster each; each ends with a build):
 
 1. **Units and movement** — the unit entity (faction, hex, people as cohorts, provisions, movement points, home, order), commands (raise with muster, move, settle, disband), movement points with terrain costs from `data/terrain.json` (mountains one hex a month; river hexes as two bank nodes, crossed only by a bridge or a settlement), A* to a destination over several months, foraging outside the borders; **settlers** as the first type (destination-based default size, calendar default for provisions), founding via `foundSettlement`; UI per UI-DESIGN 1.5: the **Recruitment** tab and raise dialog, shield markers with the gliding move animation, the unit card with Move / Settle / Disband and the route preview, **Send food** in the cluster ledger. Headless: a scripted settler-spamming builder → the 40-year sprawl curve. **Done:** 1a the sim (Session 14 — units, pathfinding, settlers, foraging, the staffing curve, Send food, the settler-spammer and the sprawl curve) and 1b the UI (Session 15 — the Recruitment page, the raise dialog, shield markers with the glide, the unit card, Send food in the cluster ledger).
-2. **Work-bands and roads** — work-bands build on the hex they stand on from `data/infrastructure.json`: roads first (movement, and food sharing by distance replacing the instant-shipping placeholder; the metropolis prerequisite), then quarries / lumber camps on resource hexes, forts (border + garrison point), watchtowers if cheap.
+2. **Work-bands and roads** — work-bands build on the hex they stand on from `data/infrastructure.json`: roads and bridges first (movement only; food sharing by road at the end of the phase), then quarries / lumber camps on resource hexes, watchtowers if cheap. **Castles (DESIGN §3.5, decided 2026-11-08)** are their own cluster of work — likely a session 2b: the castle kind on the seven-rank ladder (`data/castles.json`), castle service in the labour planner, the siege reserve, garrison capacity, build / upgrade / ruin, the fortify order and the fort's decay, the pathfinding hook; castle icons already exist (UI-DESIGN §4).
 3. **Levies** — one generic **levy** unit (men 15–44 from a settlement; raise / move / upkeep in coins and food / disband home) with no roster, facilities or combat (Phase 4). *Tier upgrades (village → town → city as a player command with the population gate + money + materials + months) were pulled forward and built in Session 15b at Omer's request, with a placeholder metropolis step; administrative capacity is added when §4.3 exists.*
 4. (if needed) Groups (stack, split, move together), hierarchical pathfinding, tuning of the Phase 1 + 2 numbers against the headless curves with Omer.
 
@@ -250,6 +250,7 @@ Candidates, ordered by Omer: events, culture, migration, real procedural map gen
 
 ## Change log
 
+- 0.6d (2026-11-08, Session 15d): castles decided (DESIGN §3.5); session 2 scope split into roads (2) and castles (2b).
 - 0.6c (2026-11-07, Session 15b): tier upgrades moved from session 3 to done.
 - 0.6b (2026-11-07, Session 15): Phase 2 session 1 done (1a Session 14, 1b Session 15); Phase 2 marked in progress.
 - 0.6a (2026-11-07, Session 13f): Phase 2 session 1 scope made concrete from the decided §3.2b and UI-DESIGN 1.5; may split into 1a sim / 1b UI.
