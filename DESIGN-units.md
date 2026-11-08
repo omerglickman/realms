@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design: Units, Roads and Castles
 
-**Part of the design contract — version 0.7 — 2026-11-08.** Sections 3.2, 3.2b, 3.4, 3.5. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
+**Part of the design contract — version 0.7c — 2026-11-08.** Sections 3.2, 3.2b, 3.4, 3.5. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
 
 ---
 
