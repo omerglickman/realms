@@ -149,10 +149,10 @@ export function makeBuildOrder(state: GameState, u: Unit, item: string, dest: nu
   if (!it) return { reason: `unknown item ${item}` };
   const here = unitCell(state.map, u);
   let route: number[];
-  if (it.kind === 'castle' && dest !== null && dest !== here) return { reason: 'a castle is built where the band stands' };
-  if (item === 'bridge') {
+  if (item === 'bridge' || it.kind === 'castle') {
+    // a single site — the band walks there first (a castle anywhere it may be built; a bridge from the bank beside it)
     const cell = dest ?? here;
-    const c = canBuildOn(state, 'bridge', cell);
+    const c = canBuildOn(state, item, cell);
     if (!c.ok) return { reason: c.reason };
     route = [cell];
   } else if (dest === null || dest === here) {
@@ -172,6 +172,35 @@ export function makeBuildOrder(state: GameState, u: Unit, item: string, dest: nu
     // a paved road needs a dirt road under it: the order lays the dirt first where there is none (stepNeeded)
   }
   return { order };
+}
+
+/**
+ * "Build a road between A and B" (Session 21): the band walks to whichever end it reaches sooner and lays the road from there
+ * to the other end (bridges included). The order's route starts at that end, so the band's own hex does not matter.
+ */
+export function makeRoadBetween(state: GameState, u: Unit, item: string, a: number, b: number): { order?: BuildOrder; reason?: string; start?: number; walkMonths?: number } {
+  const def = unitTypeDef(u.type);
+  if (!def.canBuild) return { reason: `${def.name} cannot build` };
+  const it = INFRA.items.find((x) => x.id === item);
+  if (!it || it.kind !== 'road') return { reason: 'a road item is needed' };
+  if (a === b) return { reason: 'pick two different hexes' };
+  for (const cell of [a, b]) {
+    if (cell < 0 || cell >= state.map.terrain.length) return { reason: 'off the map' };
+    if (SEA_LAKE.has(state.map.terrain[cell])) return { reason: `cannot build on ${TERRAIN[state.map.terrain[cell]].name.toLowerCase()}` };
+  }
+  const planned = planRoadRoute(state, a, b, it.level);
+  if (!planned) return { reason: 'no way to lay a road there (water in the way)' };
+  const here = unitCell(state.map, u);
+  const mp = def.movePoints;
+  const walk = (cell: number): number => here === cell ? 0 : (findRoute(state, { cell: here, bank: u.bank }, cell, mp, u.faction)?.months ?? Infinity);
+  const wa = walk(a), wb = walk(b);
+  if (!Number.isFinite(wa) && !Number.isFinite(wb)) return { reason: 'the band cannot walk to either end' };
+  const fromA = wa <= wb;
+  const fwd = [a, ...planned]; // a … b
+  const route = fromA ? fwd : [...fwd].reverse();
+  const order: BuildOrder = { kind: 'build', item, route, i: 0 };
+  if (pendingSteps(state, order).length === 0) return { reason: `the ${it.name.toLowerCase()} is already there` };
+  return { order, start: route[0], walkMonths: fromA ? wa : wb };
 }
 
 /** Validation for the orderUnit command. */

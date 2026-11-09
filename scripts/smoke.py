@@ -95,23 +95,35 @@ async def main() -> int:
             await pg.click('#dialog [data-act=raise]'); await pg.wait_for_timeout(500)
             assert await pg.is_visible('#unitcard'), 'unit card did not open for the work-band'
             await pg.keyboard.press('Space'); await pg.wait_for_timeout(600)  # the band forms
-            assert await pg.query_selector('#unitcard [data-act=roadTo]'), 'the work-band card has no Road to…'
-            print('BAND CARD:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:220])
+            assert await pg.query_selector('#unitcard [data-act=roadBetween]'), 'the work-band card has no Road between…'
+            assert not await pg.query_selector('#unitcard [data-act=roadTo]'), 'Road to… should be gone'
+            assert await pg.query_selector('#unitcard [data-act=castleAt]'), 'the work-band card has no Castle at…'
+            print('BAND CARD:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:260])
+            bid = (await pg.evaluate('() => window.__realms.ui()'))['selectedUnitId']
             ok = False
-            for dx, dy in [(70, 10), (-70, 10), (10, 70), (10, -70), (110, 40), (-110, -40)]:
-                await pg.click('#unitcard [data-act=roadTo]'); await pg.wait_for_timeout(200)
-                assert 'Click the hex' in await pg.inner_text('#info-event'), 'Road to… did not start targeting'
-                await pg.mouse.move(750 + dx, 475 + dy); await pg.wait_for_timeout(250)
-                await pg.mouse.click(750 + dx, 475 + dy); await pg.wait_for_timeout(300)
-                if 'Building' in await pg.inner_text('#unitcard'): ok = True; break
+            # Road between…: two clicks, the band walks to the nearer end; the unit is un-chosen afterwards
+            for da, db in [((1, 0), (3, 0)), ((-1, 0), (-3, 0)), ((0, 1), (0, 3)), ((0, -1), (0, -3)), ((2, 1), (4, 1)), ((-2, -1), (-4, -1))]:
+                pts = await pg.evaluate('([bid, da, db]) => { const u = window.__realms.state().units[bid]; return [window.__realms.hexScreen(u.col + da[0], u.row + da[1]), window.__realms.hexScreen(u.col + db[0], u.row + db[1])]; }', [bid, list(da), list(db)])
+                await pg.click('#unitcard [data-act=roadBetween]'); await pg.wait_for_timeout(200)
+                assert 'one end' in await pg.inner_text('#info-event'), 'Road between… did not start targeting'
+                await pg.mouse.move(pts[0]['x'], pts[0]['y']); await pg.wait_for_timeout(150)
+                await pg.mouse.click(pts[0]['x'], pts[0]['y']); await pg.wait_for_timeout(250)
+                assert 'other end' in await pg.inner_text('#info-event'), 'the first click did not wait for the second end'
+                await pg.mouse.move(pts[1]['x'], pts[1]['y']); await pg.wait_for_timeout(200)
+                await pg.mouse.click(pts[1]['x'], pts[1]['y']); await pg.wait_for_timeout(300)
+                if await pg.evaluate('(bid) => !!window.__realms.state().units[bid].build', bid): ok = True; break
                 print('ROAD TARGET REFUSED:', await pg.inner_text('#info-event'))
                 await pg.keyboard.press('Escape'); await pg.wait_for_timeout(150)
-                if await pg.is_hidden('#unitcard'): break
+                if await pg.is_hidden('#unitcard'):
+                    pos = await pg.evaluate('(bid) => window.__realms.unitScreen(bid)', bid)
+                    await pg.mouse.dblclick(pos['x'], pos['y']); await pg.wait_for_timeout(300)
             assert ok, 'the band did not take a road order'
-            print('BAND ORDER:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:260])
+            ui = await pg.evaluate('() => window.__realms.ui()')
+            assert ui['selectedUnitId'] is None and await pg.is_hidden('#unitcard'), 'an order must un-choose the unit'
+            print('BAND ORDER:', await pg.evaluate('(bid) => JSON.stringify(window.__realms.state().units[bid].build)', bid))
             for _ in range(6):
                 await pg.keyboard.press('Space'); await pg.wait_for_timeout(500)
-            print('BAND AFTER:', (await pg.inner_text('#unitcard')).replace('\n', ' | ')[:260])
+            print('BAND AFTER:', await pg.evaluate('(bid) => { const u = window.__realms.state().units[bid]; return JSON.stringify({at: [u.col, u.row], build: u.build, work: u.work}); }', bid))
             await pg.screenshot(path='/tmp/smoke_band.png')
         # ---- tier upgrade (Session 15b): a village of the big cluster, if it is at the gate ----
         await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)

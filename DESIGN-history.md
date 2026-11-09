@@ -1,11 +1,12 @@
 # Realms, Kings and Other Stuff — Design: Change Log
 
-**Part of the design contract — version 0.7f — 2026-11-09.** The version history of the design contract. Read only when asked who decided what, and when; the DECIDED items in the other files carry their own dates. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
+**Part of the design contract — version 0.7g — 2026-11-09.** The version history of the design contract. Read only when asked who decided what, and when; the DECIDED items in the other files carry their own dates. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
 
 ---
 
 ## Change log
 
+- 0.7g (2026-11-09, Session 21): Omer's small changes recorded in §3.2b rule 7 and §3.5 — road *between* A and B (replaces road to), Castle at… with a size choice, an order un-chooses the unit; his icon sprites adopted (UI-DESIGN 1.12).
 - 0.7f (2026-11-09, Session 20): Omer's notes on the levy recorded in §3.5 — a levy musters from the cluster and neighbours in reach, not only the home village; garrison status; right-click-to-order (left click only chooses).
 - 0.7e (2026-11-09, Session 19): the levy built (§3.2b rule 9 as built: men 15–44, 1 coin a man a month, disband walks home from any distance and never into a castle); garrisons and forts built (§3.5: the garrison fills the castle's room and eats from its reserve; `fortify` command). Omer's verdicts on castles recorded in §3.5: parent-resolution refinement kept until the step-3 subordination redesign; negative treasury an open question for economy tuning; upgrade cost as the difference accepted.
 - 0.7d (2026-11-08, Session 18): §3.5 castles built — Omer decided: forts / garrisons wait for military units (fort code present, nothing can create one); a castle works its own hex + best neighbours; castles can be placed in the map editor. Claude's PLACEHOLDERS recorded in §3.5: parent-resolution refinement, service-before-fields reading, upgrade cost as a difference, negative treasury. ROADMAP v0.7 (the new work order) supersedes the phase list; §5.4 Government session now step 4.

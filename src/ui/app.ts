@@ -8,7 +8,7 @@ import { SettlementLayer, setLabelFont } from './render/settlementLayer';
 import { InfraLayer } from './render/infraLayer';
 import { UnitLayer, unitAtWorld, shieldSize, type UnitPath } from './render/unitLayer';
 import { renderUnitCard } from './panels/unitCard';
-import { makeBuildOrder, orderSummary } from '../sim/workbands';
+import { makeBuildOrder, makeRoadBetween, orderSummary } from '../sim/workbands';
 import { infraItem, siteInfo } from '../sim/infrastructure';
 import { renderRaiseDialog, newRaiseDraft, type RaiseDraft } from './panels/raiseDialog';
 import { routeFor, unitCell, unitTypeDef, canFoundAt, unitsAt, isForming, UNIT_TYPES, type Unit } from '../sim/units';
@@ -143,7 +143,7 @@ export async function startApp(): Promise<void> {
   // the map's icon textures (resources, things on hexes, tier marks) — rasterised once from the shared icon set
   await preloadIconTextures([...RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), 'mill', 'wharf', 'quarry', 'lumbercamp', 'castle1', 'castle2', 'castle3', 'station'], MAP_BADGE);
   await preloadIconTextures(RESOURCES.map((r) => r.icon).filter((x): x is string => !!x), MAP_BADGE_IDLE);
-  await preloadIconTextures([...SL.TIER_ICON, ...UNIT_TYPES.map((t) => t.icon)], MAP_MARK);
+  await preloadIconTextures([...SL.TIER_ICON, ...UNIT_TYPES.map((t) => t.icon), 'fort'], MAP_MARK);
 
   const renderer = new MapRenderer(state.map);
   const settlementLayer = new SettlementLayer();
@@ -160,7 +160,7 @@ export async function startApp(): Promise<void> {
   let lastClickT = 0, lastClickX = 0, lastClickY = 0;
   let hoverUnitId: string | null = null;
   /** choosing a hex on the map: a move / settle order for a unit, or the destination of a party being raised */
-  type Mode = { kind: 'order'; unitId: string; then: 'none' | 'settle' } | { kind: 'build'; unitId: string; item: string } | { kind: 'pickDest' } | null;
+  type Mode = { kind: 'order'; unitId: string; then: 'none' | 'settle' } | { kind: 'build'; unitId: string; item: string; between?: boolean; first?: number | null } | { kind: 'pickDest' } | null;
   let mode: Mode = null;
   let preview: { cells: number[]; months: number; label: string } | null = null;
   let previewCell = -1;
@@ -307,18 +307,18 @@ export async function startApp(): Promise<void> {
     renderUnitCard(unitCard, state, u, {
       onMove: (id) => startOrder(id, 'none'),
       onSettleAt: (id) => startOrder(id, 'settle'),
-      onSettleHere: (id) => act({ type: 'settleUnit', id }),
-      onDisband: (id) => act({ type: 'disbandUnit', id }),
-      onFortify: (id) => act({ type: 'fortify', unitId: id }),
-      onCancelOrder: (id) => act({ type: 'orderUnit', id, order: null }),
+      onSettleHere: (id) => ordered(act({ type: 'settleUnit', id })),
+      onDisband: (id) => ordered(act({ type: 'disbandUnit', id })),
+      onFortify: (id) => ordered(act({ type: 'fortify', unitId: id })),
+      onCancelOrder: (id) => ordered(act({ type: 'orderUnit', id, order: null })),
       onBuildHere: (id, item) => {
         const bu = state.units[id];
         const mk = bu ? makeBuildOrder(state, bu, item, null) : null;
         if (!mk?.order) { el('info-event').textContent = mk?.reason ?? ''; return; }
-        act({ type: 'orderUnit', id, order: null, build: mk.order });
-        renderUnitCardNow();
+        ordered(act({ type: 'orderUnit', id, order: null, build: mk.order }));
       },
-      onRoadTo: (id, item) => startBuild(id, item),
+      onRoadBetween: (id, item) => startBuild(id, item, true),
+      onCastleAt: (id, item) => startBuild(id, item),
       onBridgeAt: (id) => startBuild(id, 'bridge'),
       onKind: () => renderUnitCardNow(),
       onFocusSettlement: (id) => focusSettlement(id),
@@ -363,11 +363,12 @@ export async function startApp(): Promise<void> {
     if (mouseX >= 0) updateHover(mouseX, mouseY);
     refreshLayer();
   }
-  function startBuild(unitId: string, item: string): void {
-    if (mode?.kind === 'build' && mode.unitId === unitId && mode.item === item) { mode = null; preview = null; }
-    else mode = { kind: 'build', unitId, item };
+  function startBuild(unitId: string, item: string, between = false): void {
+    if (mode?.kind === 'build' && mode.unitId === unitId && mode.item === item && !!mode.between === between) { mode = null; preview = null; }
+    else mode = { kind: 'build', unitId, item, between, first: null };
     previewCell = -1;
-    el('info-event').textContent = mode ? (item === 'bridge' ? 'Click the river hex to bridge (Esc to cancel).' : `Click the hex the ${infraItem(item).name.toLowerCase()} should reach (Esc to cancel).`) : '';
+    const it = infraItem(item);
+    el('info-event').textContent = mode ? (item === 'bridge' ? 'Click the river hex to bridge (Esc to cancel).' : it.kind === 'castle' ? `Click the hex for the ${it.name.toLowerCase()} — the band walks there and builds (Esc to cancel).` : 'Click one end of the road (Esc to cancel).') : '';
     renderUnitCardNow();
     if (mouseX >= 0) updateHover(mouseX, mouseY);
     refreshLayer();
@@ -388,11 +389,22 @@ export async function startApp(): Promise<void> {
     if (m.kind === 'build') {
       const bu = state.units[m.unitId];
       if (!bu) { if (mode) mode = null; return; }
-      const mk = makeBuildOrder(state, bu, m.item, cell);
-      if (!mk.order) { preview = { cells: [cell, cell], months: Infinity, label: mk.reason ?? 'cannot build there' }; return; }
+      const isCastle = infraItem(m.item).kind === 'castle';
+      if (m.between && m.first == null) { preview = { cells: [cell, cell], months: 0, label: 'one end of the road' }; return; }
+      const mk = m.between ? makeRoadBetween(state, bu, m.item, m.first as number, cell) : makeBuildOrder(state, bu, m.item, cell);
+      if (!mk.order) { preview = { cells: m.between ? [m.first as number, cell] : [cell, cell], months: Infinity, label: mk.reason ?? 'cannot build there' }; return; }
       const sum = orderSummary(state, bu, mk.order);
       const mats = (['timber', 'stone'] as const).filter((k) => sum.materials[k] > 0.5).map((k) => `${Math.round(sum.materials[k])} ${k}`).join(' + ');
-      preview = { cells: mk.order.route.length > 1 ? mk.order.route : [mk.order.route[0], mk.order.route[0]], months: sum.months, label: `${sum.hexes} hex${sum.hexes === 1 ? '' : 'es'} · ≈ ${Math.max(1, Math.round(sum.months))} mo${mats ? ` · ${mats}` : ''}${sum.bridges ? ` · ${sum.bridges} bridge${sum.bridges === 1 ? '' : 's'}` : ''}` };
+      const coins = sum.money > 0.5 ? `${Math.round(sum.money).toLocaleString('en-US')} coins` : '';
+      let cells = mk.order.route.length > 1 ? mk.order.route : [mk.order.route[0], mk.order.route[0]];
+      let walk = ('walkMonths' in mk && typeof mk.walkMonths === 'number') ? mk.walkMonths : 0;
+      if (!m.between) { // a single site (castle, bridge): show the walk there
+        const here = unitCell(state.map, bu);
+        const wr = here === cell ? null : findRoute(state, { cell: here, bank: bu.bank }, cell, unitTypeDef(bu.type).movePoints, bu.faction);
+        if (wr && Number.isFinite(wr.months) && wr.nodes.length) { cells = [here, ...wr.nodes.map((n) => n.cell)]; walk = wr.months; }
+      }
+      const what = isCastle ? '' : `${sum.hexes} hex${sum.hexes === 1 ? '' : 'es'} · `;
+      preview = { cells, months: sum.months, label: `${what}${walk ? `walk ${walk} mo · ` : ''}build ≈ ${Math.max(1, Math.round(sum.months))} mo${coins ? ` · ${coins}` : ''}${mats ? ` · ${mats}` : ''}${sum.bridges ? ` · ${sum.bridges} bridge${sum.bridges === 1 ? '' : 's'}` : ''}` };
       return;
     }
     let start: { cell: number; bank: number } | null = null, points = 4, settle = false, label = '';
@@ -422,23 +434,33 @@ export async function startApp(): Promise<void> {
     if (mode.kind === 'build') {
       const bu = state.units[mode.unitId];
       const item = mode.item;
+      if (mode.between && mode.first == null) {
+        // the first end of a road: remember it and wait for the second
+        mode.first = cell; preview = null; previewCell = -1;
+        el('info-event').textContent = 'Now click the other end of the road (Esc to cancel).';
+        if (mouseX >= 0) updateHover(mouseX, mouseY);
+        refreshLayer();
+        return;
+      }
+      const first = mode.first;
+      const between = !!mode.between;
       mode = null; preview = null; previewCell = -1;
       el('info-event').textContent = '';
       if (bu) {
-        const mk = makeBuildOrder(state, bu, item, cell);
-        if (mk.order) act({ type: 'orderUnit', id: bu.id, order: null, build: mk.order });
-        else el('info-event').textContent = mk.reason ?? 'cannot build there';
-      }
-      renderUnitCardNow();
+        const mk = between ? makeRoadBetween(state, bu, item, first as number, cell) : makeBuildOrder(state, bu, item, cell);
+        if (mk.order) ordered(act({ type: 'orderUnit', id: bu.id, order: null, build: mk.order }));
+        else { el('info-event').textContent = mk.reason ?? 'cannot build there'; renderUnitCardNow(); }
+      } else renderUnitCardNow();
     } else if (mode.kind === 'order') {
       const u = state.units[mode.unitId];
       const then = mode.then;
       mode = null; preview = null; previewCell = -1;
       el('info-event').textContent = '';
       if (!u) return;
-      if (cell === unitCell(state.map, u)) { if (then === 'settle') act({ type: 'settleUnit', id: u.id }); else act({ type: 'orderUnit', id: u.id, order: null }); }
-      else act({ type: 'orderUnit', id: u.id, order: { kind: 'move', dest: cell, then } });
-      renderUnitCardNow();
+      let done: boolean;
+      if (cell === unitCell(state.map, u)) done = then === 'settle' ? act({ type: 'settleUnit', id: u.id }) : act({ type: 'orderUnit', id: u.id, order: null });
+      else done = act({ type: 'orderUnit', id: u.id, order: { kind: 'move', dest: cell, then } });
+      if (done) selectUnit(null); else renderUnitCardNow();
     } else {
       mode = null; preview = null; previewCell = -1;
       if (raiseDraft) {
@@ -647,8 +669,9 @@ export async function startApp(): Promise<void> {
     const sid = settlementIdAt(state, cell % state.map.width, Math.floor(cell / state.map.width));
     const s = sid ? state.settlements[sid] : null;
     const garrison = !!s && s.faction === u.faction && isMilitary(u);
-    act({ type: 'orderUnit', id: u.id, order: { kind: 'move', dest: cell, then: 'none' } });
+    const done = act({ type: 'orderUnit', id: u.id, order: { kind: 'move', dest: cell, then: 'none' } });
     if (state.units[u.id]?.order?.dest === cell) msg.textContent = garrison ? `${u.name} marches to garrison ${s!.name}.` : `${u.name} marches to (${cell % state.map.width}, ${Math.floor(cell / state.map.width)}).`;
+    ordered(done);
   }
   function focusSettlement(id: string): void {
     const t = state.settlements[id];
@@ -658,15 +681,18 @@ export async function startApp(): Promise<void> {
     camera.centerOn(p.x, p.y);
   }
   /** A player action: goes through the command layer via the editor so it is undoable and autosaved. */
-  function act(cmd: Command): void {
+  function act(cmd: Command): boolean {
     try {
       editor.execute(cmd);
     } catch (e) {
       el('info-event').textContent = (e as Error).message;
-      return;
+      return false;
     }
     stateChanged();
+    return true;
   }
+  /** An order was given: the unit is un-chosen (Omer, Session 21) — click it again to choose it. */
+  function ordered(done: boolean): void { if (done) selectUnit(null); }
 
   // test hook for scripts/smoke.py (no game logic goes through it except `act`)
   (window as unknown as { __realms: unknown }).__realms = {

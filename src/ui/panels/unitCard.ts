@@ -17,11 +17,12 @@ import { infraItem, INFRA_ITEMS } from '../../sim/infrastructure';
 import { fmt, fmt1, esc, gauge, ICON } from './format';
 
 /** The road kind the player last chose on a work-band's card (dirt / paved), kept across cards. */
-export const buildPrefs: { kind: string } = { kind: 'dirt' };
+export const buildPrefs: { kind: string; castle: string } = { kind: 'dirt', castle: 'castle_small' };
 
 export interface UnitCardHost {
   onBuildHere(id: string, item: string): void;
-  onRoadTo(id: string, item: string): void;
+  onRoadBetween(id: string, item: string): void;
+  onCastleAt(id: string, item: string): void;
   onBridgeAt(id: string): void;
   onKind(): void;
   onMove(id: string): void;
@@ -137,21 +138,19 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
     const costText = Object.entries(ki.cost).map(([k, v]) => `${v} ${k}`).join(' + ');
     btns.push(`<select class="buildkind" data-act="kind" title="${esc(ki.blurb ?? '')} ${ki.months} months and ${costText} a hex for a band of ${300}.">${opts}</select>`);
     btns.push(`<button class="btn small primary" data-act="buildHere" ${hereOrder?.order ? `title="Build the ${esc(ki.name.toLowerCase())} on this hex"` : `disabled title="${esc(hereOrder?.reason ?? '')}"`}>Build here</button>`);
-    btns.push(`<button class="btn small" data-act="roadTo" title="Click a hex: the band lays the ${esc(ki.name.toLowerCase())} all the way, with bridges where it must">Road to…</button>`);
+    btns.push(`<button class="btn small" data-act="roadBetween" title="Click the two ends: the band walks to the nearer one and lays the ${esc(ki.name.toLowerCase())} to the other, with bridges where it must">Road between…</button>`);
     btns.push(`<button class="btn small" data-act="bridgeAt" title="Click a river hex beside the band: a bridge">Bridge at…</button>`);
   }
   if (!forming && def.canBuild) {
-    // castles: built where the band stands (a ruin is rebuilt at half price; a fort under it saves a quarter of the time)
-    for (const ci of INFRA_ITEMS.filter((i) => i.kind === 'castle')) {
-      const mk = makeBuildOrder(state, u, ci.id, null);
-      let tip = mk.reason ?? '';
-      if (mk.order) {
-        const sm = orderSummary(state, u, mk.order);
-        const mats = (['timber', 'stone'] as const).filter((k) => sm.materials[k] > 0.5).map((k) => `${fmt(sm.materials[k])} ${k}`).join(' + ');
-        tip = `≈ ${fmt1(sm.months)} months · ${fmt(sm.money)} coins${mats ? ` + ${mats}` : ''}`;
-      }
-      btns.push(`<button class="btn small" data-act="castle" data-item="${ci.id}" ${mk.order ? '' : 'disabled '}title="${esc(tip)}">${ICON.castle1 ?? ICON.hammer} ${esc(ci.name.replace(/^Build /i, ''))}</button>`);
-    }
+    // castles (Session 21): choose the size, then "Castle at…" and click a hex — the band walks there and builds (a ruin is rebuilt at half price; a fort under it saves a quarter of the time)
+    const castles = INFRA_ITEMS.filter((i) => i.kind === 'castle');
+    const ck = castles.some((i) => i.id === buildPrefs.castle) ? buildPrefs.castle : castles[0].id;
+    const ci = infraItem(ck);
+    const k = CASTLES.kinds[ci.tier as string]?.build;
+    const copts = castles.map((i) => `<option value="${i.id}" ${i.id === ck ? 'selected' : ''}>${esc(i.name)}</option>`).join('');
+    const ctip = k ? `${k.months} months for a band of 300 · ${fmt(k.money)} coins + ${fmt(k.timber)} timber / ${fmt(k.stone)} stone (a ruin costs half; a fort under it saves a quarter of the time)` : '';
+    btns.push(`<select class="buildkind" data-act="castleKind" title="${esc(ci.blurb ?? '')}">${copts}</select>`);
+    btns.push(`<button class="btn small" data-act="castleAt" title="Click a hex: the band walks there and builds the ${esc(ci.name.toLowerCase())} — ${esc(ctip)}">${ICON.castle1 ?? ICON.hammer} Castle at…</button>`);
   }
   if (!forming) {
     btns.push(`<button class="btn small" data-act="move" title="Walk to a hex you click on the map">${ICON.walk} Move</button>`);
@@ -162,7 +161,7 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
     if (def.canFortify) {
       fortCheck = canFortify(state, u);
       const fc = fortCheck;
-      btns.push(`<button class="btn small" data-act="fortify" ${fc.ok ? `title="Raise a fort on this hex: ${CASTLES.fort.fortifyTimber} timber, holds ${CASTLES.fort.capacity} men, the border grows one ring; it falls into disuse ${CASTLES.fort.decayMonths} months after the last unit leaves"` : `disabled title="${esc(fc.reason ?? '')}"`}>${ICON.castle1 ?? ICON.hammer} Fortify</button>`);
+      btns.push(`<button class="btn small" data-act="fortify" ${fc.ok ? `title="Raise a fort on this hex: ${CASTLES.fort.fortifyTimber} timber, holds ${CASTLES.fort.capacity} men, the border grows one ring; it falls into disuse ${CASTLES.fort.decayMonths} months after the last unit leaves"` : `disabled title="${esc(fc.reason ?? '')}"`}>${ICON.fort ?? ICON.hammer} Fortify</button>`);
     }
     btns.push(`<button class="btn small ${disband.ok ? '' : ''}" data-act="disband" ${disband.ok ? `title="Rejoin ${esc(disband.target!.name)}${disband.distance ? ` (${disband.distance} hex${disband.distance === 1 ? '' : 'es'} away — walks there)` : ''}"` : `disabled title="${esc(disband.reason ?? '')}"`}>Disband</button>`);
     if (u.order) btns.push(`<button class="btn small danger" data-act="cancel" title="Stay where it stands">Cancel order</button>`);
@@ -177,8 +176,9 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
   `;
   root.querySelector<HTMLSelectElement>('[data-act=kind]')?.addEventListener('change', (e) => { buildPrefs.kind = (e.target as HTMLSelectElement).value; host.onKind(); });
   root.querySelector('[data-act=buildHere]')?.addEventListener('click', () => host.onBuildHere(u.id, kind));
-  root.querySelectorAll<HTMLElement>('[data-act=castle]').forEach((b) => b.addEventListener('click', () => host.onBuildHere(u.id, b.dataset.item!)));
-  root.querySelector('[data-act=roadTo]')?.addEventListener('click', () => host.onRoadTo(u.id, kind));
+  root.querySelector<HTMLSelectElement>('[data-act=castleKind]')?.addEventListener('change', (e) => { buildPrefs.castle = (e.target as HTMLSelectElement).value; host.onKind(); });
+  root.querySelector('[data-act=castleAt]')?.addEventListener('click', () => host.onCastleAt(u.id, buildPrefs.castle));
+  root.querySelector('[data-act=roadBetween]')?.addEventListener('click', () => host.onRoadBetween(u.id, kind));
   root.querySelector('[data-act=bridgeAt]')?.addEventListener('click', () => host.onBridgeAt(u.id));
   root.querySelector('[data-act=move]')?.addEventListener('click', () => host.onMove(u.id));
   root.querySelector('[data-act=settleAt]')?.addEventListener('click', () => host.onSettleAt(u.id));

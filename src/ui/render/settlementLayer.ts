@@ -317,7 +317,7 @@ export class SettlementLayer {
       this.markers.circle(fx, fy, r);
       this.markers.fill({ color: colorToNumber(factionColor(state.factions, f.faction)), alpha: 1 });
       this.markers.stroke({ width: Math.max(1, 1.2 / view.zoom), color: 0x000000, alpha: 0.85 });
-      const sp = new Sprite(iconTexture('castle1', MAP_MARK));
+      const sp = new Sprite(iconTexture('fort', MAP_MARK));
       sp.anchor.set(0.5);
       sp.width = r * 1.6; sp.height = r * 1.6;
       sp.position.set(fx, fy);
