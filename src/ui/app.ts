@@ -373,7 +373,7 @@ export async function startApp(): Promise<void> {
     refreshLayer();
   }
   /** The route a hovered hex would mean in the current targeting mode, for the preview. */
-  /** With a unit chosen and nothing else being targeted, a click on any tile is a go-to order: the same preview. */
+  /** With a unit chosen and nothing else being targeted, a right click on any tile is a go-to order: the same preview as the cursor moves. */
   function implicitOrder(): { kind: 'order'; unitId: string; then: 'none' } | null {
     if (!selectedUnitId || editor.active) return null;
     const u = state.units[selectedUnitId];
@@ -614,7 +614,7 @@ export async function startApp(): Promise<void> {
       title: 'Keys & help', badge: 'phase 2',
       body: `<div class="cols"><div><h3>Turns</h3><table class="kv">${row('Space', 'end the month')}${row('Go', 'run the years in the box')}</table>
         <h3>Ledgers</h3><table class="kv">${row('click', 'chooses a settlement; double-click opens its ledger (a click swaps a ledger already open); the tiles at the top open the realm\'s')}${row('K', 'the realm ledger')}${row('Esc', 'close')}</table>
-        <h3>Parties</h3><table class="kv">${row('click', 'a shield chooses the party; double-click opens its card (the × closes it, the party stays chosen)')}${row('click a tile', 'with a party chosen: it marches there — and garrisons it if the tile is a settlement or castle of yours')}${row('Esc', 'unchoose')}${row('Recruitment', 'the settlement ledger\'s last page raises settlers')}</table></div>
+        <h3>Parties</h3><table class="kv">${row('left click', 'chooses what you click — a shield or a settlement; double-click opens its card or ledger (the × closes a card, the party stays chosen)')}${row('right click', 'with a party chosen: orders it to that tile — it marches there, and garrisons if the tile is a settlement or castle of yours')}${row('Esc', 'unchoose')}${row('Recruitment', 'the settlement ledger\'s last page raises settlers')}</table></div>
         <div><h3>Map</h3><table class="kv">${row('drag', 'pan')}${row('wheel', 'zoom')}${row('Home', 'fit the map')}${row('arrows', 'pan')}${row('G', 'hex grid')}${row('R', 'resource glyphs')}${row('Z', 'zones and cluster outlines')}${row('E', 'the map editor')}</table></div></div>
         <h3>Reading the screen</h3>
         <p>The strip at the top is the realm's bottom line: the crown's <b>treasury</b>, the <b>people</b>, <b>months of food</b> in all granaries, and the realm's <b>stockpile</b> of timber, stone and goods against its cap. Hover a tile for the figures behind it; click it for the full page.</p>
@@ -637,7 +637,7 @@ export async function startApp(): Promise<void> {
     selectedId = id;
     refreshLayer();
   }
-  /** A left click on a tile with a unit chosen: a go-to order — a garrison order when the tile is one of our settlements or castles. */
+  /** A right click on a tile with a unit chosen: a go-to order — a garrison order when the tile is one of our settlements or castles. */
   function orderChosenTo(cell: number): void {
     const u = selectedUnitId ? state.units[selectedUnitId] : null;
     if (!u) return;
@@ -824,8 +824,6 @@ export async function startApp(): Promise<void> {
           else if (id) select(id);
         } else if (u) {
           if (u.id !== selectedUnitId) selectUnit(u.id, false);
-        } else if (selectedUnitId && on) {
-          orderChosenTo(idx(state.map, h.col, h.row));
         } else if (id) {
           if (view) select(id); // a ledger is open: the click swaps it
           else choose(id);
@@ -833,6 +831,11 @@ export async function startApp(): Promise<void> {
         else if (selectedUnitId) selectUnit(null);
         else choose(null);
       }
+    }
+    else if (wasPanning && e.button === 2 && !moved && !mode && !editor.active && selectedUnitId) {
+      // a right click with a unit chosen: the order (go there; garrison if it is one of our settlements or castles)
+      const h = hexAt(e.clientX, e.clientY);
+      if (inBounds(state.map, h.col, h.row)) orderChosenTo(idx(state.map, h.col, h.row));
     }
     canvas.releasePointerCapture(e.pointerId);
   });

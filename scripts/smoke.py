@@ -198,12 +198,16 @@ async def main() -> int:
         await pg.click('#unitcard [data-act=close]'); await pg.wait_for_timeout(300)
         ui = await pg.evaluate('() => window.__realms.ui()')
         assert not await pg.is_visible('#unitcard') and ui['selectedUnitId'] == lv, 'the X must hide the card and keep the unit chosen'
-        # a click on a tile now orders the chosen unit; on its own castle it is a garrison order
+        # a RIGHT click on a tile orders the chosen unit; on its own castle it is a garrison order
         kpos = await pg.evaluate('(cid) => { const k = window.__realms.state().settlements[cid]; return window.__realms.hexScreen(k.col, k.row); }', cid)
-        await pg.mouse.click(kpos['x'], kpos['y']); await pg.wait_for_timeout(500)
+        # a LEFT click only chooses: on empty ground it unchooses, it must not order
+        await pg.mouse.click(kpos['x'] + 90, kpos['y'] + 90); await pg.wait_for_timeout(400)
+        ui = await pg.evaluate('() => window.__realms.ui()'); assert ui['selectedUnitId'] is None, 'a left click on empty ground should unchoose the unit'
+        await pg.mouse.click(pos['x'], pos['y']); await pg.wait_for_timeout(400)   # choose it again
+        await pg.mouse.click(kpos['x'], kpos['y'], button='right'); await pg.wait_for_timeout(500)
         order = await pg.evaluate('([lv, cid]) => { const st = window.__realms.state(), u = st.units[lv], k = st.settlements[cid]; return u.order ? u.order.dest === k.row * st.map.width + k.col : false; }', [lv, cid])
         msg = await pg.inner_text('#info-event'); print('GO-TO:', order, msg)
-        assert order, 'a click on a tile did not order the chosen unit there'
+        assert order, 'a right click on a tile did not order the chosen unit there'
         await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
         ui = await pg.evaluate('() => window.__realms.ui()'); assert ui['selectedUnitId'] is None, 'Esc should unchoose the unit'
         await pg.keyboard.press('Space'); await pg.wait_for_timeout(300)

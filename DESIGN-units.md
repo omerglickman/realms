@@ -101,5 +101,5 @@ Large castles are meant to be as rare as metropolises: hard to build, costly to 
 **Decided 2026-11-09 (Omer, after trying the Session 19 levy).**
 - **A levy may be raised from any settlement that has men to call within reach.** A small village is not blocked by its own hands: the party is gathered from it and from the other settlements of its cluster and within 3 hexes (§3.2b rule 2); how many people leave is chosen in the raise dialog.
 - **Garrison status.** A military unit is *fortified* on a fort, *garrisoned in* a settlement or castle of its faction it stands on, *partly garrisoned (x of y)* when the castle's room is smaller than the unit; the castle shows how many are inside. A military unit standing in a village, town or city counts as garrisoned there (no capacity yet).
-- **Orders.** A left click on a tile with a unit chosen is a go-to order; on one of our settlements or castles it is a garrison order (a march that ends inside).
+- **Orders.** A **right** click on a tile with a unit chosen is a go-to order (a left click only chooses what is clicked); on one of our settlements or castles it is a garrison order (a march that ends inside).
 
