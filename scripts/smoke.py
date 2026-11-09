@@ -39,6 +39,10 @@ async def main() -> int:
         def lines(txt, *keys): return [l for l in txt.split('\n') if any(k in l for k in keys)]
         async def tab(name): await pg.click(f'.m-tabs button[data-tab={name}]'); await pg.wait_for_timeout(300)
 
+        # season turns (Session 22): one End turn moves the clock a season (three months)
+        d0 = await pg.inner_text('#info-date'); await pg.click('#end-turn'); await pg.wait_for_timeout(600)
+        d1 = await pg.inner_text('#info-date'); print('DATE:', d0, '->', d1)
+        assert d0.startswith('Spring') and d1.startswith('Summer'), 'End turn did not advance one season'
         await pg.fill('#run-years', str(YEARS)); await pg.click('#run-years-btn'); await pg.wait_for_timeout(1500 * YEARS)
         strip = await pg.inner_text('#topbar'); print('STRIP:', strip.replace('\n', ' | ')[:300])
         await pg.keyboard.press('k'); await pg.wait_for_timeout(400)

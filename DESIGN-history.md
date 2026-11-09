@@ -1,11 +1,12 @@
 # Realms, Kings and Other Stuff — Design: Change Log
 
-**Part of the design contract — version 0.7g — 2026-11-09.** The version history of the design contract. Read only when asked who decided what, and when; the DECIDED items in the other files carry their own dates. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
+**Part of the design contract — version 0.7h — 2026-11-09.** The version history of the design contract. Read only when asked who decided what, and when; the DECIDED items in the other files carry their own dates. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
 
 ---
 
 ## Change log
 
+- 0.7h (2026-11-09, Session 22): step 3 opened — Omer decided **one turn = one season** (§2.4; the sim still steps monthly inside a turn) and the births rule (§4.1): base ×1.5 (0.27), famine cuts births (food sufficiency³), a surplus in the granary raises and a thin one lowers them (every tier), missing hands raise them (up to +30 %), idle hands lower them (villages). Claude's readings flagged in the DEVLOG: idle hands do not lower births in towns and cities (their spare hands are private hands); granary thresholds moved to 1.5 / 7 months.
 - 0.7g (2026-11-09, Session 21): Omer's small changes recorded in §3.2b rule 7 and §3.5 — road *between* A and B (replaces road to), Castle at… with a size choice, an order un-chooses the unit; his icon sprites adopted (UI-DESIGN 1.12).
 - 0.7f (2026-11-09, Session 20): Omer's notes on the levy recorded in §3.5 — a levy musters from the cluster and neighbours in reach, not only the home village; garrison status; right-click-to-order (left click only chooses).
 - 0.7e (2026-11-09, Session 19): the levy built (§3.2b rule 9 as built: men 15–44, 1 coin a man a month, disband walks home from any distance and never into a castle); garrisons and forts built (§3.5: the garrison fills the castle's room and eats from its reserve; `fortify` command). Omer's verdicts on castles recorded in §3.5: parent-resolution refinement kept until the step-3 subordination redesign; negative treasury an open question for economy tuning; upgrade cost as the difference accepted.

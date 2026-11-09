@@ -4,6 +4,7 @@
 // and factions. Later phases add units, characters, diplomacy — always as
 // plain data keyed by ids.
 
+import timeData from '../../data/time.json';
 import type { MapData } from './map';
 import { type RngState, seedRng } from './rng';
 import { type Settlement, emptyReport, emptyYearTotals } from './settlements';
@@ -54,6 +55,9 @@ export function logEvent(state: GameState, kind: string, text: string): void {
   if (state.events.length > MAX_EVENTS) state.events.splice(0, state.events.length - MAX_EVENTS);
 }
 
+/** Season turns (Session 22): turn length and season names, from data/time.json. */
+export const TIME = timeData;
+
 export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -77,11 +81,21 @@ export function createGameState(seed: string, map: MapData): GameState {
   };
 }
 
-/** Year (1-based) and month index (0-11) for a turn. One turn = one month (DESIGN §2.4). */
-export function calendar(turn: number): { year: number; month: number; monthName: string } {
+/**
+ * Year (1-based), month index (0-11) and season for a clock reading. `state.turn` counts MONTHS (the sim's
+ * step); what the player calls a turn is a season of `TIME.turnMonths` months (Session 22, DESIGN §2.4):
+ * see `turnNumber` and `advanceTurn` in turn.ts.
+ */
+export function calendar(turn: number): { year: number; month: number; monthName: string; season: string } {
   const year = Math.floor(turn / 12) + 1;
   const month = turn % 12;
-  return { year, month, monthName: MONTHS[month] };
+  const season = TIME.seasons[Math.floor(((month - TIME.firstMonth + 12) % 12) / TIME.turnMonths)];
+  return { year, month, monthName: MONTHS[month], season };
+}
+
+/** The turn the player is on (1-based): season boundaries crossed since the clock first reached `firstMonth`, plus one. */
+export function turnNumber(turn: number): number {
+  return Math.max(1, Math.floor((turn - TIME.firstMonth) / TIME.turnMonths) + 1);
 }
 
 export function serializeState(state: GameState): string {

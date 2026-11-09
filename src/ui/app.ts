@@ -28,7 +28,7 @@ import { factionStockKey, type Command, type CancelRaiseCommand } from '../sim/c
 import type { Materials } from '../sim/materials';
 import { generateDraftMap, MAPGEN_DEFAULTS, type MapGenParams } from '../sim/mapgen';
 import { createGameState, calendar, type GameState } from '../sim/state';
-import { endTurn } from '../sim/turn';
+import { endTurn, advanceTurn } from '../sim/turn';
 import { pixelToAxial, axialToOffset, offsetToPixel, hexCorners } from '../sim/hex';
 import { inBounds, getTerrain, getResource, idx } from '../sim/map';
 import { TERRAIN } from '../sim/terrain';
@@ -634,7 +634,7 @@ export async function startApp(): Promise<void> {
     const row = (k: string, v: string) => `<tr><th><kbd>${k}</kbd></th><td>${v}</td></tr>`;
     return {
       title: 'Keys & help', badge: 'phase 2',
-      body: `<div class="cols"><div><h3>Turns</h3><table class="kv">${row('Space', 'end the month')}${row('Go', 'run the years in the box')}</table>
+      body: `<div class="cols"><div><h3>Turns</h3><table class="kv">${row('Space', 'end the turn — a season, three months')}${row('Go', 'run the years in the box')}</table>
         <h3>Ledgers</h3><table class="kv">${row('click', 'chooses a settlement; double-click opens its ledger (a click swaps a ledger already open); the tiles at the top open the realm\'s')}${row('K', 'the realm ledger')}${row('Esc', 'close')}</table>
         <h3>Parties</h3><table class="kv">${row('left click', 'chooses what you click — a shield or a settlement; double-click opens its card or ledger (the × closes a card, the party stays chosen)')}${row('right click', 'with a party chosen: orders it to that tile — it marches there, and garrisons if the tile is a settlement or castle of yours')}${row('Esc', 'unchoose')}${row('Recruitment', 'the settlement ledger\'s last page raises settlers')}</table></div>
         <div><h3>Map</h3><table class="kv">${row('drag', 'pan')}${row('wheel', 'zoom')}${row('Home', 'fit the map')}${row('arrows', 'pan')}${row('G', 'hex grid')}${row('R', 'resource glyphs')}${row('Z', 'zones and cluster outlines')}${row('E', 'the map editor')}</table></div></div>
@@ -725,32 +725,46 @@ export async function startApp(): Promise<void> {
   el('menu-help').addEventListener('click', () => openView('help'));
 
   // ---- turns ----
-  function advance(months: number): void {
+  /** Advance `n` turns (seasons), or — with `years` — that many whole years of months. The sim steps monthly inside a turn. */
+  function advance(n: number, years = false): void {
     const t0 = performance.now();
-    // for the gliding animation (one month only): the route every ordered unit is about to walk
+    const single = !years && n === 1;
+    // for the gliding animation (one turn only): the route every ordered unit is about to walk
     const planned: { id: string; cells: number[] }[] = [];
-    if (months === 1) {
+    if (single) {
       for (const u of Object.values(state.units)) {
         if (!u.order || u.order.dest === unitCell(state.map, u)) continue;
         const r = routeFor(state, u, u.order.dest);
         if (r && Number.isFinite(r.months)) planned.push({ id: u.id, cells: [unitCell(state.map, u), ...r.nodes.map((n) => n.cell)] });
       }
     }
-    for (let i = 0; i < months; i++) endTurn(state);
-    const paths: UnitPath[] = [];
-    if (months === 1) {
+    // work-band trails are per month: gather them over the whole turn
+    const trails = new Map<string, number[]>();
+    const noteTrails = (): void => {
       for (const u of Object.values(state.units)) {
         const tr = u.report.trail;
-        if (tr && tr.length > 1) paths.push({ id: u.id, cells: tr });
+        if (!tr || tr.length < 2) continue;
+        const acc = trails.get(u.id);
+        if (!acc) trails.set(u.id, [...tr]);
+        else acc.push(...tr.slice(acc[acc.length - 1] === tr[0] ? 1 : 0));
+      }
+    };
+    let months = 0;
+    if (years) { months = 12 * n; for (let i = 0; i < months; i++) endTurn(state); }
+    else for (let i = 0; i < n; i++) months += advanceTurn(state, single ? noteTrails : undefined);
+    const paths: UnitPath[] = [];
+    if (single) {
+      for (const [id, cells] of trails) paths.push({ id, cells });
+      for (const p of planned) {
+        const u = state.units[p.id];
+        if (!u || trails.has(p.id)) continue;
+        const end = unitCell(state.map, u);
+        const k = p.cells.indexOf(end);
+        if (k > 0) paths.push({ id: p.id, cells: p.cells.slice(0, k + 1) });
       }
     }
-    for (const p of planned) {
-      const u = state.units[p.id];
-      if (!u || u.report.moved <= 0) continue;
-      paths.push({ id: p.id, cells: p.cells.slice(0, u.report.moved + 1) });
-    }
     const ms = performance.now() - t0;
-    el('info-run').textContent = months > 1 ? `${months / 12} years in ${ms.toFixed(0)} ms` : '';
+    el('info-run').textContent = years ? `${n} years in ${ms.toFixed(0)} ms` : n > 1 ? `${n} turns in ${ms.toFixed(0)} ms` : '';
     editor.stateChangedExternally();
     stateChanged();
     if (paths.length) unitLayer.animate(state, paths, camera.zoom);
@@ -759,7 +773,7 @@ export async function startApp(): Promise<void> {
   el<HTMLButtonElement>('end-turn').addEventListener('click', () => advance(1));
   el<HTMLButtonElement>('run-years-btn').addEventListener('click', () => {
     const years = Math.max(1, Math.min(200, Math.round(Number(el<HTMLInputElement>('run-years').value) || 1)));
-    advance(12 * years);
+    advance(years, true);
   });
 
   // ---- map controls ----

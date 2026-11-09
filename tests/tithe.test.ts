@@ -123,16 +123,19 @@ describe('tithe', () => {
 });
 
 describe('granary brake (DESIGN §4.1, DECIDED 2026-11-05)', () => {
-  it('factor is 1 with a full granary, minFactor when empty, linear between, and 1 for villages', async () => {
+  it('factor is minFactor when empty, 1 at spareFull, maxFactor in a surplus, linear between, for every listed tier (Session 22)', async () => {
     const { granaryBrakeFactor, DEMOGRAPHY } = await import('../src/sim/demography');
-    const g = (DEMOGRAPHY as unknown as { granaryBrake: { spareFull: number; spareEmpty: number; minFactor: number } }).granaryBrake;
-    expect(granaryBrakeFactor('city', g.spareFull)).toBe(1);
-    expect(granaryBrakeFactor('city', g.spareFull + 10)).toBe(1);
+    const g = (DEMOGRAPHY as unknown as { granaryBrake: { spareFull: number; spareEmpty: number; minFactor: number; spareMax: number; maxFactor: number } }).granaryBrake;
+    expect(granaryBrakeFactor('city', g.spareFull)).toBeCloseTo(1, 9);
+    expect(granaryBrakeFactor('city', g.spareMax)).toBeCloseTo(g.maxFactor, 9);
+    expect(granaryBrakeFactor('city', g.spareMax + 10)).toBeCloseTo(g.maxFactor, 9);
     expect(granaryBrakeFactor('city', g.spareEmpty)).toBeCloseTo(g.minFactor, 9);
     expect(granaryBrakeFactor('city', -5)).toBeCloseTo(g.minFactor, 9);
     const mid = (g.spareFull + g.spareEmpty) / 2;
     expect(granaryBrakeFactor('town', mid)).toBeCloseTo((1 + g.minFactor) / 2, 9);
-    expect(granaryBrakeFactor('village', 0)).toBe(1);
+    const up = (g.spareFull + g.spareMax) / 2;
+    expect(granaryBrakeFactor('village', up)).toBeCloseTo((1 + g.maxFactor) / 2, 9);
+    expect(granaryBrakeFactor('no-such-tier', 0)).toBe(1);
   });
 
   it('a lone city stops growing before it starves: fewer hunger deaths and a fuller granary than without the brake', async () => {

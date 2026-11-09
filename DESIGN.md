@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design Contract
 
-**Version 0.7a — 2026-11-08 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
+**Version 0.7b — 2026-11-09 — Status: DRAFT, core decisions made; Phase 1 signed off; Phase 2 unit rules decided in full (§3.2b); see §5 for what is still open**
 
 > **Model scale ×3 (DECIDED 2026-11-04, §5.8).** All people-counts in this document — hex yields, hands, building staff, settler and unit sizes, typical settlement sizes — are at the ×3 scale implemented in Session 6. The tier gates (town 1,500, city 6,000) were deliberately *not* scaled; the metropolis gate is 36,000.
 
@@ -91,7 +91,7 @@ PROPOSED for later (not v1): river as an *overlay* on any terrain (so rivers can
 
 ### 2.4 Scale and time (DECIDED 2026-11-03)
 
-- **One turn = one month. Twelve turns = one year.** Seasons fall out of this: harvest arrives in the autumn turns, winter imposes attrition on armies in the field, aging and the yearly demographic update happen at year's end.
+- **One turn = one season (three months); four turns = one year (DECIDED by Omer 2026-11-09, replacing "one turn = one month").** Reason: at twelve turns a year a 400-turn game covered 33 years, less than the ~60 years a settlement needed to become a city; a season turn makes it 100 years. Spring is March–May, Summer June–August, Autumn September–November (the harvest), Winter December–February (the yearly demographic update runs in its first month; winter imposes attrition on armies in the field). **The simulation still steps month by month inside a turn** — every rate, cost and duration in `data/` is per month and stays so; only the player's decision points are coarser (`data/time.json`, `advanceTurn`). A build that takes 12 months takes 4 turns. The pace is to be tuned by playing; the length of the year is the one knob (`turnMonths`).
 - **One hex ≈ 15–20 km nominally**, but this is flavour, not a simulation target: we are not simulating Earth. **Movement rates are tuned for fun**, not for geographic realism. Starting values *(draft)*: army on a road ~6–8 hexes per month, off-road 3–5, less through forest/swamp.
 
 ### 2.5 Fog of war — PROPOSED

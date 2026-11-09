@@ -72,7 +72,7 @@ describe('population history and growth trend', () => {
     const t = growthTrend(v)!;
     expect(t).toBeCloseTo(v.popHistory[1] / v.popHistory[0] - 1, 12);
     expect(t).toBeGreaterThan(0.005);
-    expect(t).toBeLessThan(0.03);
+    expect(t).toBeLessThan(0.09); // births x1.5 and the labour boost (Session 22): a young village with missing hands grows fast
     expect(v.popHistory[1]).toBeCloseTo(totalPopulation(v.pop), 6);
     for (let y = 2; y < POP_HISTORY_YEARS + 5; y++) for (let i = 0; i < 12; i++) endTurn(s);
     expect(v.popHistory).toHaveLength(POP_HISTORY_YEARS);

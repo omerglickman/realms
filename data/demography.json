@@ -10,16 +10,26 @@
   "workingBands": ["young", "prime", "mature"],
   "fertileBands": ["young", "prime"],
   "recruitBands": ["young", "prime"],
-  "birthsPerWomanPerYear": 0.18,
+  "birthsPerWomanPerYear": 0.27,
+  "_birthsComment": "Session 22, Omer 2026-11-09: births x1.5 (0.18 -> 0.27) so a realm visibly grows within a 400-turn game of seasons. Four modifiers act on top, all below: famine (famineBirthExponent), the granary / surplus factor (granaryBrake: thin stock lowers, a surplus raises), labour (labourBoost: unfilled jobs raise) and crowding (idle hands lower, villages only). On the old 12-turn year a village of 900 took ~30 years to reach the 1,500 town gate.",
+  "famineBirthExponent": 3,
+  "_famineComment": "DECIDED by Omer 2026-11-09: famine drops births significantly until there is enough food for everyone. Births are multiplied by (the year's food sufficiency, 0-1) to this power: 0.9 fed -> 73 %, 0.7 -> 34 %, 0.5 -> 12.5 %. (Was the sufficiency itself, exponent 1.) Reckoned from the year's average, so a settlement is back to full births the first year it is fed.",
+  "labourBoost": {
+    "_comment": "DECIDED by Omer 2026-11-09 (values draft): missing hands raise births. The share of the settlement's jobs (buildings, fields, the building site) that it has no hands for, at the December reckoning, scales births by 1 + maxBoost x min(1, share / vacancyFull). Idle hands lower births through the crowding rule below (villages), so the two pull a village toward full employment.",
+    "vacancyFull": 0.25,
+    "maxBoost": 0.3
+  },
   "crowdingBirthPenalty": 1.0,
   "crowdingAppliesTo": ["village"],
   "_crowdingComment": "DECIDED by Omer 2026-11-04 (value 1.0 is a draft for tuning): in the listed tiers, births are multiplied by (1 − penalty × idle share of hands). 0 = off. At 1.0 a village with 30 % of its hands idle has 30 % fewer births — land-starved villages stop growing instead of starving. Towns and cities are excluded: their idle hands are the workshop/recruit pool, not crowding.",
   "granaryBrake": {
-    "_comment": "DECIDED by Omer 2026-11-05 (values draft): in the listed tiers births are also multiplied by a factor that falls as the granary thins at the December reckoning. The measure is SPARE months = months of stock minus the months until the next harvest (9 in December): spare ≥ spareFull → factor 1; spare ≤ spareEmpty (it will not reach the harvest) → minFactor; linear between. A city stops growing BEFORE famine instead of growing until hunger deaths cancel its births; it settles with about two months to spare in a normal year, so only a bad harvest starves it. The pull side (idle people moving to cities with work) comes with buildings.",
-    "appliesTo": ["town", "city", "metropolis"],
-    "spareFull": 4,
-    "spareEmpty": 0,
-    "minFactor": 0.25
+    "_comment": "DECIDED by Omer 2026-11-05 (thin side); extended 2026-11-09 (Session 22) to a surplus factor for every tier. The measure is SPARE months = months of stock minus the months until the next harvest (9 in December). spare <= spareEmpty (it will not reach the harvest) -> minFactor; spareFull -> 1; spare >= spareMax -> maxFactor; linear between. A thin granary breeds less (a city stops growing BEFORE famine). Session 22 moved the thresholds from 0 / 4 to 1.5 / 7 months: with births x1.5 a city otherwise overshoots its land and starves in bad harvests (hunger deaths over 40 years of the start position: ~10-25k at 0 / 4, ~1.5-5.5k at 1.5 / 7; ~2.8k before the x1.5); a full one breeds more (this replaces the old flat plentyBirthMultiplier, which only fired above a year of stock). Applies to the listed tiers.",
+    "appliesTo": ["village", "town", "city", "metropolis"],
+    "spareFull": 7,
+    "spareEmpty": 1.5,
+    "minFactor": 0.25,
+    "spareMax": 12,
+    "maxFactor": 1.15
   },
   "plentyBirthMultiplier": 1.15,
   "boySexRatio": 0.51,

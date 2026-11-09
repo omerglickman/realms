@@ -6,7 +6,7 @@
 import type { GameState } from '../../sim/state';
 import { calendar } from '../../sim/state';
 import { TIERS, tierIndex, growthTrend, childrenOf, workedCellsBySettlement, buildingDef, type Settlement } from '../../sim/settlements';
-import { totalPopulation, workingHands, recruitableMen, fertileWomen, DEMOGRAPHY, BANDS, granaryBrakeFactor } from '../../sim/demography';
+import { totalPopulation, workingHands, recruitableMen, fertileWomen, DEMOGRAPHY, BANDS, granaryBrakeFactor, labourBirthFactor } from '../../sim/demography';
 import { planLabour, granaryTerms, monthsUntilHarvest, forecastBeforeHarvest, monthlyProduction, taxRate, titheShare, type LabourPlan } from '../../sim/economy';
 import { buildableFor, canBuild, moneyCost } from '../../sim/buildings';
 import { clusterStock, clusterCap, MATERIAL_IDS } from '../../sim/materials';
@@ -261,17 +261,25 @@ function peoplePage(ctx: Ctx): string {
     stat(ICON.people, 'Men 15–44', fmt(recruitableMen(s.pop)), 'the levy pool (Phase 4)'),
     stat(ICON.people, 'Women 15–44', fmt(fertileWomen(s.pop)), `${(100 * DEMOGRAPHY.birthsPerWomanPerYear).toFixed(0)} births per 100 a year, well fed`),
   ].join('');
-  // what limits growth here
-  let brake: string;
-  if ((DEMOGRAPHY.crowdingAppliesTo as string[]).includes(tier.id)) {
-    const idleShare = ctx.hands > 0 ? plan.idleHands / ctx.hands : 0;
-    const factor = Math.max(0, 1 - DEMOGRAPHY.crowdingBirthPenalty * idleShare);
-    brake = `<b>Crowding.</b> A village's births fall with the share of its hands that have no field to work: ${Math.round(100 * idleShare)} % are spare, so births run at <b>${Math.round(100 * factor)} %</b> of the well-fed rate. When its land is full a village settles with about a quarter of its hands spare — the levy pool — instead of starving.`;
-  } else {
-    const spare = foodMonths(s) - monthsUntilHarvest(ctx.month);
-    const factor = granaryBrakeFactor(tier.id, spare);
-    brake = `<b>The granary brake.</b> A ${tier.name.toLowerCase()} breeds less when its stock is thin: at the December reckoning births are scaled by the months of grain it will have <i>to spare</i> at the next harvest (full at ${DEMOGRAPHY.granaryBrake.spareFull}, a quarter at ${DEMOGRAPHY.granaryBrake.spareEmpty}). Reckoned now that is <b>${fmt1(spare)} months</b> → births at <b>${Math.round(100 * factor)} %</b>.`;
-  }
+  // what moves the births (Session 22, Omer 2026-11-09): four factors on top of the well-fed rate, shown as they stand now
+  const crowdable = (DEMOGRAPHY.crowdingAppliesTo as string[]).includes(tier.id);
+  const idleShare = ctx.hands > 0 ? plan.idleHands / ctx.hands : 0;
+  const crowd = crowdable ? Math.max(0, 1 - DEMOGRAPHY.crowdingBirthPenalty * idleShare) : 1;
+  const spare = foodMonths(s) - monthsUntilHarvest(ctx.month);
+  const stockF = granaryBrakeFactor(tier.id, spare);
+  const jobs = Math.max(0, ctx.hands - plan.idleHands) + plan.vacancies;
+  const vacShare = jobs > 0 ? plan.vacancies / jobs : 0;
+  const labourF = labourBirthFactor(vacShare);
+  const fedNow = s.yearMonths > 0 ? s.yearSufficiency / s.yearMonths : s.report.sufficiency;
+  const famineF = Math.pow(Math.max(0, Math.min(1, fedNow)), DEMOGRAPHY.famineBirthExponent);
+  const pctF = (f: number): string => `<b class="${f < 0.95 ? 'warn' : f > 1.02 ? 'good' : ''}">${Math.round(100 * f)} %</b>`;
+  const brake = `<b>What moves the births.</b> Once a year, in the winter turn, the women of 15–44 bear ${(100 * DEMOGRAPHY.birthsPerWomanPerYear).toFixed(0)} children in 100, times four things that stand as follows now:`;
+  const factorRows: [string, string][] = [
+    ['Enough food', `${pctF(famineF)} <span class="dim">· fed ${Math.round(100 * fedNow)} % of need this year; a short year cuts births steeply</span>`],
+    ['Stock in the granary', `${pctF(stockF)} <span class="dim">· ${fmt1(spare)} months to spare at the next harvest (a thin store lowers, a full one raises)</span>`],
+    ['Jobs without hands', `${pctF(labourF)} <span class="dim">· ${Math.round(100 * vacShare)} % of the jobs are unfilled — missing hands raise births</span>`],
+    ['Idle hands', crowdable ? `${pctF(crowd)} <span class="dim">· ${Math.round(100 * idleShare)} % of the hands have no field — a full village stops growing</span>` : `<span class="dim">not counted here — a ${tier.name.toLowerCase()}'s spare hands are its private economy</span>`],
+  ];
   const sufficiency = r.sufficiency;
   const rows: [string, string][] = [
     ['Last year', lastYearText(ctx)],
@@ -286,6 +294,7 @@ function peoplePage(ctx: Ctx): string {
     </div>
     <h3>What moves the numbers</h3>
     <p>${brake}</p>
+    ${kv(factorRows)}
     ${kv(rows)}`;
 }
 

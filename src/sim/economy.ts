@@ -619,7 +619,6 @@ export function demographyYear(state: GameState): void {
   for (const s of list) s.report.sufficiency = s.yearMonths > 0 ? s.yearSufficiency / s.yearMonths : 1;
   for (const s of list) {
     const suff = s.report.sufficiency;
-    const plenty = s.food > 12 * monthlyNeed(s);
     const crowdable = (DEMOGRAPHY as { crowdingAppliesTo: string[] }).crowdingAppliesTo.includes(TIERS[s.tier].id);
     const idleShare = crowdable && s.report.hands > 0 ? s.report.idleHands / s.report.hands : 0;
     const epidemic = k.epidemicChance > 0 && nextFloat(state.rng) < k.epidemicChance;
@@ -627,7 +626,10 @@ export function demographyYear(state: GameState): void {
     const need = monthlyNeed(s);
     const spare = (need > 0 ? s.food / need : 0) - monthsUntilHarvest(DEMOGRAPHY_YEAR_MONTH);
     const birthFactor = granaryBrakeFactor(TIERS[s.tier].id, spare);
-    const res = yearlyUpdate(s.pop, suff, plenty, idleShare, { rng: state.rng, deathMultiplier: epidemic ? k.epidemicDeathMultiplier : 1, birthFactor });
+    // the labour factor (Session 22): the share of its jobs the settlement has no hands for, as planned in December
+    const jobs = Math.max(0, s.report.hands - s.report.idleHands) + s.report.vacancies;
+    const vacancyShare = jobs > 0 ? s.report.vacancies / jobs : 0;
+    const res = yearlyUpdate(s.pop, suff, false, idleShare, { rng: state.rng, deathMultiplier: epidemic ? k.epidemicDeathMultiplier : 1, birthFactor, vacancyShare });
     s.report.births = res.births;
     s.report.deaths = res.deaths;
     s.report.epidemic = epidemic;

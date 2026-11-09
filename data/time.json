@@ -1,0 +1,6 @@
+{
+  "_comment": "DECIDED by Omer 2026-11-09 (Session 22, DESIGN §2.4): one TURN is a season, 3 months. The simulation still steps month by month inside a turn (every rate, cost and duration in data/ is per month, so nothing there changes); the player decides once per turn. Seasons start in firstMonth (index 2 = March): Spring Mar–May, Summer Jun–Aug, Autumn Sep–Nov (the harvest), Winter Dec–Feb (the yearly demographic update runs in its first month). A turn runs to the next season boundary, so a save that is not on a boundary takes one short turn first.",
+  "turnMonths": 3,
+  "firstMonth": 2,
+  "seasons": ["Spring", "Summer", "Autumn", "Winter"]
+}

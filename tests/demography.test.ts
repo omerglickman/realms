@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createPopulation, totalPopulation, workingHands, fertileWomen, yearlyUpdate, applyHunger, takeSlice, addPopulation,
-  emptyPopulation, BANDS,
+  emptyPopulation, BANDS, DEMOGRAPHY, labourBirthFactor,
 } from '../src/sim/demography';
 
 describe('demography', () => {
@@ -14,16 +14,39 @@ describe('demography', () => {
     expect(fertileWomen(p) / 1000).toBeCloseTo(0.22, 1);
   });
 
-  it('grows about 1% a year when well fed and shrinks when starved', () => {
+  it('grows about 2-3% a year when well fed (births x1.5, Session 22) and shrinks when starved', () => {
     const p = createPopulation(1000);
     for (let y = 0; y < 10; y++) yearlyUpdate(p, 1, false);
     const rate = Math.pow(totalPopulation(p) / 1000, 1 / 10) - 1;
-    expect(rate).toBeGreaterThan(0.005);
-    expect(rate).toBeLessThan(0.02);
+    expect(rate).toBeGreaterThan(0.015);
+    expect(rate).toBeLessThan(0.04);
 
     const q = createPopulation(1000);
     yearlyUpdate(q, 0.5, false); // half-fed year → half the births
     expect(totalPopulation(q)).toBeLessThan(1000);
+  });
+
+  it('famine cuts births steeply: the year\'s food sufficiency to the power famineBirthExponent (Omer 2026-11-09)', () => {
+    const a = createPopulation(1000), b = createPopulation(1000);
+    const full = yearlyUpdate(a, 1, false).births, short = yearlyUpdate(b, 0.7, false).births;
+    expect(short / full).toBeCloseTo(Math.pow(0.7, DEMOGRAPHY.famineBirthExponent), 6);
+    expect(short / full).toBeLessThan(0.4);
+  });
+
+  it('missing hands raise births, up to maxBoost, and none missing changes nothing (Omer 2026-11-09)', () => {
+    const base = yearlyUpdate(createPopulation(1000), 1, false).births;
+    const half = yearlyUpdate(createPopulation(1000), 1, false, 0, { vacancyShare: DEMOGRAPHY.labourBoost.vacancyFull / 2 }).births;
+    const full = yearlyUpdate(createPopulation(1000), 1, false, 0, { vacancyShare: 1 }).births;
+    expect(half / base).toBeCloseTo(1 + DEMOGRAPHY.labourBoost.maxBoost / 2, 6);
+    expect(full / base).toBeCloseTo(1 + DEMOGRAPHY.labourBoost.maxBoost, 6);
+    expect(labourBirthFactor(0)).toBe(1);
+  });
+
+  it('idle hands lower births (crowding) and missing hands raise them, in a village', () => {
+    const idle = yearlyUpdate(createPopulation(1000), 1, false, 0.3).births;
+    const none = yearlyUpdate(createPopulation(1000), 1, false, 0).births;
+    expect(idle).toBeLessThan(none);
+    expect(none).toBeLessThan(yearlyUpdate(createPopulation(1000), 1, false, 0, { vacancyShare: 0.5 }).births);
   });
 
   it('plenty raises births', () => {

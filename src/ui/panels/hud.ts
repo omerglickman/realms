@@ -4,7 +4,7 @@
 // Display only.
 
 import type { GameState } from '../../sim/state';
-import { calendar } from '../../sim/state';
+import { calendar, turnNumber } from '../../sim/state';
 import { realmReport } from '../../sim/clusters';
 import { realmCap, MATERIAL_IDS } from '../../sim/materials';
 import { fmt, fmt1, pct, signed, esc, ICON, gauge, popByTierText } from './format';
@@ -76,5 +76,8 @@ export function renderHud(root: HTMLElement, state: GameState, host: HudHost): v
   root.innerHTML = tiles.join('');
   root.querySelectorAll<HTMLElement>('.tile').forEach((t) => t.addEventListener('click', () => host.onRealm(t.dataset.tab!)));
   const date = document.getElementById('info-date');
-  if (date) date.innerHTML = `<b>${esc(cal.monthName)}</b>, year ${cal.year}`;
+  if (date) {
+    date.innerHTML = `<b>${esc(cal.season)}</b>, year ${cal.year} <span class="dim">· turn ${turnNumber(state.turn)}</span>`;
+    date.title = `${cal.monthName}, year ${cal.year} — a turn is a season of three months`;
+  }
 }

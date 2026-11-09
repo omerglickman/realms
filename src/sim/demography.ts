@@ -108,8 +108,10 @@ export interface YearlyOptions {
   rng?: RngState;
   /** multiplies this year's death rates (epidemic year); 1 = normal */
   deathMultiplier?: number;
-  /** extra multiplier on births (the granary brake, DESIGN §4.1); 1 = none */
+  /** extra multiplier on births (the granary factor, DESIGN §4.1); 1 = none */
   birthFactor?: number;
+  /** share of the settlement's jobs it has no hands for (the labour factor, Session 22); 0 = none */
+  vacancyShare?: number;
 }
 
 /** Which tiers the granary brake applies to (read live; the runner and tests can change it — [] = off). */
@@ -122,16 +124,31 @@ export function setGranaryBrakeTiers(tiers: string[]): void {
 }
 
 /**
- * Granary brake (DECIDED 2026-11-05): birth multiplier for a settlement of `tierId`
- * whose December stock will leave `spareMonths` months of food when the next harvest
- * arrives (negative = it will run out first). 1 for tiers the brake does not apply to.
+ * The granary factor (DECIDED 2026-11-05 as a brake; Session 22, Omer 2026-11-09: a surplus raises births too):
+ * birth multiplier for a settlement of `tierId` whose December stock will leave `spareMonths` months of food
+ * when the next harvest arrives (negative = it will run out first). minFactor at/below `spareEmpty`, 1 at
+ * `spareFull`, maxFactor at/above `spareMax`, linear between. 1 for tiers it does not apply to.
  */
 export function granaryBrakeFactor(tierId: string, spareMonths: number): number {
-  const g = (DEMOGRAPHY as { granaryBrake?: { appliesTo: string[]; spareFull: number; spareEmpty: number; minFactor: number } }).granaryBrake;
+  const g = (DEMOGRAPHY as { granaryBrake?: { appliesTo: string[]; spareFull: number; spareEmpty: number; minFactor: number; spareMax: number; maxFactor: number } }).granaryBrake;
   if (!g || !g.appliesTo.includes(tierId)) return 1;
+  if (spareMonths >= g.spareFull) {
+    const up = Math.max(1e-9, g.spareMax - g.spareFull);
+    return 1 + (g.maxFactor - 1) * Math.max(0, Math.min(1, (spareMonths - g.spareFull) / up));
+  }
   const span = Math.max(1e-9, g.spareFull - g.spareEmpty);
   const t = Math.max(0, Math.min(1, (spareMonths - g.spareEmpty) / span));
   return g.minFactor + (1 - g.minFactor) * t;
+}
+
+/**
+ * The labour factor (Session 22, Omer 2026-11-09): unfilled jobs raise births. `vacancyShare` is the share of the
+ * settlement's jobs (buildings, fields, the building site) it has no hands for; 0 = none missing.
+ */
+export function labourBirthFactor(vacancyShare: number): number {
+  const l = (DEMOGRAPHY as { labourBoost?: { vacancyFull: number; maxBoost: number } }).labourBoost;
+  if (!l || l.maxBoost <= 0) return 1;
+  return 1 + l.maxBoost * Math.max(0, Math.min(1, vacancyShare / Math.max(1e-9, l.vacancyFull)));
 }
 
 /** Expected count → realized count: exact when sampling is off or no rng is given, Poisson otherwise. */
@@ -154,8 +171,10 @@ export function yearlyUpdate(p: Population, foodSufficiency: number, plenty: boo
   }
   // 2. births (before aging so newborns stay in the child band)
   const suff = Math.max(0, Math.min(1, foodSufficiency));
-  let mult = suff;
-  if (plenty && suff >= 1) mult *= DEMOGRAPHY.plentyBirthMultiplier;
+  // famine (Session 22, Omer 2026-11-09): births fall steeply while the year's food falls short
+  let mult = Math.pow(suff, DEMOGRAPHY.famineBirthExponent);
+  if (plenty && suff >= 1) mult *= DEMOGRAPHY.plentyBirthMultiplier; // legacy flat bonus; the game passes false — the granary factor replaced it
+  mult *= labourBirthFactor(opts.vacancyShare ?? 0);
   // Crowding lowers births in villages (DESIGN §4.1, DECIDED 2026-11-04); penalty 0 turns it off
   mult *= Math.max(0, 1 - DEMOGRAPHY.crowdingBirthPenalty * Math.max(0, Math.min(1, idleShare)));
   mult *= opts.birthFactor ?? 1;
