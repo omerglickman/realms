@@ -24,6 +24,8 @@ export interface FactionYear {
   spent: number;
   /** coins paid in castle wages and upkeep (Session 18) */
   upkeep: number;
+  /** coins paid in soldiers' pay (units with `upkeepPerManPerMonth`; Session 19) */
+  pay: number;
   /** materials that overflowed cluster caps into the realm stockpile */
   overflowIn: Materials;
   /** materials lost above the realm cap */
@@ -32,7 +34,7 @@ export interface FactionYear {
 }
 
 export function emptyFactionYear(): FactionYear {
-  return { tax: 0, sales: 0, spent: 0, upkeep: 0, overflowIn: emptyMaterials(), lost: emptyMaterials(), months: 0 };
+  return { tax: 0, sales: 0, spent: 0, upkeep: 0, pay: 0, overflowIn: emptyMaterials(), lost: emptyMaterials(), months: 0 };
 }
 
 /** Live faction state (plain JSON in GameState). */

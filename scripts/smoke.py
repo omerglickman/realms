@@ -154,6 +154,39 @@ async def main() -> int:
         await pg.screenshot(path='/tmp/smoke_castle.png')
         await pg.keyboard.press('Escape'); await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
         await tab('treasury'); print('LEDGER:', *lines(await panel(), 'castles'), sep='\n  ')
+        # ---- the levy (Session 19): raise, pay, garrison the castle, fortify ----
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
+        lv = await pg.evaluate('''(cid) => {
+          const w = window.__realms, st = w.state();
+          const home = Object.values(st.settlements).filter(s => !s.castle && s.faction === st.playerFaction)
+            .sort((a, b) => (b.pop.m.reduce((x, y) => x + y, 0)) - (a.pop.m.reduce((x, y) => x + y, 0)))[0];
+          w.act({ type: 'raiseUnit', spec: { type: 'levy', at: home.id, muster: [{ id: home.id, people: 60 }], provisionMonths: 3 } });
+          const u = Object.values(w.state().units).find(x => x.type === 'levy');
+          return u ? u.id : null; }''', cid)
+        assert lv, 'the levy was not raised'
+        await pg.keyboard.press('Space'); await pg.wait_for_timeout(400)
+        pay = await pg.evaluate('() => window.__realms.state().factions[window.__realms.state().playerFaction].year.pay')
+        print('LEVY PAY this year:', pay); assert pay > 0, 'the levy was not paid'
+        await pg.evaluate('''([lv, cid]) => { const w = window.__realms, st = w.state(); const k = st.settlements[cid], u = st.units[lv]; u.col = k.col; u.row = k.row; }''', [lv, cid])
+        await pg.keyboard.press('Space'); await pg.wait_for_timeout(400)
+        await pg.evaluate('(cid) => window.__realms.focus(cid)', cid); await pg.wait_for_timeout(400)
+        ct = await panel(); print('CASTLE WITH GARRISON:', *lines(ct, 'Garrison'), sep='\n  ')
+        assert 'inside' in ct, 'the castle ledger shows no garrison'
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
+        forted = await pg.evaluate('''([lv, cid]) => {
+          const w = window.__realms, st = w.state(), u = st.units[lv], k = st.settlements[cid];
+          for (const [dc, dr] of [[3,3],[-3,3],[3,-3],[-3,-3],[4,2],[-4,2]]) {
+            u.col = k.col + dc; u.row = k.row + dr;
+            const n = Object.keys(w.state().forts).length;
+            try { w.act({ type: 'fortify', unitId: lv }); } catch (e) { continue; }
+            if (Object.keys(w.state().forts).length > n) return true;
+          }
+          return false; }''', [lv, cid])
+        print('FORTIFY:', forted); assert forted, 'the levy could not fortify anywhere'
+        await pg.keyboard.press('Space'); await pg.wait_for_timeout(300)
+        await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
+        await tab('treasury'); print('LEDGER (pay):', *lines(await panel(), 'pay'), sep='\n  ')
+        await pg.screenshot(path='/tmp/smoke_levy.png')
         await b.close()
     if errs:
         print('CONSOLE ERRORS:', *errs, sep='\n  '); return 1

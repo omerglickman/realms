@@ -5,6 +5,9 @@
 // Settle at…, Disband, Cancel order. Display and forwarding only.
 
 import type { GameState } from '../../sim/state';
+import { canFortify, fortAt } from '../../sim/forts';
+import { CASTLES } from '../../sim/castles';
+import { garrisonShare } from '../../sim/garrison';
 import { type Unit, unitTypeDef, isForming, unitCell, canSettle, disbandTarget, routeFor, UNITS } from '../../sim/units';
 import { totalPopulation, workingHands } from '../../sim/demography';
 import { makeBuildOrder, orderSummary } from '../../sim/workbands';
@@ -23,6 +26,7 @@ export interface UnitCardHost {
   onSettleAt(id: string): void;
   onSettleHere(id: string): void;
   onDisband(id: string): void;
+  onFortify(id: string): void;
   onCancelOrder(id: string): void;
   onFocusSettlement(id: string): void;
 }
@@ -124,6 +128,10 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
       btns.push(`<button class="btn small" data-act="settleAt" title="Walk to a hex and found a village there">${ICON.village} Settle at…</button>`);
       btns.push(`<button class="btn small primary" data-act="settleHere" ${settleCheck?.ok ? '' : `disabled title="${esc(settleCheck?.reason ?? '')}"`}>Settle here</button>`);
     }
+    if (def.canFortify) {
+      const fc = canFortify(state, u);
+      btns.push(`<button class="btn small" data-act="fortify" ${fc.ok ? `title="Raise a fort on this hex: ${CASTLES.fort.fortifyTimber} timber, holds ${CASTLES.fort.capacity} men, the border grows one ring; it falls into disuse ${CASTLES.fort.decayMonths} months after the last unit leaves"` : `disabled title="${esc(fc.reason ?? '')}"`}>${ICON.castle1 ?? ICON.hammer} Fortify</button>`);
+    }
     btns.push(`<button class="btn small ${disband.ok ? '' : ''}" data-act="disband" ${disband.ok ? `title="Rejoin ${esc(disband.target!.name)}${disband.distance ? ` (${disband.distance} hex${disband.distance === 1 ? '' : 'es'} away — walks there)` : ''}"` : `disabled title="${esc(disband.reason ?? '')}"`}>Disband</button>`);
     if (u.order) btns.push(`<button class="btn small danger" data-act="cancel" title="Stay where it stands">Cancel order</button>`);
   }
@@ -142,6 +150,7 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
   root.querySelector('[data-act=move]')?.addEventListener('click', () => host.onMove(u.id));
   root.querySelector('[data-act=settleAt]')?.addEventListener('click', () => host.onSettleAt(u.id));
   root.querySelector('[data-act=settleHere]')?.addEventListener('click', () => host.onSettleHere(u.id));
+  root.querySelector('[data-act=fortify]')?.addEventListener('click', () => host.onFortify(u.id));
   root.querySelector('[data-act=disband]')?.addEventListener('click', () => host.onDisband(u.id));
   root.querySelector('[data-act=cancel]')?.addEventListener('click', () => host.onCancelOrder(u.id));
   root.querySelector<HTMLElement>('[data-home]')?.addEventListener('click', (e) => { e.preventDefault(); host.onFocusSettlement(u.home); });

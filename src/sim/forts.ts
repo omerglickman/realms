@@ -2,16 +2,16 @@
 // unit. A fort is NOT a settlement: it has no staff, no cluster and no ladder
 // rank; it extends the border by one ring, holds 100 men, and disappears 12
 // months after the last unit leaves. A castle may be built on it, saving a
-// quarter of the time. Omer's reading (2026-11-08): the fort is built now, but
-// no unit type can fortify yet (levies arrive next session, with garrisons),
-// so nothing creates one in play — `canFortify` in data/units.json is the switch.
+// quarter of the time. Since Session 19 the levy can fortify (`canFortify` in
+// data/units.json is the switch); `fortify`/`unfortify` are commands, so the order
+// can be undone with an exact refund.
 // PLACEHOLDER: the order is instant (the design says one month). No DOM.
 
 import type { GameState } from './state';
 import { logEvent } from './state';
 import { CASTLES } from './castles';
 import { settlementIdAt } from './settlements';
-import { clusterStock, payFromCluster } from './materials';
+import { clusterStock, payFromCluster, refund, type Payment } from './materials';
 import { coveringSettlement, type Unit, unitCell, unitTypeDef } from './units';
 import { TERRAIN } from './terrain';
 import { offsetToAxial, axialRange, axialToOffset } from './hex';
@@ -48,21 +48,39 @@ export function canFortify(state: GameState, u: Unit): FortifyCheck {
   return { ok: true };
 }
 
-/** Pay and raise the fort (timber from the covering cluster, else the realm). Returns the fort. */
-export function fortify(state: GameState, u: Unit): Fort {
+/** What a fort cost, and who paid it — enough to refund it exactly. */
+export interface FortifyResult {
+  fort: Fort;
+  paid: Payment[];
+  fromRealm: number;
+  /** cluster member to refund into if a payer is gone */
+  fallbackId: string | null;
+}
+
+/** Pay and raise the fort (timber from the covering cluster, else the realm). */
+export function fortify(state: GameState, u: Unit): FortifyResult {
   const c = canFortify(state, u);
   if (!c.ok) throw new Error(c.reason);
   const need = CASTLES.fort.fortifyTimber;
   const owner = coveringSettlement(state, u.faction, unitCell(state.map, u));
   const fromCluster = owner ? Math.min(need, clusterStock(state, owner.id).timber) : 0;
-  if (owner && fromCluster > 0) payFromCluster(state, owner, { timber: fromCluster });
+  const paid = owner && fromCluster > 0 ? payFromCluster(state, owner, { timber: fromCluster }) : [];
   const f = state.factions[u.faction];
-  if (f) f.stock.timber -= need - fromCluster;
+  const fromRealm = need - fromCluster;
+  if (f) f.stock.timber -= fromRealm;
   const id = `f${state.nextId++}`;
   const fort: Fort = { id, col: u.col, row: u.row, faction: u.faction, emptyMonths: 0, builtTurn: state.turn };
   state.forts[id] = fort;
   logEvent(state, 'fortified', `${u.name} fortified (${u.col}, ${u.row}).`);
-  return fort;
+  return { fort, paid, fromRealm, fallbackId: owner ? owner.id : null };
+}
+
+/** Undo a fortify: remove the fort and give back the timber. */
+export function unfortify(state: GameState, fortId: string, paid: Payment[], fromRealm: number, fallbackId: string | null, faction: string): void {
+  delete state.forts[fortId];
+  if (paid.length > 0) refund(state, paid, fallbackId ?? paid[0].id);
+  const f = state.factions[faction];
+  if (f && fromRealm > 0) f.stock.timber += fromRealm;
 }
 
 /** Monthly: a fort with no unit of its faction on the hex for `decayMonths` disappears. */

@@ -1,5 +1,5 @@
 {
-  "_comment": "Units (DESIGN §3.2b, DECIDED by Omer 2026-11-07; every number here is DRAFT, ×3 scale — DESIGN §5.8). A unit carries people drawn from settlements (a proportional slice of every cohort; a levy takes men 15–44 only) and returns them when it settles or disbands. `enabled` says which types the player may raise in the current build: settlers in Phase 2 session 1; work-bands since session 2 (Session 16); levies (session 3) are data only until then. Costs: `money` from the faction treasury; materials from the raising settlement's cluster stockpile, the rest from the realm stockpile with a notice (instant — PLACEHOLDER until roads and caravans). `movePoints` per month against data/terrain.json moveCost (mountains take the whole month, lake and sea are impassable, a river hex is crossed only by a bridge or a settlement standing on it). `defaultSize`: a number of people, or \"destination\" = the hands the destination's seven hexes + hall + granary need, turned into people at the source's hands share. `defaultProvisions`: months, or \"calendar\" = months until the October harvest + 2 (max 12).",
+  "_comment": "Units (DESIGN §3.2b, DECIDED by Omer 2026-11-07; every number here is DRAFT, ×3 scale — DESIGN §5.8). A unit carries people drawn from settlements (a proportional slice of every cohort; a levy takes men 15–44 only) and returns them when it settles or disbands. `enabled` says which types the player may raise in the current build: settlers in Phase 2 session 1; work-bands since session 2 (Session 16); levies since Session 19 (men 15–44, pay 1 coin a man a month, disband = a walk home, they garrison castles and may fortify). Costs: `money` from the faction treasury; materials from the raising settlement's cluster stockpile, the rest from the realm stockpile with a notice (instant — PLACEHOLDER until roads and caravans). `movePoints` per month against data/terrain.json moveCost (mountains take the whole month, lake and sea are impassable, a river hex is crossed only by a bridge or a settlement standing on it). `defaultSize`: a number of people, or \"destination\" = the hands the destination's seven hexes + hall + granary need, turned into people at the source's hands share. `defaultProvisions`: months, or \"calendar\" = months until the October harvest + 2 (max 12).",
   "types": [
     {
       "id": "settlers",
@@ -32,7 +32,7 @@
       "id": "levy",
       "name": "Levy",
       "icon": "levy",
-      "enabled": false,
+      "enabled": true,
       "slice": "men",
       "movePoints": 5,
       "cost": { "money": 0 },
@@ -40,7 +40,9 @@
       "defaultProvisions": 3,
       "canSettle": false,
       "upkeepPerManPerMonth": 1,
-      "blurb": "Men 15–44 called from a settlement; paid upkeep; disband is a walk home (Phase 2 session 3)."
+      "canFortify": true,
+      "disbandsHome": true,
+      "blurb": "Men 15–44 called from a settlement; paid 1 coin a man a month and fed; they garrison castles, fortify the ground, and disband by walking home."
     }
   ],
   "provisions": {

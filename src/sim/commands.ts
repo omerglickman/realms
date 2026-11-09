@@ -24,6 +24,7 @@ import { infraCellAt, type InfraCell } from './infrastructure';
 import type { Payment } from './materials';
 import { addPopulation } from './demography';
 import { clusterRootOf } from './clusters';
+import { fortify, unfortify } from './forts';
 import { idx as cellIndex } from './map';
 
 export interface CellEdit {
@@ -170,6 +171,25 @@ export interface DisbandUnitCommand {
   id: string;
 }
 
+/**
+ * A unit that can fortify raises a fort on the hex it stands on (DESIGN §3.5).
+ * Instant — PLACEHOLDER. Inverse: unfortify (exact refund).
+ */
+export interface FortifyCommand {
+  type: 'fortify';
+  unitId: string;
+}
+
+export interface UnfortifyCommand {
+  type: 'unfortify';
+  unitId: string;
+  fortId: string;
+  faction: string;
+  paid: Payment[];
+  fromRealm: number;
+  fallbackId: string | null;
+}
+
 export interface UndisbandCommand {
   type: 'undisband';
   unit: Unit;
@@ -252,6 +272,8 @@ export type Command =
   | UnsettleCommand
   | DisbandUnitCommand
   | UndisbandCommand
+  | FortifyCommand
+  | UnfortifyCommand
   | SendFoodCommand
   | QueueBuildingCommand
   | CancelBuildingCommand
@@ -500,6 +522,7 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       if (!u) throw new Error(`No unit "${cmd.id}"`);
       const d = disbandTarget(state, u);
       if (!d.ok || !d.target) throw new Error(`${u.name} cannot disband: ${d.reason}`);
+      if (!(d.target.col === u.col && d.target.row === u.row) && !routeFor(state, u, cellIndex(state.map, d.target.col, d.target.row))) throw new Error(`${u.name} cannot disband: no way home`);
       if (d.target.col === u.col && d.target.row === u.row) {
         const snapshot: Unit = JSON.parse(JSON.stringify(u));
         disbandInto(state, u, d.target);
@@ -509,6 +532,16 @@ export function applyCommand(state: GameState, cmd: Command): Command {
       u.order = { kind: 'move', dest: cellIndex(state.map, d.target.col, d.target.row), then: 'disband', to: d.target.id };
       u.build = null;
       return { type: 'orderUnit', id: cmd.id, order: prev, build: prevBuild };
+    }
+    case 'fortify': {
+      const u = state.units[cmd.unitId];
+      if (!u) throw new Error(`No unit "${cmd.unitId}"`);
+      const r = fortify(state, u);
+      return { type: 'unfortify', unitId: u.id, fortId: r.fort.id, faction: u.faction, paid: r.paid, fromRealm: r.fromRealm, fallbackId: r.fallbackId };
+    }
+    case 'unfortify': {
+      unfortify(state, cmd.fortId, cmd.paid, cmd.fromRealm, cmd.fallbackId, cmd.faction);
+      return { type: 'fortify', unitId: cmd.unitId };
     }
     case 'undisband': {
       const s = state.settlements[cmd.into];
@@ -582,7 +615,7 @@ export function commandTouchesSettlements(cmd: Command): boolean {
 
 /** Does this command touch units (so the unit layer must redraw)? */
 export function commandTouchesUnits(cmd: Command): boolean {
-  return cmd.type === 'raiseUnit' || cmd.type === 'cancelRaise' || cmd.type === 'orderUnit' || cmd.type === 'settleUnit' || cmd.type === 'unsettle' || cmd.type === 'disbandUnit' || cmd.type === 'undisband' || cmd.type === 'replaceMap';
+  return cmd.type === 'raiseUnit' || cmd.type === 'cancelRaise' || cmd.type === 'orderUnit' || cmd.type === 'settleUnit' || cmd.type === 'unsettle' || cmd.type === 'disbandUnit' || cmd.type === 'undisband' || cmd.type === 'fortify' || cmd.type === 'unfortify' || cmd.type === 'replaceMap';
 }
 
 /** Cells touched by a command (for renderer invalidation); 'all' for whole-map commands. */

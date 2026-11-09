@@ -303,6 +303,7 @@ export async function startApp(): Promise<void> {
       onSettleAt: (id) => startOrder(id, 'settle'),
       onSettleHere: (id) => act({ type: 'settleUnit', id }),
       onDisband: (id) => act({ type: 'disbandUnit', id }),
+      onFortify: (id) => act({ type: 'fortify', unitId: id }),
       onCancelOrder: (id) => act({ type: 'orderUnit', id, order: null }),
       onBuildHere: (id, item) => {
         const bu = state.units[id];
@@ -535,6 +536,7 @@ export async function startApp(): Promise<void> {
           onRemove: (id) => { editor.removeSettlement(id); closeView(); },
           onUpgrade: (id) => act({ type: 'upgradeSettlement', id }),
           onCancelUpgrade: (id) => act({ type: 'cancelUpgrade', id }),
+          onSelectUnit: (unitId) => { selectUnit(unitId); const u = state.units[unitId]; if (u) { const p = offsetToPixel(u.col, u.row, HEX_SIZE); camera.centerOn(p.x, p.y); refreshLayer(); } },
         }, editor.active);
         wireLinks(croot, links);
         return;

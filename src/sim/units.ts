@@ -25,6 +25,7 @@ import { clusterMembers } from './clusters';
 import { hexJobs, ECONOMY, type Job } from './economy';
 import { findRoute, stepsThisMonth, isRiver, OPEN, type Route } from './pathfinding';
 import { type BuildOrder, type WorkProject, buildMonth } from './workbands';
+import { garrisonShare } from './garrison';
 
 // ---- data ----
 
@@ -45,7 +46,10 @@ export interface UnitTypeDef {
   canBuild?: boolean;
   /** may it fortify the hex it stands on (Session 18, DESIGN §3.5)? Military units only; none yet */
   canFortify?: boolean;
+  /** coins a man costs the treasury each month (levies, Session 19) */
   upkeepPerManPerMonth?: number;
+  /** disband is a walk to the home settlement, from any distance (levies; rule 9) */
+  disbandsHome?: boolean;
   blurb?: string;
 }
 
@@ -99,6 +103,10 @@ export interface UnitReport {
   built?: number;
   /** the hexes the unit stood on this month, in order, for the glide (builders) */
   trail?: number[];
+  /** coins of pay this month (levies) */
+  pay?: number;
+  /** castle id and the share of the unit inside its walls (0–1) when garrisoned (Session 19) */
+  garrison?: { castle: string; inside: number } | null;
 }
 
 export function emptyUnitReport(): UnitReport {
@@ -470,9 +478,20 @@ export interface DisbandCheck { ok: boolean; reason?: string; target?: Settlemen
 export function disbandTarget(state: GameState, u: Unit): DisbandCheck {
   if (isForming(state, u)) return { ok: false, reason: 'the party is still forming' };
   const here = unitAxial(u);
+  const def = unitTypeDef(u.type);
+  if (def.disbandsHome) {
+    // a levy goes home, from any distance (rule 9): the settlement it was raised at, else the nearest own settlement
+    const home = state.settlements[u.home];
+    if (home && home.faction === u.faction && !isCastle(home)) return { ok: true, target: home, distance: axialDistance(here, settlementAxial(home)) };
+    const own = Object.values(state.settlements).filter((s) => s.faction === u.faction && !isCastle(s))
+      .map((s) => ({ s, d: axialDistance(here, settlementAxial(s)) }))
+      .sort((a, b) => a.d - b.d || (a.s.id < b.s.id ? -1 : 1));
+    if (own.length === 0) return { ok: false, reason: 'no own settlement to go home to' };
+    return { ok: true, target: own[0].s, distance: own[0].d };
+  }
   const reach = UNITS.disband.withinHexes;
   const cands = Object.values(state.settlements)
-    .filter((s) => s.faction === u.faction)
+    .filter((s) => s.faction === u.faction && !isCastle(s)) // people cannot rejoin a castle (it holds none)
     .map((s) => ({ s, d: axialDistance(here, settlementAxial(s)), starving: s.report.shortfall > 0 ? s.report.shortfall : 0 }))
     .filter((c) => c.d <= reach);
   if (cands.length === 0) return { ok: false, reason: `no own settlement within ${reach} hexes` };
@@ -557,6 +576,13 @@ export function unitsMonth(state: GameState, month: number): void {
     if (!u) continue;
     const r = emptyUnitReport();
     const forming = isForming(state, u);
+    // pay (levies, rule 9): coins a man a month from the treasury — PLACEHOLDER: it may go negative, as castle wages do (DESIGN §3.5)
+    const upDef = unitTypeDef(u.type);
+    const fac = state.factions[u.faction];
+    if (upDef.upkeepPerManPerMonth && fac) {
+      const pay = totalPopulation(u.pop) * upDef.upkeepPerManPerMonth;
+      fac.treasury -= pay; fac.year.pay += pay; r.pay = pay;
+    }
     // 1. movement — or a work-band's building (Session 16)
     if (u.build && !forming) {
       buildMonth(state, u, r);
@@ -598,7 +624,16 @@ export function unitsMonth(state: GameState, month: number): void {
     }
     // 2. provisions: refill inside the borders, forage outside; eat; hunger when the bags are empty
     const people = totalPopulation(u.pop);
-    const need = people; // 1 food per person per month (data/economy.json foodPerPersonPerMonth)
+    let need = people; // 1 food per person per month (data/economy.json foodPerPersonPerMonth)
+    // a garrison inside a castle of its own eats from the castle's reserve first (DESIGN §3.5)
+    let eatenAtCastle = 0;
+    const gar = garrisonShare(state, u);
+    if (gar) {
+      eatenAtCastle = Math.min(gar.castle.food, people * gar.inside);
+      gar.castle.food -= eatenAtCastle;
+      need -= eatenAtCastle;
+      r.garrison = { castle: gar.castle.id, inside: gar.inside };
+    }
     const cell = unitCell(map, u);
     const owner = coveringSettlement(state, u.faction, cell);
     r.inBorders = owner !== null;
@@ -633,6 +668,7 @@ export function unitsMonth(state: GameState, month: number): void {
         if (r.hungerDeaths > 0.5) logEvent(state, 'hunger', `${u.name} is starving in the field: ${Math.round(r.hungerDeaths)} died.`);
       }
     }
+    r.consumed += eatenAtCastle;
     u.report = r;
     if (totalPopulation(u.pop) < 1) {
       delete state.units[u.id];

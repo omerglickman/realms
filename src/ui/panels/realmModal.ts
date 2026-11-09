@@ -73,7 +73,7 @@ function overviewPage(state: GameState, r: Report): string {
   const stats = [
     stat(ICON.people, 'People', fmt(r.population), growth !== null ? `${pct(growth)} last year` : `${r.clusters.length} clusters`),
     stat(ICON.granary, 'Food', `${fmt1(months)} <small>months</small>`, `${fmt(r.food)} in all granaries` + (r.lastYear ? ` · ${signed(r.lastYear.produced - r.lastYear.consumed)} last year` : ''), gauge(months / 24, { marks: [3 / 24] })),
-    stat(ICON.coin, 'Treasury', `${fmt(f?.treasury ?? 0)} <small>coins</small>`, ly ? `${signed(ly.tax + ly.sales - ly.spent - (ly.upkeep ?? 0))} last year · +${fmt(f?.year.tax ?? 0)} tax so far this year` : `+${fmt(f?.year.tax ?? 0)} tax this year`),
+    stat(ICON.coin, 'Treasury', `${fmt(f?.treasury ?? 0)} <small>coins</small>`, ly ? `${signed(ly.tax + ly.sales - ly.spent - (ly.upkeep ?? 0) - (ly.pay ?? 0))} last year · +${fmt(f?.year.tax ?? 0)} tax so far this year` : `+${fmt(f?.year.tax ?? 0)} tax this year`),
     stat(ICON.goods, 'Stockpile', `${fmt(f?.stock.timber ?? 0)} <small>timber</small>`, `${fmt(f?.stock.stone ?? 0)} stone · ${fmt(f?.stock.goods ?? 0)} goods`),
   ].join('');
   const warnings: string[] = [];
@@ -154,16 +154,17 @@ function treasuryPage(state: GameState, r: Report): string {
   if (!f) return '<p class="note">No faction.</p>';
   const y = f.year, ly = f.lastYear;
   const up = (k: typeof y) => k.upkeep ?? 0;
-  const net = (k: typeof y) => k.tax + k.sales - k.spent - up(k);
+  const pay = (k: typeof y) => k.pay ?? 0;
+  const net = (k: typeof y) => k.tax + k.sales - k.spent - up(k) - pay(k);
   const stats = [
     stat(ICON.coin, 'Treasury', `${fmt(f.treasury)} <small>coins</small>`, 'the realm\'s money; clusters hold grain and materials, never coin'),
     stat(ICON.scroll, 'Tax base', fmt(privateHands(state, r)), `private hands × ${taxRate()} coins a year × administration`),
     stat(ICON.goods, 'Sales', `${fmt(y.sales)} <small>this year</small>`, ly ? `${fmt(ly.sales)} last year · only Markets sell goods` : 'only Markets sell goods'),
     stat(ICON.hammer, 'Spent', `${fmt(y.spent)} <small>this year</small>`, ly ? `${fmt(ly.spent)} last year, on buildings and castles` : 'on buildings and castles'),
   ].join('');
-  const ledger = `<table class="data"><tr><th></th><th class="r">tax</th><th class="r">sales</th><th class="r">spent</th><th class="r" title="castle wages and upkeep">castles</th><th class="r">net</th></tr>
-    <tr><td>This year <span class="dim">(${y.months} month${y.months === 1 ? '' : 's'})</span></td><td class="r">+${fmt(y.tax)}</td><td class="r">+${fmt(y.sales)}</td><td class="r">−${fmt(y.spent)}</td><td class="r">${up(y) > 0.5 ? `−${fmt(up(y))}` : ''}</td><td class="r ${net(y) >= 0 ? 'good' : 'warn'}">${signed(net(y))}</td></tr>
-    ${ly ? `<tr><td>Last year</td><td class="r">+${fmt(ly.tax)}</td><td class="r">+${fmt(ly.sales)}</td><td class="r">−${fmt(ly.spent)}</td><td class="r">${up(ly) > 0.5 ? `−${fmt(up(ly))}` : ''}</td><td class="r ${net(ly) >= 0 ? 'good' : 'warn'}">${signed(net(ly))}</td></tr>` : ''}</table>`;
+  const ledger = `<table class="data"><tr><th></th><th class="r">tax</th><th class="r">sales</th><th class="r">spent</th><th class="r" title="castle wages and upkeep">castles</th><th class="r" title="soldiers' pay: a coin a man a month">pay</th><th class="r">net</th></tr>
+    <tr><td>This year <span class="dim">(${y.months} month${y.months === 1 ? '' : 's'})</span></td><td class="r">+${fmt(y.tax)}</td><td class="r">+${fmt(y.sales)}</td><td class="r">−${fmt(y.spent)}</td><td class="r">${up(y) > 0.5 ? `−${fmt(up(y))}` : ''}</td><td class="r">${pay(y) > 0.5 ? `−${fmt(pay(y))}` : ''}</td><td class="r ${net(y) >= 0 ? 'good' : 'warn'}">${signed(net(y))}</td></tr>
+    ${ly ? `<tr><td>Last year</td><td class="r">+${fmt(ly.tax)}</td><td class="r">+${fmt(ly.sales)}</td><td class="r">−${fmt(ly.spent)}</td><td class="r">${up(ly) > 0.5 ? `−${fmt(up(ly))}` : ''}</td><td class="r">${pay(ly) > 0.5 ? `−${fmt(pay(ly))}` : ''}</td><td class="r ${net(ly) >= 0 ? 'good' : 'warn'}">${signed(net(ly))}</td></tr>` : ''}</table>`;
   const byCluster = r.clusters.filter((c) => (c.totals.lastYear?.tax ?? c.totals.year.tax) > 0.5).map((c) => {
     const t = c.totals.lastYear ?? c.totals.year;
     const ph = c.members.reduce((a, id) => a + state.settlements[id].report.privateHands, 0);

@@ -10,6 +10,7 @@ import { TIERS, tierIndex, childrenOf, workedCellsBySettlement, isRuin, type Set
 import { ECONOMY } from '../../sim/economy';
 import { CASTLES, castleKindOf, castleNeed, allocateService } from '../../sim/castles';
 import { canUpgrade, upgradeStep } from '../../sim/upgrades';
+import { garrisonOf } from '../../sim/garrison';
 import { fmt, fmt1, esc, tierName, tierGlyph, gauge, stat, kv, ICON } from './format';
 import type { ModalSpec } from './modal';
 
@@ -18,6 +19,7 @@ export interface CastleHost {
   onRemove(id: string): void;
   onUpgrade(id: string): void;
   onCancelUpgrade(id: string): void;
+  onSelectUnit(unitId: string): void;
 }
 
 function reserveInfo(s: Settlement): { cap: number; months: number; fraction: number } {
@@ -55,7 +57,7 @@ export function castleSpec(state: GameState, s: Settlement, editing: boolean): M
   } else {
     const stats = [
       stat(ICON.hand, 'Staffing', `${Math.round(100 * fed)} <small>%</small>`, `${fmt(c.gotHands)} of ${fmt(c.needHands || need.total)} hands in service`, gauge(fed, { title: 'hands in service ÷ hands it needs' })),
-      stat(ICON.castle1 ?? ICON.people, 'Garrison room', `${fmt(c.garrisonCapacity)}`, `of ${fmt(kind.capacity)} at full staffing · no garrison yet — military units come with levies`),
+      stat(ICON.castle1 ?? ICON.people, 'Garrison room', `${fmt(c.garrisonCapacity)}`, `${fmt(garrisonOf(state, s).inside)} inside · of ${fmt(kind.capacity)} at full staffing`),
       stat(ICON.granary, 'Siege reserve', `${fmt1(res.months)} <small>of ${CASTLES.reserve.months} months</small>`, `${fmt(s.food)} food · fed by its own hexes, then its subordinates' surplus`, gauge(res.fraction, { title: 'food in the reserve ÷ the reserve for a full garrison' })),
       stat(ICON.coin, 'Cost', `${fmt((c.wages + c.upkeep) * 12)} <small>coins / yr</small>`, `wages ${fmt(c.wages * 12)} (${fmt(c.gotHands)} hands × ${CASTLES.service.wagePerHandPerMonth}/mo) + upkeep ${fmt(kind.upkeepPerYear)}`),
     ].join('');
@@ -66,6 +68,9 @@ export function castleSpec(state: GameState, s: Settlement, editing: boolean): M
     const rows: [string, string][] = [
       ['Served by', served || '<span class="warn">nobody — no settlement of yours within its influence rings</span>'],
       ['Worked hexes', worked.length ? `${worked.length} (${need.jobs.length ? need.jobs.map((j) => j.kind).join(', ') : 'no food'}) · ${fmt(need.hexHands)} hands · ${fmt(kind.staffHands)} more run the walls` : '<span class="dim">none — a small castle works no land</span>'],
+      ['Garrison', garrisonOf(state, s).rows.length
+        ? garrisonOf(state, s).rows.map((r) => `<a href="#" data-unit="${r.unit.id}">${esc(r.unit.name)}</a> <span class="dim num">${fmt(r.inside)} inside${r.inside < r.people - 0.5 ? ` of ${fmt(r.people)} (the rest camp outside)` : ''}</span>`).join(' · ')
+        : '<span class="dim">empty — a levy standing here becomes the garrison and eats from the reserve</span>'],
       ['Under it', children.length ? children.map((k) => `${tierGlyph(k.tier)}<a href="#" data-focus="${k.id}">${esc(k.name)}</a>`).join(', ') : '<span class="dim">nothing yet</span>'],
       ['Influence', `${TIERS[s.tier].influenceRings} rings`],
       ['Founded', `${calendar(s.foundedTurn).monthName}, year ${calendar(s.foundedTurn).year}`],
@@ -118,6 +123,7 @@ export function wireCastle(root: HTMLElement, s: Settlement, host: CastleHost, e
   const name = root.querySelector<HTMLInputElement>('#sp-name');
   if (name && editing) name.addEventListener('change', () => { const v = name.value.trim(); if (v && v !== s.name) host.onRename(s.id, v); });
   root.querySelector<HTMLButtonElement>('#sp-remove')?.addEventListener('click', () => host.onRemove(s.id));
+  root.querySelectorAll<HTMLElement>('[data-unit]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); host.onSelectUnit(b.dataset.unit!); }));
   root.querySelector<HTMLButtonElement>('[data-upgrade]')?.addEventListener('click', () => host.onUpgrade(s.id));
   root.querySelector<HTMLButtonElement>('[data-cancel-upgrade]')?.addEventListener('click', (e) => { e.stopPropagation(); host.onCancelUpgrade(s.id); });
 }

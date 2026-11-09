@@ -299,7 +299,7 @@ describe('upgrading in place and the pathfinding hook', () => {
 });
 
 describe('forts', () => {
-  it('nothing can fortify yet; with a unit that can, the fort is raised and disappears 12 months after it leaves', () => {
+  it('a workband cannot fortify; with a unit that can, the fort is raised and disappears 12 months after it leaves', () => {
     const { state } = world();
     const home = found(state, 'Home', 'town', 12, 10, 6000);
     const u = band(state, home);
@@ -309,7 +309,7 @@ describe('forts', () => {
     try {
       u.col = 3; u.row = 3;
       const timber = state.factions[u.faction].stock.timber;
-      const fort = fortify(state, u);
+      const { fort } = fortify(state, u);
       expect(fortAt(state, 3, 3)).toBe(fort);
       expect(state.factions[u.faction].stock.timber).toBe(timber - CASTLES.fort.fortifyTimber);
       u.col = 5; // leaves
