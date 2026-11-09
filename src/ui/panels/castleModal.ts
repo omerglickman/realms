@@ -57,7 +57,7 @@ export function castleSpec(state: GameState, s: Settlement, editing: boolean): M
   } else {
     const stats = [
       stat(ICON.hand, 'Staffing', `${Math.round(100 * fed)} <small>%</small>`, `${fmt(c.gotHands)} of ${fmt(c.needHands || need.total)} hands in service`, gauge(fed, { title: 'hands in service ÷ hands it needs' })),
-      stat(ICON.castle1 ?? ICON.people, 'Garrison room', `${fmt(c.garrisonCapacity)}`, `${fmt(garrisonOf(state, s).inside)} inside · of ${fmt(kind.capacity)} at full staffing`),
+      stat(ICON.castle1 ?? ICON.people, 'Garrison', `${fmt(garrisonOf(state, s).inside)} <small>of ${fmt(c.garrisonCapacity)} room</small>`, `${fmt(kind.capacity)} at full staffing`, gauge(c.garrisonCapacity > 0 ? garrisonOf(state, s).inside / c.garrisonCapacity : 0, { title: 'people inside ÷ room at this staffing' })),
       stat(ICON.granary, 'Siege reserve', `${fmt1(res.months)} <small>of ${CASTLES.reserve.months} months</small>`, `${fmt(s.food)} food · fed by its own hexes, then its subordinates' surplus`, gauge(res.fraction, { title: 'food in the reserve ÷ the reserve for a full garrison' })),
       stat(ICON.coin, 'Cost', `${fmt((c.wages + c.upkeep) * 12)} <small>coins / yr</small>`, `wages ${fmt(c.wages * 12)} (${fmt(c.gotHands)} hands × ${CASTLES.service.wagePerHandPerMonth}/mo) + upkeep ${fmt(kind.upkeepPerYear)}`),
     ].join('');
@@ -140,7 +140,7 @@ export function renderCastleHover(root: HTMLElement, state: GameState, s: Settle
     ${ruin ? '<div class="warnline">⚠ in ruins — a work-band can rebuild it</div>' : `
     ${row('Staffing', `${Math.round(100 * c.staffing)} % <span class="dim">(${fmt(c.gotHands)} of ${fmt(c.needHands)} hands)</span>`)}
     ${gauge(c.staffing, { title: 'hands in service ÷ hands it needs' })}
-    ${row('Garrison room', `${fmt(c.garrisonCapacity)} <span class="dim">of ${fmt(castleKindOf(s).capacity)}</span>`)}
+    ${row('Garrison', `${fmt(garrisonOf(state, s).inside)} <span class="dim">inside · room for ${fmt(c.garrisonCapacity)} of ${fmt(castleKindOf(s).capacity)}</span>`)}
     ${row('Reserve', `${fmt1(res.months)} months <span class="dim">of ${CASTLES.reserve.months}</span>`)}
     ${row('Cost', `${fmt((c.wages + c.upkeep) * 12)} coins/yr`)}
     ${row(parent ? 'Under' : 'Parent', parent ? `${esc(parent.name)} <span class="dim">(${tierName(parent)})</span>` : '<span class="dim">none</span>')}

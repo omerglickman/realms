@@ -11,6 +11,7 @@
 import { Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
 import type { GameState } from '../../sim/state';
 import { fortCells } from '../../sim/forts';
+import { garrisonOf, fortGarrison } from '../../sim/garrison';
 import { TIERS, isRuin, influenceCells, workedCellsBySettlement, computeWorkAssignment, type Settlement } from '../../sim/settlements';
 import { clustersOf, clusterInfluenceCells } from '../../sim/clusters';
 import { factionColor } from '../../sim/factions';
@@ -115,13 +116,14 @@ export class SettlementLayer {
   private markers = new Graphics();
   private markerIcons = new Container();
   private hexBadges = new Container();
+  private fortIcons = new Container();
   private labels = new Container();
   private labelById = new Map<string, Text>();
   private iconById = new Map<string, Sprite>();
   private showZones = true;
 
   constructor() {
-    this.root.addChild(this.zones, this.clusters, this.hatch, this.work, this.edges, this.hexBadges, this.markers, this.markerIcons, this.labels);
+    this.root.addChild(this.zones, this.clusters, this.hatch, this.work, this.edges, this.hexBadges, this.markers, this.markerIcons, this.fortIcons, this.labels);
   }
 
   /** Tier icon ids (src/ui/icons.ts) by rank. */
@@ -133,6 +135,16 @@ export class SettlementLayer {
   /** Screen-independent marker radius in world units for a settlement at this zoom. */
   static markerRadius(s: Settlement, zoom: number): number {
     return Math.max(5 / zoom, HEX_SIZE * (MARKER_SCALE[TIERS[s.tier].rank] ?? 0.5));
+  }
+
+  /** A small capacity bar centred on (cx, y): a dark trough with a gold fill, red when full. */
+  private garrisonBar(cx: number, y: number, w: number, frac: number, zoom: number): void {
+    const h = Math.max(3 / zoom, 2);
+    const f = Math.max(0, Math.min(1, frac));
+    this.markers.rect(cx - w / 2 - 0.5 / zoom, y - 0.5 / zoom, w + 1 / zoom, h + 1 / zoom);
+    this.markers.fill({ color: 0x1a120a, alpha: 0.9 });
+    this.markers.rect(cx - w / 2, y, w * f, h);
+    this.markers.fill({ color: f >= 0.999 ? 0xc94a33 : 0xe5c466, alpha: 1 });
   }
 
   /** Redraw everything from the state. Cheap for tens of settlements. */
@@ -262,16 +274,6 @@ export class SettlementLayer {
       }
     }
 
-    // forts (Session 18): a small keep on the hex, in the faction colour's border already drawn above
-    for (const f of Object.values(state.forts ?? {})) {
-      const p = offsetToPixel(f.col, f.row, HEX_SIZE);
-      const sp = new Sprite(iconTexture('castle1', MAP_BADGE));
-      sp.anchor.set(0.5);
-      sp.width = badgeD * 1.2; sp.height = badgeD * 1.2;
-      sp.position.set(p.x, p.y);
-      this.hexBadges.addChild(sp);
-    }
-
     // ---- markers: a faction-colour disc with the tier's icon (Session 13b); hover/selection ring ----
     this.markers.clear();
     const seenIcons = new Set<string>();
@@ -304,6 +306,33 @@ export class SettlementLayer {
     }
     for (const [id, sp] of this.iconById) {
       if (!seenIcons.has(id)) { sp.destroy(); this.iconById.delete(id); }
+    }
+
+    // ---- forts (Session 20): their own marker — a faction-colour disc with a keep, low and to the right of the hex so a unit's shield does not hide it ----
+    this.fortIcons.removeChildren().forEach((ch) => ch.destroy());
+    for (const f of Object.values(state.forts ?? {})) {
+      const c = offsetToPixel(f.col, f.row, HEX_SIZE);
+      const r = Math.max(4.5 / view.zoom, HEX_SIZE * 0.3);
+      const fx = c.x + HEX_SIZE * 0.42, fy = c.y + HEX_SIZE * 0.34;
+      this.markers.circle(fx, fy, r);
+      this.markers.fill({ color: colorToNumber(factionColor(state.factions, f.faction)), alpha: 1 });
+      this.markers.stroke({ width: Math.max(1, 1.2 / view.zoom), color: 0x000000, alpha: 0.85 });
+      const sp = new Sprite(iconTexture('castle1', MAP_MARK));
+      sp.anchor.set(0.5);
+      sp.width = r * 1.6; sp.height = r * 1.6;
+      sp.position.set(fx, fy);
+      this.fortIcons.addChild(sp);
+      const g = fortGarrison(state, f);
+      if (g.people > 0) this.garrisonBar(fx, fy + r + 1.5 / view.zoom, r * 2.2, g.inside / g.capacity, view.zoom);
+    }
+    // ---- garrison bars: a castle with a unit inside shows how much of its room is used ----
+    for (const s of list) {
+      if (!s.castle || isRuin(s) || !markersOn(s)) continue;
+      const g = garrisonOf(state, s);
+      if (g.people <= 0) continue;
+      const p = offsetToPixel(s.col, s.row, HEX_SIZE);
+      const r = SettlementLayer.markerRadius(s, view.zoom);
+      this.garrisonBar(p.x, p.y + r + 3 / view.zoom, Math.max(r * 1.7, 18 / view.zoom), g.capacity > 0 ? g.inside / g.capacity : 1, view.zoom);
     }
 
     // ---- labels (constant screen size; which tiers are named depends on the zoom level) ----

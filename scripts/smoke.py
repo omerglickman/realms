@@ -183,6 +183,29 @@ async def main() -> int:
           }
           return false; }''', [lv, cid])
         print('FORTIFY:', forted); assert forted, 'the levy could not fortify anywhere'
+        # ---- Session 20: choose / open / close / go-to ----
+        await pg.evaluate('(cid) => window.__realms.focus(cid)', cid); await pg.wait_for_timeout(300)
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(300)   # close the ledger; nothing chosen
+        pos = await pg.evaluate('(lv) => window.__realms.unitScreen(lv)', lv)
+        await pg.mouse.click(pos['x'], pos['y']); await pg.wait_for_timeout(600)
+        ui = await pg.evaluate('() => window.__realms.ui()')
+        print('AFTER SINGLE CLICK:', ui); assert ui['selectedUnitId'] == lv and not ui['unitCardOpen'], 'a single click must choose the unit without opening its card'
+        assert not await pg.is_visible('#unitcard'), 'the card opened on a single click'
+        await pg.mouse.dblclick(pos['x'], pos['y']); await pg.wait_for_timeout(500)
+        card = await pg.inner_text('#unitcard'); print('CARD:', card.replace(chr(10), ' | '))
+        assert await pg.is_visible('#unitcard'), 'a double-click did not open the card'
+        assert 'fortified' in card.lower(), 'the card does not say the unit is fortified'
+        await pg.click('#unitcard [data-act=close]'); await pg.wait_for_timeout(300)
+        ui = await pg.evaluate('() => window.__realms.ui()')
+        assert not await pg.is_visible('#unitcard') and ui['selectedUnitId'] == lv, 'the X must hide the card and keep the unit chosen'
+        # a click on a tile now orders the chosen unit; on its own castle it is a garrison order
+        kpos = await pg.evaluate('(cid) => { const k = window.__realms.state().settlements[cid]; return window.__realms.hexScreen(k.col, k.row); }', cid)
+        await pg.mouse.click(kpos['x'], kpos['y']); await pg.wait_for_timeout(500)
+        order = await pg.evaluate('([lv, cid]) => { const st = window.__realms.state(), u = st.units[lv], k = st.settlements[cid]; return u.order ? u.order.dest === k.row * st.map.width + k.col : false; }', [lv, cid])
+        msg = await pg.inner_text('#info-event'); print('GO-TO:', order, msg)
+        assert order, 'a click on a tile did not order the chosen unit there'
+        await pg.keyboard.press('Escape'); await pg.wait_for_timeout(200)
+        ui = await pg.evaluate('() => window.__realms.ui()'); assert ui['selectedUnitId'] is None, 'Esc should unchoose the unit'
         await pg.keyboard.press('Space'); await pg.wait_for_timeout(300)
         await pg.keyboard.press('k'); await pg.wait_for_timeout(300)
         await tab('treasury'); print('LEDGER (pay):', *lines(await panel(), 'pay'), sep='\n  ')

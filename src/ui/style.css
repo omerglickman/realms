@@ -544,6 +544,10 @@ body.editing #map { cursor: crosshair; }
 #unitcard .pop-ico .ico { width: 20px; height: 20px; color: var(--oak-2); }
 #unitcard .pop-name { font-family: var(--script); font-size: 16px; color: var(--oak); }
 #unitcard .pop-tier { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); margin-left: auto; }
+#unitcard .pop-x { background: none; border: 0; padding: 2px; margin-left: 4px; cursor: pointer; color: var(--ink-3); line-height: 0; }
+#unitcard .pop-x:hover { color: var(--verm); }
+#unitcard .pop-x .ico { width: 14px; height: 14px; }
+#unitcard .pop-row .warn { color: var(--verm); }
 #unitcard .pop-row { display: flex; justify-content: space-between; gap: 12px; }
 #unitcard .pop-row span:first-child { color: var(--ink-3); }
 #unitcard .pop-row .num { font-variant-numeric: tabular-nums; text-align: right; }

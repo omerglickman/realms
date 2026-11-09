@@ -13,6 +13,9 @@ import { type Unit, disbandTarget } from '../src/sim/units';
 import { fortAt, canFortify } from '../src/sim/forts';
 import { garrisonOf, garrisonShare, isMilitary } from '../src/sim/garrison';
 import { CASTLES } from '../src/sim/castles';
+import { newRaiseDraft, draftSpec, draftTotal } from '../src/ui/panels/raiseDialog';
+import { fortGarrison } from '../src/sim/garrison';
+import { raiseCheck } from '../src/sim/units';
 
 setNoise(NO_NOISE);
 setAbandonBelow(0);
@@ -134,5 +137,32 @@ describe('the levy (DESIGN §3.2b rule 9, Session 19)', () => {
     expect(after.report.garrison?.castle).toBe(keep.id);
     expect(keep.food).toBeLessThan(reserve);
     expect(after.provisions).toBeGreaterThanOrEqual(bags - (totalPopulation(after.pop) * (1 - inside)) - 1e-6);
+  });
+
+  it('a small village can raise a levy by drawing on its neighbours (the draft fills from the muster in reach)', () => {
+    const { state } = world();
+    const village = found(state, 'Tiny', 'village', 12, 10, 300);
+    found(state, 'Big', 'town', 14, 10, 9000);
+    endTurn(state);
+    const d = newRaiseDraft(state, state.settlements[village.id], 'levy');
+    const spec = draftSpec(d);
+    expect(draftTotal(d)).toBeGreaterThan(0);
+    expect(Object.keys(d.muster).length).toBeGreaterThan(1); // more than the village alone
+    expect(raiseCheck(state, spec).ok).toBe(true);
+    applyCommand(state, { type: 'raiseUnit', spec });
+    expect(Object.values(state.units).some((u) => u.type === 'levy')).toBe(true);
+  });
+
+  it('a fort holds military people on its hex up to its capacity', () => {
+    const { state } = world();
+    const home = found(state, 'Home', 'town', 12, 10, 6000);
+    const u = levy(state, home, 200);
+    u.col = 20; u.row = 18;
+    applyCommand(state, { type: 'fortify', unitId: u.id });
+    const fort = fortAt(state, 20, 18)!;
+    const g = fortGarrison(state, fort);
+    expect(g.people).toBeGreaterThan(0);
+    expect(g.inside).toBeLessThanOrEqual(CASTLES.fort.capacity);
+    expect(g.inside).toBeCloseTo(Math.min(g.people, CASTLES.fort.capacity), 6);
   });
 });

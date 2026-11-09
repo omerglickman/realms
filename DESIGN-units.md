@@ -1,6 +1,6 @@
 # Realms, Kings and Other Stuff — Design: Units, Roads and Castles
 
-**Part of the design contract — version 0.7e — 2026-11-09.** Sections 3.2, 3.2b, 3.4, 3.5. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
+**Part of the design contract — version 0.7f — 2026-11-09.** Sections 3.2, 3.2b, 3.4, 3.5. The index and the reading rules (DECIDED / PROPOSED / OPEN, *(draft)*) are in **DESIGN.md**; section numbers are the same everywhere, so "§3.2b" always means the same rule.
 
 ---
 
@@ -97,3 +97,9 @@ Large castles are meant to be as rare as metropolises: hard to build, costly to 
 - **Garrison food.** Those inside eat from the castle's **siege reserve** (its `food`), not their own bags; the camped share and a castle with an empty reserve fall back to the party's provisions and foraging as usual. The unit's bags are not topped up from the reserve.
 - **Fort.** `fortify` is a command on a unit with the `canFortify` flag (the levy): instant (PLACEHOLDER; the design says a month), 30 timber from the covering cluster, else the realm; refused on water, on a settlement's hex, or where a fort already stands. Undo refunds the timber exactly. No garrison inside forts yet (they hold 100 men by data, but nothing uses it).
 - **Pay.** Charged at the start of each month's unit step; counted in the faction's yearly `pay`, not in `spent`.
+
+**Decided 2026-11-09 (Omer, after trying the Session 19 levy).**
+- **A levy may be raised from any settlement that has men to call within reach.** A small village is not blocked by its own hands: the party is gathered from it and from the other settlements of its cluster and within 3 hexes (§3.2b rule 2); how many people leave is chosen in the raise dialog.
+- **Garrison status.** A military unit is *fortified* on a fort, *garrisoned in* a settlement or castle of its faction it stands on, *partly garrisoned (x of y)* when the castle's room is smaller than the unit; the castle shows how many are inside. A military unit standing in a village, town or city counts as garrisoned there (no capacity yet).
+- **Orders.** A left click on a tile with a unit chosen is a go-to order; on one of our settlements or castles it is a garrison order (a march that ends inside).
+

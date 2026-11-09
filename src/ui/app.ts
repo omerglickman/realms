@@ -11,7 +11,8 @@ import { renderUnitCard } from './panels/unitCard';
 import { makeBuildOrder, orderSummary } from '../sim/workbands';
 import { infraItem, siteInfo } from '../sim/infrastructure';
 import { renderRaiseDialog, newRaiseDraft, type RaiseDraft } from './panels/raiseDialog';
-import { routeFor, unitCell, unitTypeDef, canFoundAt, unitsAt, UNIT_TYPES, type Unit } from '../sim/units';
+import { routeFor, unitCell, unitTypeDef, canFoundAt, unitsAt, isForming, UNIT_TYPES, type Unit } from '../sim/units';
+import { isMilitary } from '../sim/garrison';
 import { findRoute, OPEN } from '../sim/pathfinding';
 import { Camera } from './camera';
 import { Editor } from './editor/editor';
@@ -154,6 +155,9 @@ export async function startApp(): Promise<void> {
 
   // ---- units (Phase 2 session 1b): selection, the pinned card, targeting modes, the raise dialog ----
   let selectedUnitId: string | null = null;
+  /** the unit card shows only after a double-click (or a raise); a single click just chooses the unit */
+  let unitCardOpen = false;
+  let lastClickT = 0, lastClickX = 0, lastClickY = 0;
   let hoverUnitId: string | null = null;
   /** choosing a hex on the map: a move / settle order for a unit, or the destination of a party being raised */
   type Mode = { kind: 'order'; unitId: string; then: 'none' | 'settle' } | { kind: 'build'; unitId: string; item: string } | { kind: 'pickDest' } | null;
@@ -249,7 +253,7 @@ export async function startApp(): Promise<void> {
     state = s;
     selectedId = null;
     hoverId = null;
-    selectedUnitId = null; hoverUnitId = null; mode = null; preview = null; raiseDraft = null;
+    selectedUnitId = null; unitCardOpen = false; hoverUnitId = null; mode = null; preview = null; raiseDraft = null;
     raiseInverses.clear();
     if (view && (view.kind === 'settlement' || view.kind === 'cluster')) closeView();
     applyMap(fit);
@@ -283,9 +287,11 @@ export async function startApp(): Promise<void> {
   }
 
   // ---- the unit card: pinned next to the selected unit's shield ----
-  function selectUnit(id: string | null): void {
+  function selectUnit(id: string | null, openCard = false): void {
     if (id && !state.units[id]) id = null;
+    if (id !== selectedUnitId) { preview = null; previewCell = -1; }
     selectedUnitId = id;
+    unitCardOpen = !!id && openCard;
     if (!id && (mode?.kind === 'order' || mode?.kind === 'build')) { mode = null; preview = null; }
     if (id) {
       // a unit's card and a settlement's ledger do not share the screen well: close the ledger
@@ -297,7 +303,7 @@ export async function startApp(): Promise<void> {
   }
   function renderUnitCardNow(): void {
     const u = selectedUnitId ? state.units[selectedUnitId] : null;
-    if (!u) { unitCard.classList.add('hidden'); return; }
+    if (!u || !unitCardOpen) { unitCard.classList.add('hidden'); return; }
     renderUnitCard(unitCard, state, u, {
       onMove: (id) => startOrder(id, 'none'),
       onSettleAt: (id) => startOrder(id, 'settle'),
@@ -316,6 +322,7 @@ export async function startApp(): Promise<void> {
       onBridgeAt: (id) => startBuild(id, 'bridge'),
       onKind: () => renderUnitCardNow(),
       onFocusSettlement: (id) => focusSettlement(id),
+      onClose: () => { unitCardOpen = false; unitCard.classList.add('hidden'); },
     });
     unitCard.style.borderLeftColor = state.factions[u.faction]?.color ?? '#4a2f1a';
     unitCard.classList.toggle('targeting', mode?.kind === 'order' || mode?.kind === 'build');
@@ -366,15 +373,22 @@ export async function startApp(): Promise<void> {
     refreshLayer();
   }
   /** The route a hovered hex would mean in the current targeting mode, for the preview. */
+  /** With a unit chosen and nothing else being targeted, a click on any tile is a go-to order: the same preview. */
+  function implicitOrder(): { kind: 'order'; unitId: string; then: 'none' } | null {
+    if (!selectedUnitId || editor.active) return null;
+    const u = state.units[selectedUnitId];
+    return u && !isForming(state, u) ? { kind: 'order', unitId: u.id, then: 'none' } : null;
+  }
   function previewTo(cell: number): void {
     if (cell === previewCell) return;
     previewCell = cell;
     preview = null;
-    if (!mode) return;
-    if (mode.kind === 'build') {
-      const bu = state.units[mode.unitId];
-      if (!bu) { mode = null; return; }
-      const mk = makeBuildOrder(state, bu, mode.item, cell);
+    const m: Exclude<Mode, null> | null = mode ?? implicitOrder();
+    if (!m) return;
+    if (m.kind === 'build') {
+      const bu = state.units[m.unitId];
+      if (!bu) { if (mode) mode = null; return; }
+      const mk = makeBuildOrder(state, bu, m.item, cell);
       if (!mk.order) { preview = { cells: [cell, cell], months: Infinity, label: mk.reason ?? 'cannot build there' }; return; }
       const sum = orderSummary(state, bu, mk.order);
       const mats = (['timber', 'stone'] as const).filter((k) => sum.materials[k] > 0.5).map((k) => `${Math.round(sum.materials[k])} ${k}`).join(' + ');
@@ -382,12 +396,12 @@ export async function startApp(): Promise<void> {
       return;
     }
     let start: { cell: number; bank: number } | null = null, points = 4, settle = false, label = '';
-    if (mode.kind === 'order') {
-      const u = state.units[mode.unitId];
-      if (!u) { mode = null; return; }
+    if (m.kind === 'order') {
+      const u = state.units[m.unitId];
+      if (!u) { if (mode) mode = null; return; }
       start = { cell: unitCell(state.map, u), bank: u.bank };
       points = unitTypeDef(u.type).movePoints;
-      settle = mode.then === 'settle';
+      settle = m.then === 'settle';
     } else if (raiseDraft) {
       const s = state.settlements[raiseDraft.at];
       if (!s) return;
@@ -467,7 +481,7 @@ export async function startApp(): Promise<void> {
         raiseDraft = null;
         dialog.classList.add('hidden');
         stateChanged();
-        if (newId) selectUnit(newId);
+        if (newId) selectUnit(newId, true);
       },
       onClose: closeDialog,
     });
@@ -536,7 +550,7 @@ export async function startApp(): Promise<void> {
           onRemove: (id) => { editor.removeSettlement(id); closeView(); },
           onUpgrade: (id) => act({ type: 'upgradeSettlement', id }),
           onCancelUpgrade: (id) => act({ type: 'cancelUpgrade', id }),
-          onSelectUnit: (unitId) => { selectUnit(unitId); const u = state.units[unitId]; if (u) { const p = offsetToPixel(u.col, u.row, HEX_SIZE); camera.centerOn(p.x, p.y); refreshLayer(); } },
+          onSelectUnit: (unitId) => { selectUnit(unitId, true); const u = state.units[unitId]; if (u) { const p = offsetToPixel(u.col, u.row, HEX_SIZE); camera.centerOn(p.x, p.y); refreshLayer(); } },
         }, editor.active);
         wireLinks(croot, links);
         return;
@@ -553,7 +567,7 @@ export async function startApp(): Promise<void> {
         onCancelRaise: (unitId) => cancelRaise(unitId),
         onUpgrade: (id) => act({ type: 'upgradeSettlement', id }),
         onCancelUpgrade: (id) => act({ type: 'cancelUpgrade', id }),
-        onSelectUnit: (unitId) => { selectUnit(unitId); const u = state.units[unitId]; if (u) { const p = offsetToPixel(u.col, u.row, HEX_SIZE); camera.centerOn(p.x, p.y); refreshLayer(); } },
+        onSelectUnit: (unitId) => { selectUnit(unitId, true); const u = state.units[unitId]; if (u) { const p = offsetToPixel(u.col, u.row, HEX_SIZE); camera.centerOn(p.x, p.y); refreshLayer(); } },
       }, editor.active);
       wireLinks(root, links);
     } else if (view.kind === 'cluster') {
@@ -599,8 +613,8 @@ export async function startApp(): Promise<void> {
     return {
       title: 'Keys & help', badge: 'phase 2',
       body: `<div class="cols"><div><h3>Turns</h3><table class="kv">${row('Space', 'end the month')}${row('Go', 'run the years in the box')}</table>
-        <h3>Ledgers</h3><table class="kv">${row('click', 'a settlement opens its ledger; the tiles at the top open the realm\'s')}${row('K', 'the realm ledger')}${row('Esc', 'close')}</table>
-        <h3>Parties</h3><table class="kv">${row('click', 'a shield opens the party\'s card: Move, Settle, Disband')}${row('Recruitment', 'the settlement ledger\'s last page raises settlers')}</table></div>
+        <h3>Ledgers</h3><table class="kv">${row('click', 'chooses a settlement; double-click opens its ledger (a click swaps a ledger already open); the tiles at the top open the realm\'s')}${row('K', 'the realm ledger')}${row('Esc', 'close')}</table>
+        <h3>Parties</h3><table class="kv">${row('click', 'a shield chooses the party; double-click opens its card (the × closes it, the party stays chosen)')}${row('click a tile', 'with a party chosen: it marches there — and garrisons it if the tile is a settlement or castle of yours')}${row('Esc', 'unchoose')}${row('Recruitment', 'the settlement ledger\'s last page raises settlers')}</table></div>
         <div><h3>Map</h3><table class="kv">${row('drag', 'pan')}${row('wheel', 'zoom')}${row('Home', 'fit the map')}${row('arrows', 'pan')}${row('G', 'hex grid')}${row('R', 'resource glyphs')}${row('Z', 'zones and cluster outlines')}${row('E', 'the map editor')}</table></div></div>
         <h3>Reading the screen</h3>
         <p>The strip at the top is the realm's bottom line: the crown's <b>treasury</b>, the <b>people</b>, <b>months of food</b> in all granaries, and the realm's <b>stockpile</b> of timber, stone and goods against its cap. Hover a tile for the figures behind it; click it for the full page.</p>
@@ -613,8 +627,28 @@ export async function startApp(): Promise<void> {
   function select(id: string | null): void {
     if (!id || !state.settlements[id]) { if (view?.kind === 'settlement' || view?.kind === 'cluster') closeView(); selectedId = null; refreshLayer(); return; }
     const keepTab = view?.kind === 'settlement' ? view.tab : undefined;
-    if (selectedUnitId) { selectedUnitId = null; unitCard.classList.add('hidden'); if (mode?.kind === 'order' || mode?.kind === 'build') { mode = null; preview = null; } }
+    if (selectedUnitId) { selectedUnitId = null; unitCardOpen = false; unitCard.classList.add('hidden'); if (mode?.kind === 'order' || mode?.kind === 'build') { mode = null; preview = null; } }
     openView('settlement', id, keepTab);
+  }
+  /** A single click on a settlement: choose it (a ring on the map, the hover card) without opening its ledger. */
+  function choose(id: string | null): void {
+    if (!id || !state.settlements[id]) { selectedId = null; refreshLayer(); return; }
+    if (selectedUnitId) selectUnit(null);
+    selectedId = id;
+    refreshLayer();
+  }
+  /** A left click on a tile with a unit chosen: a go-to order — a garrison order when the tile is one of our settlements or castles. */
+  function orderChosenTo(cell: number): void {
+    const u = selectedUnitId ? state.units[selectedUnitId] : null;
+    if (!u) return;
+    const msg = el('info-event');
+    if (isForming(state, u)) { msg.textContent = `${u.name} is still forming.`; return; }
+    if (cell === unitCell(state.map, u)) { msg.textContent = `${u.name} is already here.`; return; }
+    const sid = settlementIdAt(state, cell % state.map.width, Math.floor(cell / state.map.width));
+    const s = sid ? state.settlements[sid] : null;
+    const garrison = !!s && s.faction === u.faction && isMilitary(u);
+    act({ type: 'orderUnit', id: u.id, order: { kind: 'move', dest: cell, then: 'none' } });
+    if (state.units[u.id]?.order?.dest === cell) msg.textContent = garrison ? `${u.name} marches to garrison ${s!.name}.` : `${u.name} marches to (${cell % state.map.width}, ${Math.floor(cell / state.map.width)}).`;
   }
   function focusSettlement(id: string): void {
     const t = state.settlements[id];
@@ -635,7 +669,22 @@ export async function startApp(): Promise<void> {
   }
 
   // test hook for scripts/smoke.py (no game logic goes through it except `act`)
-  (window as unknown as { __realms: unknown }).__realms = { state: () => state, act, focus: focusSettlement };
+  (window as unknown as { __realms: unknown }).__realms = {
+    state: () => state, act, focus: focusSettlement,
+    /** screen position of a unit's shield (for the smoke script's clicks) */
+    unitScreen: (id: string) => {
+      const u = state.units[id];
+      if (!u) return null;
+      const sh = unitLayer.shieldAt(state, unitCell(state.map, u), camera.zoom);
+      const p = sh ? { x: sh.x, y: sh.y } : offsetToPixel(u.col, u.row, HEX_SIZE);
+      return { x: renderer.root.position.x + p.x * camera.zoom, y: renderer.root.position.y + p.y * camera.zoom };
+    },
+    hexScreen: (col: number, row: number) => {
+      const p = offsetToPixel(col, row, HEX_SIZE);
+      return { x: renderer.root.position.x + p.x * camera.zoom, y: renderer.root.position.y + p.y * camera.zoom };
+    },
+    ui: () => ({ selectedUnitId, selectedId, unitCardOpen }),
+  };
 
   // ---- menu ----
   const menu = el<HTMLDivElement>('menu');
@@ -766,11 +815,23 @@ export async function startApp(): Promise<void> {
         const wpt = camera.screenToWorld(e.clientX, e.clientY);
         const u = unitAtWorld(state, unitLayer, wpt.x, wpt.y, camera.zoom);
         const id = on ? settlementIdAt(state, h.col, h.row) : null;
-        if (u) selectUnit(u.id);
-        else if (id) select(id);
-        else if (view) closeView();
+        const t = performance.now();
+        const dbl = t - lastClickT < 400 && Math.abs(e.clientX - lastClickX) + Math.abs(e.clientY - lastClickY) < 8;
+        lastClickT = dbl ? 0 : t; lastClickX = e.clientX; lastClickY = e.clientY;
+        if (dbl) {
+          // a double-click opens: a unit's card, a settlement's ledger
+          if (u) selectUnit(u.id, true);
+          else if (id) select(id);
+        } else if (u) {
+          if (u.id !== selectedUnitId) selectUnit(u.id, false);
+        } else if (selectedUnitId && on) {
+          orderChosenTo(idx(state.map, h.col, h.row));
+        } else if (id) {
+          if (view) select(id); // a ledger is open: the click swaps it
+          else choose(id);
+        } else if (view) closeView();
         else if (selectedUnitId) selectUnit(null);
-        else select(null);
+        else choose(null);
       }
     }
     canvas.releasePointerCapture(e.pointerId);
@@ -870,7 +931,7 @@ export async function startApp(): Promise<void> {
     const prevHoverUnit = hoverUnitId;
     hoverUnitId = hu ? hu.id : null;
     hoverId = hu ? null : settlementIdAt(state, h.col, h.row);
-    if (mode) { const pc = previewCell; previewTo(cell); if (pc !== previewCell) refreshLayer(); }
+    if (mode || implicitOrder()) { const pc = previewCell; previewTo(cell); if (pc !== previewCell) refreshLayer(); }
     if (prevHover !== hoverId || prevHoverUnit !== hoverUnitId) { showPopover(hoverId); refreshLayer(); }
     else if (hoverId) renderPopoverIfStale();
     const lw = 2 / camera.zoom;

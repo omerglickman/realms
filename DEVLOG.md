@@ -6,19 +6,20 @@ Every chat session appends an entry here at the end, **even if the work is unfin
 
 ## CURRENT STATE (overwrite this block every session; keep it under ~6 KB, present tense, no session history)
 
-- **Where we are:** Omer's work order (ROADMAP v0.7, 2026-11-08): 1 castles — DONE (Session 18) · **2 military units, starting with the levy — DONE (Session 19)** · **3 time-scale / economy / demography overhaul — NEXT** (then an outside threat and Imperium-style battle / siege resolution) · 4 government, institutions and characters (+ the one-faction naming scheme) · 5 AI and diplomacy · 6 further mechanisms. Principle: get to a playable game first, tune the pace by playing. Phase 1 signed off 2026-11-07 (numbers untuned until the sinks exist).
-- **Repository:** GitHub `omerglickman/realms` (private), branch `main`. **Read `CLAUDE.md` for the protocol, `ARCHITECTURE.md` for the module map, `UI-DESIGN.md` before touching `src/ui/`.** Tests: 191 passing. `npm run smoke` (headless Chrome over the built game: settlers, a work-band's road, a tier upgrade, send food, a castle by command, and since Session 19 a levy raised, paid, garrisoning the castle and fortifying; the page exposes `window.__realms` {state, act, focus}); `npm run shots` screenshots every page.
+- **Where we are:** Omer's work order (ROADMAP v0.7, 2026-11-08): 1 castles — DONE (Session 18) · **2 military units, starting with the levy — DONE (Sessions 19–20)** · **3 time-scale / economy / demography overhaul — NEXT** (then an outside threat and Imperium-style battle / siege resolution) · 4 government, institutions and characters (+ the one-faction naming scheme) · 5 AI and diplomacy · 6 further mechanisms. Principle: get to a playable game first, tune the pace by playing. Phase 1 signed off 2026-11-07 (numbers untuned until the sinks exist).
+- **Repository:** GitHub `omerglickman/realms` (private), branch `main`. **Read `CLAUDE.md` for the protocol, `ARCHITECTURE.md` for the module map, `UI-DESIGN.md` before touching `src/ui/`.** Tests: 193 passing. `npm run smoke` (headless Chrome over the built game: settlers, a road, an upgrade, send food, a castle, a levy paid / garrisoning / fortifying, the click model; the page exposes `window.__realms`); `npm run shots` screenshots every page.
 - **How Omer plays:** `realms.html` from disk; it opens on `scenarios/start.json` ("vinral-start" rev 1: 60 settlements, ≈248k people, February year 1); "Bare map" loads `maps/testmap.json`. Saves are state **v10** (older saves migrate; new `FactionYear.pay` is default-filled).
 - **What the build does now:**
-  - *Phase 1 (ARCHITECTURE.md has the modules):* hex map + editor; village / town / city / metropolis with zones, clusters, cohort demography with hunger, migration, granary brake, pull factor; farming / herding / fishing / hunting, granaries, tithe; timber / stone / goods, private hands → tax and goods, Markets, 16 buildings; partial staffing (§3.2b rule 1); the Session 13 UI.
+  - *Phase 1 (ARCHITECTURE.md has the modules):* hex map + editor; four settlement tiers with zones, clusters, cohort demography, migration, granary brake, pull factor; food, timber / stone / goods, private hands → tax and goods, Markets, 16 buildings; partial staffing; the Session 13 UI.
   - *Units (14–15):* **settlers** and **work-bands** (muster from the cluster and own settlements within 3 hexes; coins, timber, provisions); A* orders (mountains a month; a river hex is two banks, crossed by a bridge or a settlement); settle, disband, foraging, Send food; shield markers, unit card, Recruitment page, raise dialog. Tier upgrades at the gates 1,500 / 6,000 / 36,000 (15b–c; cluster leadership).
   - *Roads and bridges (16):* work-band build orders; movement costs terrain × 0.5 dirt / 0.25 paved with minimums. *Editor Infrastructure tab (17–17b):* roads, bridges, quarries and lumber camps — **quarries and lumber camps still have no economic effect; step 3 decides.**
   - *Castles (18, DESIGN §3.5):* seven ranks on the tier ladder (castles at TIERS indices 4–6); a castle is a `Settlement` with `castle: CastleState` and no people; staffed by hands lent from settlements in reach, wages 0.1 coin / hand / month + yearly upkeep, 12 unstaffed months → ruin; a siege reserve of 12 months; work-band construction, in-place upgrades; another faction's castle blocks pathfinding.
   - ***The levy (Session 19, §3.2b rule 9, §3.5):*** raised from a settlement (men 15–44 only, 300 default, no coins or materials), **paid 1 coin a man a month** (`FactionYear.pay`, "pay" column in the Treasury ledger) and fed like any party; **disband walks home from any distance** (never into a castle or a ruin); **garrison:** military units on a castle's hex fill its `garrisonCapacity` in id order (the last split inside / camped) and **eat from the castle's siege reserve** (`garrison.ts`); **fortify:** `fortify` / `unfortify` commands (exact timber refund), unit-card Fortify button, instant (PLACEHOLDER), 30 timber, forts decay 12 months after the last unit leaves. UI: Levy cube live, castle ledger Garrison row, Fortify button.
+  - ***Session 20 (Omer's notes):*** a levy musters from any settlement with men in reach; a click chooses, a double-click opens (card / ledger), × on the unit card, a left click on any tile orders the chosen unit (garrison on our settlement / castle; Esc unchooses); Status row on military units; forts are their own marker; capacity bars under castles / forts with a unit inside.
 - **Placeholders and limitations:** every castle number in `data/castles.json` and the two upgrade steps (draft); the parent-resolution refinement (a castle never takes a village from a covering town or city — kept by Omer until the step-3 subordination redesign); service-before-fields; upgrade cost as the difference (accepted); **treasury allowed to go negative with no consequence** (wages, upkeep, soldiers' pay — open question for economy tuning); **instant fortify**; levy pay / size / speed are drafts; units camped outside a castle have no effect; forts hold no garrison yet; instant shipping and muster; roads move units only; quarries / lumber camps inert; roads belong to no faction; flat realm cap; administration quality = hall staffing.
 - **Numbers to remember:** model scale ×3 (a village 900, a town 9,000, a city 24,000); gates 1,500 / 6,000 / 36,000; influence rings 1/3/5/6 (castles 2/3/5); a band of 300 lays a dirt-road hex in 2 months; castle build 12 / 24 / 48 months, 5,000 / 20,000 / 80,000 coins; levy 1 coin / man / month, move 5, fort 30 timber / 100 men.
 - **Next steps (in order):**
-  1. **Omer plays the Session 19 build** — raise a levy, send it into a castle, fortify, watch the pay column; say whether pay / food / size feel right.
+  1. **Omer plays the Session 20 build** — raise a levy, click it, click a castle, fortify; say whether pay / food / size and the new clicking feel right.
   2. **Step 3 — the overhaul:** open with the year-length discussion (shorter year, somewhat higher growth); decide what quarries and lumber camps yield; redesign subordination (Omer wants to); decide what a negative treasury does; tune by playing. Then the threat and battle / siege resolution (Omer to describe the Imperium principles).
   3. Keep the "§4.3 hooks" list (Session 19 entry) in mind for step 4.
   4. Housekeeping: DEVLOG-archive-3.md is at ~34 KB; DEVLOG.md passes ~45 KB around Session 21 — then move all but the last three entries to the next archive.
@@ -144,4 +145,30 @@ Sessions 0–13e (planning, Phase 0, the headless Phase 1 model, the ×3 scale, 
 
 **Next session should:**
 1. Take Omer's verdict on the levy numbers, then open step 3 with the year-length discussion.
+
+## 2026-11-09 — Session 20 — Levy follow-ups (Omer's notes)
+
+**Phase:** 2 — **Goal of session:** Omer's notes after trying the Session 19 build.
+
+**Done:**
+- *Hands:* the Recruitment cube checked only the home settlement's men against a 300-man default, so a small village was refused. It now asks the same draft the dialog builds (`newRaiseDraft` → `draftSpec` → `raiseCheck`), which fills from the raising settlement's spare hands, then the neighbours in reach, then up to each source's cap (`sourceCap`: a quarter of its people, never more than its men 15–44).
+- *Fortify "does nothing":* a freshly raised levy stands on its home settlement, where fortifying is refused — the button was merely greyed with a tooltip; and where it worked, the unit's shield sat on top of the fort badge. Now the card prints the reason under the buttons, shows **Status: fortified**, and the fort is a faction-colour disc with a keep, low right on the hex.
+- *Garrison display:* castle ledger tile "Garrison x of room" with a gauge, hover row, Garrison row (links select the unit); unit card **Status** row (`garrisonStatus`); gold capacity bars under castles and forts with a unit inside (red when full); `fortGarrison` in garrison.ts.
+- *Selection model:* single click chooses (unit or settlement), double-click opens the card / ledger (a click still swaps an already-open ledger), × on the unit card keeps the unit chosen, a left click on any tile orders the chosen unit (garrison message for own settlement / castle; route preview as the cursor moves), Esc unchooses. After Raise the new unit's card opens (Claude's choice, for feedback).
+- Smoke extended (single click / double-click / × / go-to / Esc); test hooks `unitScreen`, `hexScreen`, `ui` on `window.__realms`. 2 new tests (193).
+
+**How it was done / decisions of note (Claude's, PLACEHOLDER where marked):**
+- A "garrison order" is a plain move order: arrival on an own castle hex is garrisoning. A military unit standing in an own village / town / city is called *garrisoned in* it, with no capacity (PLACEHOLDER).
+- Non-military units are ordered by the same click (settlers, work-bands); the old Move button still works and Settle at… / Road to… keep their targeting modes, which take priority.
+- With a unit chosen a single click on a settlement can no longer choose the settlement (it is the order); double-click opens its ledger, Esc unchooses first.
+
+**Design decisions made by Omer this session (written into DESIGN-units §3.5):** a levy musters from the cluster and neighbours, not only the home village; garrison status wording; click-to-order.
+
+**Broken / unfinished:** instant fortify and the other Session 19 placeholders stand; a chosen unit's order cannot yet be queued (waypoints); no right-click.
+
+**Tests & build:** pass (193; `tsc`, build, smoke OK, zero console errors).
+**Build delivered:** `realms.html` (Session 20)
+
+**Next session should:**
+1. Take Omer's verdict on the clicking and the levy numbers, then open step 3 with the year-length discussion.
 

@@ -69,3 +69,20 @@ export function garrisonShare(state: GameState, u: Unit): { castle: Settlement; 
 export function fortCapacity(): number {
   return CASTLES.fort.capacity;
 }
+
+/** The military people of the fort's faction standing on a fort's hex, and how many of them it holds. */
+export function fortGarrison(state: GameState, fort: { col: number; row: number; faction: string }): { capacity: number; people: number; inside: number; rows: GarrisonRow[] } {
+  const capacity = CASTLES.fort.capacity;
+  const rows: GarrisonRow[] = [];
+  let room = capacity, people = 0, inside = 0;
+  const here = Object.values(state.units)
+    .filter((u) => u.faction === fort.faction && u.col === fort.col && u.row === fort.row && isMilitary(u))
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const u of here) {
+    const n = totalPopulation(u.pop);
+    const inn = Math.max(0, Math.min(room, n));
+    room -= inn; people += n; inside += inn;
+    rows.push({ unit: u, people: n, inside: inn });
+  }
+  return { capacity, people, inside, rows };
+}

@@ -16,6 +16,7 @@ import { getTerrain, getResource } from '../../sim/map';
 import { fmt, fmt1, pct, signed, esc, tierName, tierGlyph, foodMonths, clusterLine, projectText, gauge, hbar, stack, stat, kv, ICON, jobIcon, jobName, sparkSvg } from './format';
 import type { ModalSpec } from './modal';
 import { UNIT_TYPES, unitTypeDef, raiseCheck, defaultSize, defaultProvisionMonths, isForming, unitCell, type Unit } from '../../sim/units';
+import { newRaiseDraft, draftSpec } from './raiseDialog';
 import { idx } from '../../sim/map';
 import { unitState } from './unitCard';
 import { canUpgrade, upgradeStep } from '../../sim/upgrades';
@@ -509,8 +510,10 @@ function recruitmentPage(ctx: Ctx): string {
   const taxPerHand = plan.taxableHands > 0 ? plan.taxPerYear / plan.taxableHands : 0;
   const opts = UNIT_TYPES.map((def) => {
     if (!def.enabled) return { def, ok: false, reason: `${def.name} cannot be raised yet.`, check: null as ReturnType<typeof raiseCheck> | null };
-    const people = Math.min(defaultSize(state, def.id, s, null), Math.floor(ctx.pop * 0.5));
-    const check = raiseCheck(state, { type: def.id, at: s.id, muster: [{ id: s.id, people: Math.max(10, people) }], provisionMonths: defaultProvisionMonths(def.id, month) });
+    // the cube asks what the dialog would offer: the party gathered from this settlement and the others in reach, not from here alone
+    const spec = draftSpec(newRaiseDraft(state, s, def.id));
+    if (spec.muster.length === 0) return { def, ok: false, reason: `Nobody to call: neither ${s.name} nor the settlements in reach can give ${def.slice === 'men' ? 'men 15–44' : 'people'} just now.`, check: null as ReturnType<typeof raiseCheck> | null };
+    const check = raiseCheck(state, spec);
     return { def, ok: check.ok, reason: check.reason ?? '', check };
   });
   const who = (def: ReturnType<typeof unitTypeDef>) => def.slice === 'men' ? 'Men 15–44 leave; the women, children and old stay.' : 'A proportional slice of every cohort leaves — families, not just hands. Hands leave the private economy first, then gathering, then the fields; buildings keep their staff.';

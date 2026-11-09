@@ -15,7 +15,7 @@ import { planLabour } from '../../sim/economy';
 import { workedCellsBySettlement } from '../../sim/settlements';
 import { MATERIAL_IDS } from '../../sim/materials';
 import { idx } from '../../sim/map';
-import { unitTypeDef, musterSources, raiseCheck, destinationHands, defaultSize, defaultProvisionMonths, handsShare, canFoundAt, UNITS, type RaiseSpec } from '../../sim/units';
+import { unitTypeDef, musterSources, raiseCheck, destinationHands, defaultSize, defaultProvisionMonths, handsShare, canFoundAt, recruitableMenOf, UNITS, type RaiseSpec } from '../../sim/units';
 import { findRoute, OPEN } from '../../sim/pathfinding';
 import { fmt, fmt1, esc, foodMonths, tierGlyph, ICON } from './format';
 
@@ -57,7 +57,7 @@ export function distribute(state: GameState, d: RaiseDraft, total: number): void
   const sources = musterSources(state, d.at);
   d.muster = {};
   let left = Math.max(0, Math.round(total / 10) * 10);
-  const cap = (src: { settlement: Settlement }) => Math.floor((def.slice === 'men' ? totalPopulation(src.settlement.pop) * 0.25 : totalPopulation(src.settlement.pop) * 0.5) / 10) * 10;
+  const cap = (src: { settlement: Settlement }) => sourceCap(def, src.settlement);
   for (const src of sources) {
     if (left <= 0) break;
     const give = Math.min(left, spareAsPeople(src), cap(src));
@@ -70,6 +70,18 @@ export function distribute(state: GameState, d: RaiseDraft, total: number): void
       if (more > 0) { d.muster[at.settlement.id] = (d.muster[at.settlement.id] ?? 0) + more; left -= more; }
     }
   }
+  // still short (a small village on its own): the neighbours in reach give up to their caps, nearest first
+  for (const src of sources) {
+    if (left <= 0) break;
+    const more = Math.min(left, Math.max(0, cap(src) - (d.muster[src.settlement.id] ?? 0)));
+    if (more > 0) { d.muster[src.settlement.id] = (d.muster[src.settlement.id] ?? 0) + more; left -= more; }
+  }
+}
+
+/** The most one source may be asked for: levies — a quarter of its people, never more than its men 15–44; others — half. */
+export function sourceCap(def: ReturnType<typeof unitTypeDef>, s: Settlement): number {
+  const raw = def.slice === 'men' ? Math.min(totalPopulation(s.pop) * 0.25, recruitableMenOf(s.pop)) : totalPopulation(s.pop) * 0.5;
+  return Math.floor(raw / 10) * 10;
 }
 
 export function draftTotal(d: RaiseDraft): number {
@@ -94,7 +106,7 @@ export function renderRaiseDialog(root: HTMLElement, state: GameState, d: RaiseD
   if (!s) { host.onClose(); return; }
   const def = unitTypeDef(d.type);
   const sources = musterSources(state, d.at);
-  const poolTotal = Math.max(10, sources.reduce((t, src) => t + Math.floor((def.slice === 'men' ? totalPopulation(src.settlement.pop) * 0.25 : totalPopulation(src.settlement.pop) * 0.5) / 10) * 10, 0));
+  const poolTotal = Math.max(10, sources.reduce((t, src) => t + sourceCap(def, src.settlement), 0));
   // the slider runs to three times the usual party (the fields take any number)
   const usual = defaultSize(state, d.type, s, d.dest);
   const maxTotal = Math.min(poolTotal, Math.max(usual * 3, 3000, draftTotal(d)));

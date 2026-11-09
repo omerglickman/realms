@@ -302,7 +302,7 @@ export function raiseCheck(state: GameState, spec: RaiseSpec): RaiseCheck {
   return { ok: true, fromRealm, people };
 }
 
-function recruitableMenOf(pop: Population): number {
+export function recruitableMenOf(pop: Population): number {
   let t = 0;
   for (const b of RECRUIT) t += pop.m[b];
   return t;

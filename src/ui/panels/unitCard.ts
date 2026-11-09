@@ -7,7 +7,9 @@
 import type { GameState } from '../../sim/state';
 import { canFortify, fortAt } from '../../sim/forts';
 import { CASTLES } from '../../sim/castles';
-import { garrisonShare } from '../../sim/garrison';
+import { garrisonShare, fortGarrison, isMilitary } from '../../sim/garrison';
+import { settlementIdAt } from '../../sim/settlements';
+import { TIERS } from '../../sim/settlements';
 import { type Unit, unitTypeDef, isForming, unitCell, canSettle, disbandTarget, routeFor, UNITS } from '../../sim/units';
 import { totalPopulation, workingHands } from '../../sim/demography';
 import { makeBuildOrder, orderSummary } from '../../sim/workbands';
@@ -29,6 +31,8 @@ export interface UnitCardHost {
   onFortify(id: string): void;
   onCancelOrder(id: string): void;
   onFocusSettlement(id: string): void;
+  /** the X: hide the card, the unit stays chosen */
+  onClose(): void;
 }
 
 /** One-word state of a unit for the card and the status strip. */
@@ -45,6 +49,30 @@ export function unitState(state: GameState, u: Unit): string {
   }
   if (!u.report.inBorders) return 'foraging';
   return 'waiting';
+}
+
+/** What a military unit's position means: fortified, garrisoned in a settlement or castle, or partly so (x of y). null when it is just standing somewhere. */
+export function garrisonStatus(state: GameState, u: Unit): { text: string; warn: boolean } | null {
+  if (!isMilitary(u) || isForming(state, u)) return null;
+  const people = totalPopulation(u.pop);
+  const sid = settlementIdAt(state, u.col, u.row);
+  const s = sid ? state.settlements[sid] : null;
+  if (s && s.faction === u.faction && s.castle) {
+    const sh = garrisonShare(state, u);
+    const inside = sh ? Math.round(people * sh.inside) : 0;
+    const name = esc(s.name);
+    if (s.castle.ruin) return { text: `camped at the ruins of ${name}`, warn: false };
+    if (inside >= people - 0.5) return { text: `garrisoned in ${name} <span class="dim">(${TIERS[s.tier].name.toLowerCase()})</span>`, warn: false };
+    if (inside > 0) return { text: `partly garrisoned in ${name} <span class="dim">(${fmt(inside)} of ${fmt(people)} inside)</span>`, warn: true };
+    return { text: `camped outside ${name} <span class="dim">(0 of ${fmt(people)} inside — the castle is full)</span>`, warn: true };
+  }
+  if (s && s.faction === u.faction) return { text: `garrisoned in ${esc(s.name)} <span class="dim">(${TIERS[s.tier].name.toLowerCase()})</span>`, warn: false };
+  const fort = fortAt(state, u.col, u.row);
+  if (fort && fort.faction === u.faction) {
+    const g = fortGarrison(state, fort);
+    return g.inside >= g.people - 0.5 ? { text: 'fortified', warn: false } : { text: `partly fortified <span class="dim">(${fmt(g.inside)} of ${fmt(g.people)} inside the fort)</span>`, warn: true };
+  }
+  return null;
 }
 
 export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, host: UnitCardHost): void {
@@ -87,6 +115,8 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
     rows.push(row('At work on', `${esc(wi.name.toLowerCase())} <span class="dim">(${u.work.cell % w}, ${Math.floor(u.work.cell / w)})</span> <b>${Math.round(u.work.progress * 100)} %</b>`));
   }
   rows.push(row('State', unitState(state, u) + (u.report.inBorders ? '' : ' <span class="dim">· outside the borders</span>')));
+  const gs = garrisonStatus(state, u);
+  if (gs) rows.push(row('Status', gs.warn ? `<span class="warn">${gs.text}</span>` : gs.text));
   const r = u.report;
   const warn: string[] = [];
   if (forming) warn.push(`${ICON.hand} forms at the end of this month; cancel it from ${esc(home?.name ?? 'the home settlement')}'s Recruitment page`);
@@ -98,6 +128,7 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
   const settleCheck = def.canSettle ? canSettle(state, u) : null;
   const disband = disbandTarget(state, u);
   const btns: string[] = [];
+  let fortCheck: ReturnType<typeof canFortify> | null = null;
   const kind = INFRA_ITEMS.some((i) => i.id === buildPrefs.kind && i.kind === 'road') ? buildPrefs.kind : 'dirt';
   const hereOrder = def.canBuild ? makeBuildOrder(state, u, kind, null) : null;
   if (!forming && def.canBuild) {
@@ -129,18 +160,20 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
       btns.push(`<button class="btn small primary" data-act="settleHere" ${settleCheck?.ok ? '' : `disabled title="${esc(settleCheck?.reason ?? '')}"`}>Settle here</button>`);
     }
     if (def.canFortify) {
-      const fc = canFortify(state, u);
+      fortCheck = canFortify(state, u);
+      const fc = fortCheck;
       btns.push(`<button class="btn small" data-act="fortify" ${fc.ok ? `title="Raise a fort on this hex: ${CASTLES.fort.fortifyTimber} timber, holds ${CASTLES.fort.capacity} men, the border grows one ring; it falls into disuse ${CASTLES.fort.decayMonths} months after the last unit leaves"` : `disabled title="${esc(fc.reason ?? '')}"`}>${ICON.castle1 ?? ICON.hammer} Fortify</button>`);
     }
     btns.push(`<button class="btn small ${disband.ok ? '' : ''}" data-act="disband" ${disband.ok ? `title="Rejoin ${esc(disband.target!.name)}${disband.distance ? ` (${disband.distance} hex${disband.distance === 1 ? '' : 'es'} away — walks there)` : ''}"` : `disabled title="${esc(disband.reason ?? '')}"`}>Disband</button>`);
     if (u.order) btns.push(`<button class="btn small danger" data-act="cancel" title="Stay where it stands">Cancel order</button>`);
   }
   root.innerHTML = `
-    <div class="pop-head"><span class="pop-ico">${ICON[def.icon] ?? ICON.walk}</span><span class="pop-name">${esc(u.name)}</span><span class="pop-tier">${esc(def.name)}</span></div>
+    <div class="pop-head"><span class="pop-ico">${ICON[def.icon] ?? ICON.walk}</span><span class="pop-name">${esc(u.name)}</span><span class="pop-tier">${esc(def.name)}</span><button class="pop-x" data-act="close" title="Close the card (the unit stays chosen; double-click it to open the card again)">${ICON.close}</button></div>
     ${rows.join('')}
     ${warn.length ? `<div class="warnline">${warn.join('<br>')}</div>` : ''}
     ${btns.length ? `<div class="pop-actions">${btns.join('')}</div>` : ''}
     ${settleCheck && !settleCheck.ok && !forming ? `<div class="pop-hint">${esc(settleCheck.reason ?? '')}</div>` : ''}
+    ${fortCheck && !fortCheck.ok && !forming && fortCheck.reason !== 'already fortified' ? `<div class="pop-hint">Cannot fortify here: ${esc(fortCheck.reason ?? '')}.</div>` : ''}
   `;
   root.querySelector<HTMLSelectElement>('[data-act=kind]')?.addEventListener('change', (e) => { buildPrefs.kind = (e.target as HTMLSelectElement).value; host.onKind(); });
   root.querySelector('[data-act=buildHere]')?.addEventListener('click', () => host.onBuildHere(u.id, kind));
@@ -152,6 +185,7 @@ export function renderUnitCard(root: HTMLElement, state: GameState, u: Unit, hos
   root.querySelector('[data-act=settleHere]')?.addEventListener('click', () => host.onSettleHere(u.id));
   root.querySelector('[data-act=fortify]')?.addEventListener('click', () => host.onFortify(u.id));
   root.querySelector('[data-act=disband]')?.addEventListener('click', () => host.onDisband(u.id));
+  root.querySelector('[data-act=close]')?.addEventListener('click', () => host.onClose());
   root.querySelector('[data-act=cancel]')?.addEventListener('click', () => host.onCancelOrder(u.id));
   root.querySelector<HTMLElement>('[data-home]')?.addEventListener('click', (e) => { e.preventDefault(); host.onFocusSettlement(u.home); });
 }
